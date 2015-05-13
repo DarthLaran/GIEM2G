@@ -1,5 +1,6 @@
+ifneq ($(MAKECMDGOALS), clean)
 include $(MAKECMDGOALS).make	
-
+endif
 MISC_O=const_module.o mpi_module.o fftw3_mod.o
 FILTER_WEIGHTS_O=IntegralCodes.o VolumeBesselTransforms.o  
 MODEL_O=data_types_module.o mpi_saveload_module.o
@@ -14,8 +15,9 @@ ALL_O=$(MISC_O) $(FILTER_WEIGHTS_O) $(MODEL_O) $(IMAGE_O) $(IE_O) $(RC_O) $(SRC_
 
 LIBS=  $(LIB_FGMRES) $(LIB_BLAS) $(LIB_FFTW)  $(LIB_ADD)
 
-
+ifneq ($(MAKECMDGOALS), clean)
 $(MAKECMDGOALS): giem2g
+endif
 
 giem2g:  $(ALL_O) giem2g.F90 $(MAKECMDGOALS).make Makefile	
 	$(FC_Link)   $(DFLAGS)  -o giem2g $(ALL_O) giem2g.F90 $(LIBS)  -I$(INCLUDE) 
