@@ -20,16 +20,16 @@ $(MAKECMDGOALS): zfgmres giem2g
 endif
 
 zfgmres:
-		$(MAKE) -C ZFGMRES FC=$(F77)  FOPTS='$(FOPTS)'
+		$(MAKE) -C ZFGMRES FC=$(F77)  FOPTS='$(FOPTS)' AR=$(AR) 
 
 giem2g:  $(ALL_O) giem2g.F90 $(MAKECMDGOALS).make Makefile	
-	$(FC_Link)   $(FOPTS) -o giem2g $(ALL_O) giem2g.F90 $(LIBS)  -I$(INCLUDE) 
+	$(FC_Link)   $(FOPTS)  -o giem2g $(ALL_O) giem2g.F90 $(LIBS)  -I$(INCLUDE) 
 
 %.o:%.f90
-	$(FC) $(DFLAGS) -c $*.f90 -I$(INCLUDE)
+	$(FC) $(FOPTS) -c $*.f90 -I$(INCLUDE)
 
 %.o:%.F90
-	$(FC) $(DFLAGS) -c $*.F90 -I$(INCLUDE)
+	$(FC) $(FOPTS) -c $*.F90 -I$(INCLUDE)
 clean:
 	rm $(ALL_O)   *.mod
 	$(MAKE) -C ZFGMRES clean

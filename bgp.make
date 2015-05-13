@@ -4,7 +4,7 @@
 FC= mpixlf2003_r
 F77= mpixlf77_r
 FC_Link=mpixlf2003_r
-
+AR=ar
 
 
 

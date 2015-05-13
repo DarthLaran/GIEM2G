@@ -1,11 +1,12 @@
 FC=
 F77=
 FC_Link=
-FOPT=
+AR=ar
+FOPTS=
 
 
 LIB_FFTW=  
-LIB_ZFGMRES=
+LIB_ZFGMRES=-L./ZFGMRES/ -lzfgmres  #but you may use another build 
 LIB_BLAS=
 LIB_ADD=
 
