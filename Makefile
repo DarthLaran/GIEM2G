@@ -13,14 +13,17 @@ SRC_O=sources_module.o
 ALL_O=$(MISC_O) $(FILTER_WEIGHTS_O) $(MODEL_O) $(IMAGE_O) $(IE_O) $(RC_O) $(SRC_O)
 
 
-LIBS=  $(LIB_FGMRES) $(LIB_BLAS) $(LIB_FFTW)  $(LIB_ADD)
+LIBS=  $(LIB_ZFGMRES) $(LIB_BLAS) $(LIB_FFTW)  $(LIB_ADD)
 
 ifneq ($(MAKECMDGOALS), clean)
-$(MAKECMDGOALS): giem2g
+$(MAKECMDGOALS): zfgmres giem2g 
 endif
 
+zfgmres:
+		$(MAKE) -C ZFGMRES FC=$(F77)  FOPTS='$(FOPTS)'
+
 giem2g:  $(ALL_O) giem2g.F90 $(MAKECMDGOALS).make Makefile	
-	$(FC_Link)   $(DFLAGS)  -o giem2g $(ALL_O) giem2g.F90 $(LIBS)  -I$(INCLUDE) 
+	$(FC_Link)   $(FOPTS) -o giem2g $(ALL_O) giem2g.F90 $(LIBS)  -I$(INCLUDE) 
 
 %.o:%.f90
 	$(FC) $(DFLAGS) -c $*.f90 -I$(INCLUDE)
@@ -29,3 +32,4 @@ giem2g:  $(ALL_O) giem2g.F90 $(MAKECMDGOALS).make Makefile
 	$(FC) $(DFLAGS) -c $*.F90 -I$(INCLUDE)
 clean:
 	rm $(ALL_O)   *.mod
+	$(MAKE) -C ZFGMRES clean
