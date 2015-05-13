@@ -1,0 +1,11 @@
+FC=
+FC_Link=
+DFLAGS=
+
+
+LIB_FFTW=  
+LIB_FGMRES=
+LIB_BLAS=
+LIB_ADD=
+
+INCLUDE= 
