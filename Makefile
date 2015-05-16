@@ -13,8 +13,7 @@ SRC_O=sources_module.o
 ALL_O=$(MISC_O) $(FILTER_WEIGHTS_O) $(MODEL_O) $(IMAGE_O) $(IE_O) $(RC_O) $(SRC_O)
 
 
-LIBS=  $(LIB_ZFGMRES) $(LIB_BLAS) $(LIB_FFTW)  $(LIB_ADD)
-
+LIBS=  $(LIB_ADD)  $(LIB_FFTW) $(LIB_BLAS) $(LIB_ZFGMRES) 
 ifneq ($(MAKECMDGOALS), clean)
 $(MAKECMDGOALS): zfgmres giem2g 
 endif
