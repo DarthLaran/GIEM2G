@@ -111,11 +111,11 @@ PROGRAM GIEMIEMG
 
 	IF (int_eq%real_space) THEN
 		CALL AllocateSiga(anomaly)
-		IF ( ASSOCIATED(FX)) THEN
-			DEALLOCATE(FX,FY)
-			DEALLOCATE(Ea,Ha)
-			DEALLOCATE(Et,Ht)
-		ENDIF
+!		IF ( ASSOCIATED(FX)) THEN
+!			DEALLOCATE(FX,FY)
+!			DEALLOCATE(Ea,Ha)
+!			DEALLOCATE(Et,Ht)
+!		ENDIF
 		ALLOCATE(FX(1,1,1,6),FY(1,1,1,6))
 		ALLOCATE(Ea(Nr,EX:EZ,int_eq%Nx,int_eq%Ny_loc),Ha(Nr,HX:HZ,int_eq%Nx,int_eq%Ny_loc))
 		ALLOCATE(Et(Nr,EX:EZ,int_eq%Nx,int_eq%Ny_loc),Ht(Nr,HX:HZ,int_eq%Nx,int_eq%Ny_loc))
