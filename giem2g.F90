@@ -37,17 +37,17 @@ PROGRAM GIEMIEMG
 	COMPLEX(REALPARM),POINTER::Eprevy(:,:,:,:)
 	COMPLEX(REALPARM),POINTER::Eprevx(:,:,:,:)
 	COMPLEX(REALPARM)::sig1(3),sig2(3),q1,q2
-		INTEGER::N,Nfreq,Nr
-		INTEGER::NT,OMP_GET_MAX_THREADS
-		LOGICAL::threads_ok
-		INTEGER::wcomm,wsize,me,real_comm
-		TYPE (BKG_DATA_TYPE)::bkg
-		TYPE (ANOMALY_TYPE)::anomaly
-		TYPE (FGMRES_CTL_TYPE)::fgmres_ctl
-		REAL(REALPARM)::RC_Threshold,IE_Threshold
-	 CHARACTER(len=11)::fnum1,fnum2
-	 CHARACTER(len=1024),POINTER::anom_list(:)
-	 INTEGER::Istr,Na,Ia
+	INTEGER::N,Nfreq,Nr
+	INTEGER::NT,OMP_GET_MAX_THREADS
+	LOGICAL::threads_ok
+	INTEGER::wcomm,wsize,me,real_comm
+	TYPE (BKG_DATA_TYPE)::bkg
+	TYPE (ANOMALY_TYPE)::anomaly
+	TYPE (FGMRES_CTL_TYPE)::fgmres_ctl
+	REAL(REALPARM)::RC_Threshold,IE_Threshold
+	CHARACTER(len=11)::fnum1,fnum2
+	CHARACTER(len=1024),POINTER::anom_list(:)
+	INTEGER::Istr,Na,Ia
 !-------------------MPI INITIALIZATION-------------------------------------!
 	CALL MPI_INIT_THREAD(MPI_THREAD_FUNNELED, PROVIDED, IERROR)
 	wcomm=MPI_COMM_WORLD
@@ -79,7 +79,8 @@ PROGRAM GIEMIEMG
 		IF (me==0)	PRINT*,'Number of threads:',NT
 
 	CALL  FFTW_MPI_INIT
-		freqs=>NULL()
+	freqs=>NULL()
+        recvs=>NULL()
 	CALL LoadBackground(bkg,wcomm,'background.dat')
 	CALL LoadAnomalyShape(anomaly,bkg,wcomm,'anomaly_shape.dat',.TRUE.)
 	CALL LoadFrequencies(freqs,wcomm,'frequencies.dat')
@@ -111,11 +112,6 @@ PROGRAM GIEMIEMG
 
 	IF (int_eq%real_space) THEN
 		CALL AllocateSiga(anomaly)
-!		IF ( ASSOCIATED(FX)) THEN
-!			DEALLOCATE(FX,FY)
-!			DEALLOCATE(Ea,Ha)
-!			DEALLOCATE(Et,Ht)
-!		ENDIF
 		ALLOCATE(FX(1,1,1,6),FY(1,1,1,6))
 		ALLOCATE(Ea(Nr,EX:EZ,int_eq%Nx,int_eq%Ny_loc),Ha(Nr,HX:HZ,int_eq%Nx,int_eq%Ny_loc))
 		ALLOCATE(Et(Nr,EX:EZ,int_eq%Nx,int_eq%Ny_loc),Ht(Nr,HX:HZ,int_eq%Nx,int_eq%Ny_loc))
