@@ -104,6 +104,7 @@ CONTAINS
 		ELSE
 			rc_op%real_space=.TRUE.
 		ENDIF
+                rc_op%master_proc=0
 		IF ((rc_op%master).AND.(rc_op%Ny_offset/=0)) THEN
 			PRINT*,  'Main process has no zero offset.&
 				   & Now it is problem. It will be solved... sometime'
