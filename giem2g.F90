@@ -135,6 +135,9 @@ PROGRAM GIEMIEMG
 		DO Istr=1,11
 				IF (fnum1(Istr:Istr)==' ') fnum1(Istr:Istr)='0'
 		ENDDO
+		IF (me==0) THEN
+			PRINT'(A, F11.5, A)', 'Frequency:', freqs(Ifreq), 'Hz'
+		ENDIF
 		CALL Set_Freq(bkg,freqs(Ifreq))
 		CALL CalcIntegralGreenTensor(int_eq,bkg,anomaly,IE_Threshold)
 		CALL CalcFFTofIETensor(int_eq)
