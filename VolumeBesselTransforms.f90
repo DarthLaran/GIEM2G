@@ -17,11 +17,11 @@ PRIVATE
 		COMPLEX(dp),TARGET::f1(0:N-1)
 	INTEGER::INDS(0:N-1)
 	COMPLEX(dp),TARGET::W_fwd(0:N-1),W_bwd(0:N-1)
-
+	REAL(dp),TARGET::explt(0:N-1)
 INTERFACE
-	FUNCTION outfunction(lt,phi,dxr,dyr) RESULT(R)
+	FUNCTION outfunction(lt,cphi,sphi,dxr,dyr) RESULT(R)
 		INTEGER ,PARAMETER::dp=16
-		REAL(dp),INTENT(IN)::lt,phi,dxr,dyr
+		REAL(dp),INTENT(IN)::lt,cphi,sphi,dxr,dyr
 		REAL(dp)::R
 	END FUNCTION
 END INTERFACE
@@ -30,11 +30,10 @@ PUBLIC ::VBTransformWeights,VBTransformInit
 
 CONTAINS
 
-
 SUBROUTINE VBTransformInit(lms) !NOT THREAD SAFETY!
 	REAL(RealParm2),INTENT(OUT)::lms(Nfirst:Nlast)
 		COMPLEX(dp)::f11(0:N-1),f21(0:N-1),tmp
-	REAL(dp)::y1,theta
+	REAL(dp)::y1,theta,y2
 	INTEGER::I,J,K,I2
 	INDS=bit_reverse((/(I,I=0,N-1)/));
 	I2=0
@@ -54,6 +53,11 @@ SUBROUTINE VBTransformInit(lms) !NOT THREAD SAFETY!
 		f1(INDS(I))=inputfunction(y1)
 		y1=y1+y_step
 		f1(INDS(I+1))=-inputfunction(y1)
+
+		y2=(I+N2)*y_step+p
+		explt(I)=EXP(y2)
+		y2=y2+y_step
+		explt(I+1)=EXP(y2)
 	ENDDO
 	CALL FFT_16(f1,W_fwd)
 	
@@ -163,15 +167,20 @@ END SUBROUTINE
 		PROCEDURE(outfunction),POINTER,INTENT(IN)::outfunc
 		REAL(RealParm2),INTENT(OUT)::WT(Nfirst:Nlast)
 		REAL(dp)::y2
-			COMPLEX(dp)::g11(0:N-1)
+		REAL(dp)::cphi,sphi
+		COMPLEX(dp)::g11(0:N-1)
 		COMPLEX(dp)::h(0:N-1),tmp
 		g11=1d0
+		cphi=COS(phi)
+		sphi=SIN(phi)
 		DO I=0,N-1,2
 			y2=(I+N2)*y_step+p
-			g11(INDS(I))=outfunc(y2,phi,alpha,beta)
+			g11(INDS(I))=outfunc(explt(I),cphi,sphi,alpha,beta)
+!			g11(INDS(I))=outfunc(y2,phi,alpha,beta)
 
 			y2=y2+y_step
-			g11(INDS(I+1))=-outfunc(y2,phi,alpha,beta)
+!			g11(INDS(I+1))=-outfunc(y2,phi,alpha,beta)
+			g11(INDS(I+1))=-outfunc(explt(I+1),cphi,sphi,alpha,beta)
 		ENDDO
 		CALL FFT_16(g11,W_fwd)
 		h=g11/inputfunc;
@@ -204,46 +213,52 @@ END FUNCTION
 !----------------- INT4 ---------------------------------------------------------!
 !lt is distance between bottom left corner of the first rectangle and center of the second. The sizes of rectangles are the same
 
-FUNCTION outfunci4cl(lt,phi,dxr,dyr) RESULT(R)	
+FUNCTION outfunci4cl(lt,cphi,sphi,dxr,dyr) RESULT(R)	
 		REAL(dp),INTENT(IN)::lt,phi,dxr,dyr
+		REAL(dp),INTENT(IN)::cphi,sphi
 	REAL(dp)::R
 	REAL(dp)::t,x1,y1,dx,dy,t3,p
-	t=EXP(lt)
+!	t=EXP(lt)
+	t=lt
 	t3=t*t*t
-		x1=t*COS(phi)
-		y1=t*SIN(phi)
-		dx=dxr*t
-		dy=dyr*t
+	x1=t*cphi
+	y1=t*sphi
+	dx=dxr*t
+	dy=dyr*t
 	x1=x1-dx*0.5_dp
 	y1=y1-dy*0.5_dp
 	R=INT_t4EXP_d2xd2y(x1,y1,dx,dy)
 	R=R/t3
 END FUNCTION
 
-FUNCTION outfunci4dxdxcl(lt,phi,dxr,dyr) RESULT(R)	
-		REAL(dp),INTENT(IN)::lt,phi,dxr,dyr
+FUNCTION outfunci4dxdxcl(lt,cphi,sphi,dxr,dyr) RESULT(R)	
+		REAL(dp),INTENT(IN)::lt,dxr,dyr
+		REAL(dp),INTENT(IN)::cphi,sphi
 	REAL(dp)::R
 	REAL(dp)::t,x1,y1,dx,dy,t3,p
-	t=EXP(lt)
+!	t=EXP(lt)
+	t=lt
 	t3=t*t*t
-		x1=t*COS(phi)
-		y1=t*SIN(phi)
-		dx=dxr*t
-		dy=dyr*t
+	x1=t*cphi
+	y1=t*sphi
+	dx=dxr*t
+	dy=dyr*t
 	x1=x1-dx*0.5_dp
 	y1=y1-dy*0.5_dp
 	R=INT_t4EXP_d0xd2y(x1,y1,dx,dy)
 	R=R/t
 END FUNCTION
 
-FUNCTION outfunci4dxdycl(lt,phi,dxr,dyr) RESULT(R)	
-		REAL(dp),INTENT(IN)::lt,phi,dxr,dyr
+FUNCTION outfunci4dxdycl(lt,cphi,sphi,dxr,dyr) RESULT(R)	
+		REAL(dp),INTENT(IN)::lt,dxr,dyr
+		REAL(dp),INTENT(IN)::cphi,sphi
 	REAL(dp)::R
 	REAL(dp)::t,x1,y1,dx,dy,t2,p
-	t=EXP(lt)
+!	t=EXP(lt)
+	t=lt	
 	t2=t*t
-		x1=t*COS(phi)
-		y1=t*SIN(phi)
+		x1=t*cphi
+		y1=t*sphi
 		dx=dxr*t
 		dy=dyr*t
 !	PRINT*, x1/dx*2.0_dp-1.0_dp,y1/dy*2.0_dp-1.0_dp
@@ -252,14 +267,16 @@ FUNCTION outfunci4dxdycl(lt,phi,dxr,dyr) RESULT(R)
 	R=INT_t4EXP_d1xd1y(x1,y1,dx,dy)
 	R=R/t
 END FUNCTION
-FUNCTION outfunci4dxcl(lt,phi,dxr,dyr) RESULT(R)	
+FUNCTION outfunci4dxcl(lt,cphi,sphi,dxr,dyr) RESULT(R)	
 		REAL(dp),INTENT(IN)::lt,phi,dxr,dyr
+		REAL(dp),INTENT(IN)::cphi,sphi
 	REAL(dp)::R
 	REAL(dp)::t,x1,y1,dx,dy,t2,p
-	t=EXP(lt)
+!	t=EXP(lt)
+	t=lt
 	t2=t*t
-		x1=t*COS(phi)
-		y1=t*SIN(phi)
+		x1=t*cphi
+		y1=t*sphi
 		dx=dxr*t
 		dy=dyr*t
 	x1=x1-dx*0.5_dp
@@ -268,26 +285,6 @@ FUNCTION outfunci4dxcl(lt,phi,dxr,dyr) RESULT(R)
 	R=R/t2
 END FUNCTION
 
-
-FUNCTION outfunci4dxdx2cl(lt,phi,dxr,dyr) RESULT(R)
-	REAL(dp),INTENT(IN)::lt,phi,dxr,dyr
-	REAL(dp)::R
-		R=outfunci4dxdxcl(lt,phi,dxr,dyr)*EXP(-lt)
-END FUNCTION
-
-FUNCTION outfunci4dx2cl(lt,phi,dxr,dyr) RESULT(R)
-	REAL(dp),INTENT(IN)::lt,phi,dxr,dyr
-	REAL(dp)::R
-		R=outfunci4dxcl(lt,phi,dxr,dyr)*EXP(-lt)
-END FUNCTION
-
-FUNCTION outfunci4dxdy2cl(lt,phi,dxr,dyr) RESULT(R)
-	REAL(dp),INTENT(IN)::lt,phi,dxr,dyr
-	REAL(dp)::R
-	REAL(dp)::phi2
-!		phi2=ATAN2(lt*COS(phi),lt*SIN(phi))
-		R=outfunci4dxdycl(lt,phi,dxr,dyr)*EXP(-lt)
-END FUNCTION
 !------------------------------ ---------------------------------------!
 !lt is distance between centers of two rectangles of the same size dxr*dyr
 
@@ -295,7 +292,8 @@ FUNCTION outfunci4c(lt,phi,dxr,dyr) RESULT(R)
 	REAL(dp),INTENT(IN)::lt,phi,dxr,dyr
 	REAL(dp)::R
 	REAL(dp)::t,x1,y1,dx,dy,t3,p,q
-	t=EXP(lt)
+!	t=EXP(lt)
+	t=lt
 	t3=t*t*t
 		x1=t*COS(phi)
 		y1=t*SIN(phi)
@@ -307,11 +305,12 @@ END FUNCTION
 !-------------------------------- INT2 ------------------------------------!
 !lt is distance between bottom left corner of the  rectangle and point.
 
-FUNCTION outfunci2cl(lt,phi,dxr,dyr) RESULT(R)
-	REAL(dp),INTENT(IN)::lt,phi,dxr,dyr
+FUNCTION outfunci2cl(lt,cphi,sphi,dxr,dyr) RESULT(R)
+	REAL(dp),INTENT(IN)::lt,dxr,dyr
+	REAL(dp),INTENT(IN)::cphi,sphi
 	REAL(dp)::R
 	REAL(dp)::t,x1,x2,y1,y2,a,b,f0,f1,f2,g0,g1,g2
-	CALL CalcXY2(lt,phi,dxr,dyr,x1,x2,y1,y2,t) 
+	CALL CalcXY2(lt,cphi,sphi,dxr,dyr,x1,x2,y1,y2,t) 
 	f0=INT_I0(y1,y2)
 	f1=INT_I1(y1,y2)
 	f2=INT_I2(y1,y2)
@@ -325,11 +324,12 @@ FUNCTION outfunci2cl(lt,phi,dxr,dyr) RESULT(R)
 	R=R/t
 
 END FUNCTION
-FUNCTION outfunci2dxdxcl(lt,phi,dxr,dyr) RESULT(R)
-	REAL(dp),INTENT(IN)::lt,phi,dxr,dyr
+FUNCTION outfunci2dxdxcl(lt,cphi,sphi,dxr,dyr) RESULT(R)
+	REAL(dp),INTENT(IN)::lt,dxr,dyr	
+	REAL(dp),INTENT(IN)::cphi,sphi
 	REAL(dp)::R
 	REAL(dp)::t,x1,x2,y1,y2,f0,f1,f2,g11,g31,g51,g12,g32,g52
-	CALL CalcXY2(lt,phi,dxr,dyr,x1,x2,y1,y2,t) 
+	CALL CalcXY2(lt,cphi,sphi,dxr,dyr,x1,x2,y1,y2,t) 
 	f0=INT_I0(y1,y2)*2.0_dp
 	f1=INT_I1(y1,y2)*2.0_dp
 	f2=INT_I2(y1,y2)*2.0_dp
@@ -348,11 +348,12 @@ FUNCTION outfunci2dxdxcl(lt,phi,dxr,dyr) RESULT(R)
 	R=R*t
 
 END FUNCTION
-FUNCTION outfunci2dxdycl(lt,phi,dxr,dyr) RESULT(R)
-	REAL(dp),INTENT(IN)::lt,phi,dxr,dyr
+FUNCTION outfunci2dxdycl(lt,cphi,sphi,dxr,dyr) RESULT(R)
+	REAL(dp),INTENT(IN)::lt,dxr,dyr
+	REAL(dp),INTENT(IN)::cphi,sphi
 	REAL(dp)::R
 	REAL(dp)::t,x1,x2,y1,y2,f11,f12,f21,f22,r1
-	CALL CalcXY2(lt,phi,dxr,dyr,x1,x2,y1,y2,t)
+	CALL CalcXY2(lt,cphi,sphi,dxr,dyr,x1,x2,y1,y2,t)
 	r1=(x1*x1+y1*y1)
 	f11=EXP(-r1)*r1*r1*4.0_dp
 
@@ -367,11 +368,12 @@ FUNCTION outfunci2dxdycl(lt,phi,dxr,dyr) RESULT(R)
 	R=(f22-f12)-(f21-f11)
 	R=R*t
 END FUNCTION
-FUNCTION outfunci2dxcl(lt,phi,dxr,dyr) RESULT(R)
-	REAL(dp),INTENT(IN)::lt,phi,dxr,dyr
+FUNCTION outfunci2dxcl(lt,cphi,sphi,dxr,dyr) RESULT(R)
+	REAL(dp),INTENT(IN)::lt,dxr,dyr
+	REAL(dp),INTENT(IN)::cphi,sphi
 	REAL(dp)::R
 	REAL(dp)::t,x1,x2,y1,y2,f0,f1,f2,g01,g21,g41,g02,g22,g42
-	CALL CalcXY2(lt,phi,dxr,dyr,x1,x2,y1,y2,t)
+	CALL CalcXY2(lt,cphi,sphi,dxr,dyr,x1,x2,y1,y2,t)
 	f0=INT_I0(y1,y2)
 	f1=INT_I1(y1,y2)
 	f2=INT_I2(y1,y2)
@@ -386,42 +388,25 @@ FUNCTION outfunci2dxcl(lt,phi,dxr,dyr) RESULT(R)
 	
 	R=8.0_dp*f0*(g42-g41)+4.0_dp*f1*(g22-g21)+f2*(g02-g01)*0.5_dp
 END FUNCTION
-FUNCTION outfunci2dxdx2cl(lt,phi,dxr,dyr) RESULT(R)
-	REAL(dp),INTENT(IN)::lt,phi,dxr,dyr
-	REAL(dp)::R
-		R=outfunci2dxdxcl(lt,phi,dxr,dyr)*EXP(-lt)
-END FUNCTION
-
-FUNCTION outfunci2dx2cl(lt,phi,dxr,dyr) RESULT(R)
-	REAL(dp),INTENT(IN)::lt,phi,dxr,dyr
-	REAL(dp)::R
-		R=outfunci2dxcl(lt,phi,dxr,dyr)*EXP(-lt)
-END FUNCTION
-
-FUNCTION outfunci2dxdy2cl(lt,phi,dxr,dyr) RESULT(R)
-	REAL(dp),INTENT(IN)::lt,phi,dxr,dyr
-	REAL(dp)::R
-	REAL(dp)::phi2
-!		phi2=ATAN2(lt*COS(phi),lt*SIN(phi))
-		R=outfunci2dxdycl(lt,phi,dxr,dyr)*EXP(-lt)
-END FUNCTION
 !---------------------------------------------------------------------!
 !lt is distance between centers of rectangle and point
-FUNCTION outfunci2c(lt,phi,dxr,dyr) RESULT(R)
-	REAL(dp),INTENT(IN)::lt,phi,dxr,dyr
+FUNCTION outfunci2c(lt,cphi,sphi,dxr,dyr) RESULT(R)
+	REAL(dp),INTENT(IN)::lt,dxr,dyr
+	REAL(dp),INTENT(IN)::cphi,sphi
 	REAL(dp)::R
 	REAL(dp)::t,x1,x2,y1,y2,a,b,f1,f2,dx,dy,g1,g2
-	t=EXP(lt)
-		x1=t*COS(phi)
-		y1=t*SIN(phi)
-		dx=dxr*t
-		dy=dyr*t
+!	t=EXP(lt)
+	t=lt
+	x1=t*cphi
+	y1=t*sphi
+	dx=dxr*t
+	dy=dyr*t
 	x1=x1-dx/2.0_dp
 	y1=y1-dy/2.0_dp
 	x2=x1+dx
 	y2=y1+dy
-		f1=ERRFD(x1,x2,1.0_dp)*SPI;
-		f2=ERRFD(y1,y2,1.0_dp)*SPI;
+	f1=ERRFD(x1,x2,1.0_dp)*SPI;
+	f2=ERRFD(y1,y2,1.0_dp)*SPI;
 	g1=XEXP2(x2/2.0_dp)-XEXP2(x1/2.0_dp)
 	g2=XEXP2(y2/2.0_dp)-XEXP2(y1/2.0_dp)
 	R=((f1-2.0_dp*g1)*f2+(f2-2.0_dp*g2)*f1)/4.0_dp!/dx/dy/8.0_dp
@@ -429,13 +414,15 @@ FUNCTION outfunci2c(lt,phi,dxr,dyr) RESULT(R)
 END FUNCTION
 
 !-------------------------------------------------------------------------------------!
-SUBROUTINE CalcXY2(lt,phi,dxr,dyr,x1,x2,y1,y2,t) 
+SUBROUTINE CalcXY2(lt,cphi,sphi,dxr,dyr,x1,x2,y1,y2,t) 
 	REAL(dp),INTENT(IN)::lt,phi,dxr,dyr
+	REAL(dp),INTENT(IN)::cphi,sphi
 	REAL(dp),INTENT(OUT)::x1,x2,y1,y2,t
 	REAL(dp)::dx,dy
-	t=EXP(lt)
-		x1=t*COS(phi)
-		y1=t*SIN(phi)
+!	t=EXP(lt)
+t=lt
+		x1=t*cphi
+		y1=t*sphi
 		dx=dxr*t
 		dy=dyr*t
 	x2=x1+dx
@@ -645,65 +632,6 @@ END FUNCTION
 
 
 !-------------------------------------------------------------!
-
-FUNCTION inpf_a(t) RESULT (R)
-	REAL(dp),INTENT(IN)::t
-	REAL(dp)::R
-	REAL(dp)::y,y2
-	y=EXP(-t);
-	y2=y*y;
-	R=EXP(-y2-t)*(1.0_dp-EXP(-y2))
-END FUNCTION
-
-FUNCTION outpf_a(lt,phi,dxr,dyr) RESULT(R)
-	REAL(dp),INTENT(IN)::lt,phi,dxr,dyr
-	REAL(dp)::R
-	REAL(dp)::t,x1,y1,dx,dy,t4
-	t=EXP(lt)
-	t2=t*t/8.0_dp
-	R=EXP(-t2)*(EXP(-t2)-0.5_dp)/2.0_dp*t
-END FUNCTION
-
-
- FUNCTION inpfd(t) RESULT (R)
-	REAL(dp),INTENT(IN)::t
-	REAL(dp)::R
-	REAL(dp)::y,y2
-	y=EXP(-t);
-		y2=y*y;
-		R=y*EXP(-y2)*(1.0_dp-y2);
-END FUNCTION
- FUNCTION outpfd(t) RESULT (R)
-	REAL(dp),INTENT(IN)::t
-	REAL(dp)::R
-	REAL(dp)::y,y2
-	y=EXP(t);
-		y2=y*y;
-!		 R=EXP(-y2/4.0_dp)*y2/8.0_dp!*y
-	R=y2*XEXP2(y/2.0_dp)/4.0_dp
-END FUNCTION
-
-FUNCTION outfunc4(lt,phi,dxr,dyr) RESULT(R)
-	REAL(dp),INTENT(IN)::lt,phi,dxr,dyr
-	REAL(dp)::R
-	REAL(dp)::t,x1,y1,dx,dy,t4
-	t=EXP(lt)
-	t4=t*t*t*t
-	R=EXP(-t*t/4.0_dp)*t4*t/4.0_dp
-END FUNCTION
-
-
-FUNCTION outfunc2(lt,phi,dxr,dyr) RESULT(R)
-	REAL(dp),INTENT(IN)::lt,phi,dxr,dyr
-	REAL(dp)::R
-	REAL(dp)::t,x1,y1,dx,dy,t2
-	t=EXP(lt)
-	t2=t*t
-	R=t2*XEXP2(t/2.0_dp)/4.0_dp
-!		 PRINT*, R
-END FUNCTION
-
-!---------------------------   FFT for COMPLEX(16)	 for this module only!-----------------------------------------!
 
 	ELEMENTAL  FUNCTION bit_reverse(I) RESULT(R)
 		INTEGER, INTENT(in) :: I
