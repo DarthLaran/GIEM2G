@@ -214,7 +214,7 @@ END FUNCTION
 !lt is distance between bottom left corner of the first rectangle and center of the second. The sizes of rectangles are the same
 
 FUNCTION outfunci4cl(lt,cphi,sphi,dxr,dyr) RESULT(R)	
-		REAL(dp),INTENT(IN)::lt,phi,dxr,dyr
+		REAL(dp),INTENT(IN)::lt,dxr,dyr
 		REAL(dp),INTENT(IN)::cphi,sphi
 	REAL(dp)::R
 	REAL(dp)::t,x1,y1,dx,dy,t3,p
@@ -268,7 +268,7 @@ FUNCTION outfunci4dxdycl(lt,cphi,sphi,dxr,dyr) RESULT(R)
 	R=R/t
 END FUNCTION
 FUNCTION outfunci4dxcl(lt,cphi,sphi,dxr,dyr) RESULT(R)	
-		REAL(dp),INTENT(IN)::lt,phi,dxr,dyr
+		REAL(dp),INTENT(IN)::lt,dxr,dyr
 		REAL(dp),INTENT(IN)::cphi,sphi
 	REAL(dp)::R
 	REAL(dp)::t,x1,y1,dx,dy,t2,p
@@ -415,7 +415,7 @@ END FUNCTION
 
 !-------------------------------------------------------------------------------------!
 SUBROUTINE CalcXY2(lt,cphi,sphi,dxr,dyr,x1,x2,y1,y2,t) 
-	REAL(dp),INTENT(IN)::lt,phi,dxr,dyr
+	REAL(dp),INTENT(IN)::lt,dxr,dyr
 	REAL(dp),INTENT(IN)::cphi,sphi
 	REAL(dp),INTENT(OUT)::x1,x2,y1,y2,t
 	REAL(dp)::dx,dy
