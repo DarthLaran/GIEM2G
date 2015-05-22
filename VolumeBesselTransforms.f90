@@ -27,6 +27,7 @@ TYPE EXP_DATA_TYPE
 	REAL(dp),DIMENSION(3,0:N-1,2)::xy
 	REAL(dp),DIMENSION(3,0:N-1,2)::xy_exp2
 	REAL(dp),DIMENSION(3,0:N-1,2)::xy_erf
+	REAL(dp),DIMENSION(3,0:N-1,2)::xy2
 END TYPE
 INTERFACE
 	FUNCTION outfunction(lt,cphi,sphi,dxr,dyr) RESULT(R)
@@ -221,12 +222,12 @@ END SUBROUTINE
 SUBROUTINE VBTransformWeightsAllInt4(x,y,hx,hy,WT)
 	IMPLICIT NONE
 	REAL(RealParm),INTENT(IN)::x,y,hx,hy
-	REAL(RealParm2),INTENT(OUT)::WT(Nfirst:Nlast,6)
+	REAL(RealParm),INTENT(OUT)::WT(Nfirst:Nlast,6)
 		TYPE (EXP_DATA_TYPE)::edt
 	REAL(dp)::rho,phi,alpha,beta
 	REAL(dp)::xq,yq,hxq,hyq
 	PROCEDURE(outfunction2),POINTER::outfunc
-	REAL(RealParm2)::rp(6)
+	REAL(RealParm)::rp(6)
 	
 	xq=x;
 	yq=y;
@@ -241,9 +242,9 @@ SUBROUTINE VBTransformWeightsAllInt4(x,y,hx,hy,WT)
 	rp(5)=rho
 	rp(6)=rho*rho
 
-	alpha=hyq/rho;
-	beta=hxq/rho;
-	phi=ATAN2(xq,yq);
+	alpha=hxq/rho;
+	beta=hyq/rho;
+	phi=ATAN2(yq,xq);
 	CALL  PrepareExps4(phi,alpha,beta,edt)
 	outfunc=>outfunci4cl2
 	CALL CalcWeights2(edt,WT(:,1),outfunc)
@@ -255,9 +256,9 @@ SUBROUTINE VBTransformWeightsAllInt4(x,y,hx,hy,WT)
 	outfunc=>outfunci4dxcl2
 	CALL CalcWeights2(edt,WT(:,4),outfunc)
 
-	alpha=hxq/rho;
-	beta=hyq/rho;
-	phi=ATAN2(yq,xq);
+	alpha=hyq/rho;
+	beta=hxq/rho;
+	phi=ATAN2(xq,yq);
 	CALL  PrepareExps4(phi,alpha,beta,edt)
 
 	outfunc=>outfunci4cl2
@@ -280,13 +281,10 @@ SUBROUTINE CalcWeights2(edt,WT,outfunc)
 		REAL(dp)::cphi,sphi
 		COMPLEX(dp)::g11(0:N-1)
 		COMPLEX(dp)::h(0:N-1),tmp
-		g11=1d0
+		g11=1.0_dp
 		DO I=0,N-1,2
-			y2=(I+N2)*y_step+p
 			g11(INDS(I))=outfunc(edt,I)
-
-			y2=y2+y_step
-			g11(INDS(I+1))=-outfunc(edt,I)
+			g11(INDS(I+1))=-outfunc(edt,I+1)
 		ENDDO
 		CALL FFT_16(g11,W_fwd)
 		h=g11/f1;
@@ -337,16 +335,18 @@ SUBROUTINE PrepareExps4(phi,alpha,beta,edt)
 			x=x*0.5_dp
 			x2=x*x
 			edt%xy_exp2(:,I,JX)=EXP(-x2)
-			edt%xy_erf(:,I,JX)=ERF(-x)
+			edt%xy_erf(:,I,JX)=ERF(x)
 			edt%xy(:,I,JX)=x
+			edt%xy2(:,I,JX)=x2
 			y(1)=edt%y1(I)
 			y(2)=y(1)+edt%dy(I)
 			y(3)=y(1)-edt%dy(I)
 			y=y*0.5_dp
 			y2=y*y
 			edt%xy_exp2(:,I,JY)=EXP(-y2)
-			edt%xy_erf(:,I,JY)=ERF(-y)
+			edt%xy_erf(:,I,JY)=ERF(y)
 			edt%xy(:,I,JY)=y
+			edt%xy2(:,I,JY)=y2
 		ENDDO
 ENDSUBROUTINE
 
@@ -820,7 +820,7 @@ FUNCTION INT_D2TEXPd4_2d_edt(edt,I,J) RESULT(R)
 	REAL(dp)::R(1:3)
 	REAL(dp)::f(1:3),l2,h2,x(1:3),x2(1:3),ex(1:3)
 	x=edt%xy(:,I,J)
-	x2=x*x
+	x2=edt%xy2(:,I,J)
 	ex=x*edt%xy_exp2(:,I,J)/2.0_dp
 	f=x2*ex
 	R(2)=f(2)+f(3)-2.0_dp*f(1)
@@ -848,8 +848,8 @@ FUNCTION INT_1d_edt(edt,I,J)RESULT(R)
 	REAL(dp)::R(1:3)
 	REAL(dp)::x(1:3),f(1:3),x2(1:3)
 	x=edt%xy(:,I,J)
-	x2=x*x
-	f=x*edt%xy_erf(:,I,J)
+	x2=edt%xy2(:,I,J)
+	f=edt%xy_erf(:,I,J)
 	R(1)=f(2)+f(3)-2.0_dp*f(1)
 	R(1)=R(1)*SPI*0.5_dp
 
@@ -878,7 +878,7 @@ FUNCTION INT_2d_edt(edt,I,J)RESULT(R)
 	REAL(dp)::R(1:3)
 	REAL(dp)::x(1:3),f(1:3),x2(1:3)
 	x=edt%xy(:,I,J)
-	x2=x*x
+	x2=edt%xy2(:,I,J)
 	f=x*edt%xy_erf(:,I,J)
 	R(1)=f(2)+f(3)-2.0_dp*f(1)
 	R(1)=R(1)*SPI*0.25_dp
@@ -905,8 +905,8 @@ END FUNCTION
 		END DO
 		R = temp
 	END FUNCTION bit_reverse
-	SUBROUTINE fft_16(x,wp)!x MUST be after bit reverse, wp -array of coefficients for forward or backward FT
-		COMPLEX(dp), DIMENSION(0:), INTENT(inout) :: x
+	SUBROUTINE FFT_16(x,wp)!x MUST be after bit reverse, wp -array of coefficients for forward or backward FT
+		COMPLEX(dp), DIMENSION(0:N-1), INTENT(inout) :: x
 		COMPLEX(dp),INTENT(IN)::wp(0:N-1)
 		COMPLEX(dp) ::	temp
 		INTEGER :: I,J,J2,I2,Istep,Ip,Iq
@@ -924,5 +924,5 @@ END FUNCTION
 				I2=I2+1
 			END DO
 		END DO
-	END SUBROUTINE fft_16
+	END SUBROUTINE FFT_16
 END
