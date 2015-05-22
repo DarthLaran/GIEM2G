@@ -269,13 +269,16 @@
 		MODULE FFT_QUAD
 		CONTAINS
 	subroutine cdft(n, isgn, a, ip, w)
-      integer n, isgn, ip(0 : *), nw
-      real*16 a(0 : n - 1), w(0 : *)
+      integer,INTENT(IN):: n, isgn
+	  integer,INTENT(IN):: ip(0:)
+      real*16,INTENT(INOUT):: a(0 : n - 1)
+	  REAL(16),INTENT(IN):: w(0:)
+	  integer:: nw
       nw = ip(0)
-      if (n .gt. 4 * nw) then
-          nw = n / 4
-          call makewt(nw, ip, w)
-      end if
+!      if (n .gt. 4 * nw) then
+!          nw = n / 4
+!          call makewt(nw, ip, w)
+!      end if
       if (isgn .ge. 0) then
           call cftfsub(n, a, ip, nw, w)
       else
@@ -287,13 +290,16 @@
 ! -------- initializing routines --------
 !
       subroutine makewt(nw, ip, w)
-      integer nw, ip(0 : *), j, nwh, nw0, nw1
-      real*16 w(0 : nw - 1), delta, wn4r, wk1r, wk1i, wk3r, wk3i
+      integer,INTENT(IN)::nw
+	  INTEGER,INTENT(INOUT):: ip(0: )
+      real(16),INTENT(INOUT):: w(0: )
+	  REAL(16):: delta, wn4r, wk1r, wk1i, wk3r, wk3i
+	  INTEGER:: j, nwh, nw0, nw1
       ip(0) = nw
       ip(1) = 1
       if (nw .gt. 2) then
           nwh = nw / 2
-          delta = atan(1.0d0) / nwh
+          delta = atan(1.0e0_16) / nwh
           wn4r = cos(delta * nwh)
           w(0) = 1
           w(1) = wn4r
@@ -302,8 +308,8 @@
               w(3) = sin(delta * 2)
           else if (nwh .gt. 4) then
               call makeipt(nw, ip)
-              w(2) = 0.5d0 / cos(delta * 2)
-              w(3) = 0.5d0 / cos(delta * 6)
+              w(2) = 0.5e0_16 / cos(delta * 2)
+              w(3) = 0.5e0_16 / cos(delta * 6)
               do j = 4, nwh - 4, 4
                   w(j) = cos(delta * j)
                   w(j + 1) = sin(delta * j)
@@ -325,8 +331,8 @@
               else if (nwh .gt. 4) then
                   wk1r = w(nw0 + 4)
                   wk3r = w(nw0 + 6)
-                  w(nw1 + 2) = 0.5d0 / wk1r
-                  w(nw1 + 3) = 0.5d0 / wk3r
+                  w(nw1 + 2) = 0.5e0_16 / wk1r
+                  w(nw1 + 3) = 0.5e0_16 / wk3r
                   do j = 4, nwh - 4, 4
                       wk1r = w(nw0 + 2 * j)
                       wk1i = w(nw0 + 2 * j + 1)
@@ -368,12 +374,12 @@
       ip(1) = nc
       if (nc .gt. 1) then
           nch = nc / 2
-          delta = atan(1.0d0) / nch
+          delta = atan(1.0e0_16) / nch
           c(0) = cos(delta * nch)
-          c(nch) = 0.5d0 * c(0)
+          c(nch) = 0.5e0_16 * c(0)
           do j = 1, nch - 1
-              c(j) = 0.5d0 * cos(delta * j)
-              c(nc - j) = 0.5d0 * sin(delta * j)
+              c(j) = 0.5e0_16 * cos(delta * j)
+              c(nc - j) = 0.5e0_16 * sin(delta * j)
           end do
       end if
       endsubroutine
@@ -381,8 +387,9 @@
 ! -------- child routines --------
 !
       subroutine cftfsub(n, a, ip, nw, w)
-      integer n, ip(0 : *), nw
-      real*16 a(0 : n - 1), w(0 : nw - 1)
+      integer,intent(in):: n, ip(0 : *), nw
+      real(16),intent(out):: a(0 : n - 1)
+	  real(16),intent(in):: w(0 : nw - 1)
       if (n .gt. 8) then
           if (n .gt. 32) then
               call cftf1st(n, a, w(nw - n / 4))
@@ -409,8 +416,9 @@
       endsubroutine
 !
       subroutine cftbsub(n, a, ip, nw, w)
-      integer n, ip(0 : *), nw
-      real*16 a(0 : n - 1), w(0 : nw - 1)
+      integer,INTENT(IN):: n, ip(0 : ), nw
+      real(16),INTENT(INOUT):: a(0 : n - 1)
+	  real(16),INTENT(IN):: w(0 : nw - 1)
       if (n .gt. 8) then
           if (n .gt. 32) then
               call cftb1st(n, a, w(nw - n / 4))
@@ -1719,7 +1727,7 @@
       endsubroutine
 !
       subroutine cftrec4(n, a, nw, w)
-      integer n, nw, cfttree, isplt, j, k, m
+      integer n, nw,  isplt, j, k, m
       real*16 a(0 : n - 1), w(0 : nw - 1)
       m = n
       do while (m .gt. 512)
@@ -1735,8 +1743,9 @@
       end do
       endsubroutine
 !
-      integer function cfttree(n, j, k, a, nw, w)
+      function cfttree(n, j, k, a, nw, w) result(R)
       integer n, j, k, nw, i, isplt, m
+	  integer::R
       real*16 a(0 : j - 1), w(0 : nw - 1)
       if (mod(k, 4) .ne. 0) then
           isplt = mod(k, 2)
@@ -1765,7 +1774,7 @@
               end do
           end if
       end if
-      cfttree = isplt
+      R = isplt
       endfunction
 !
       subroutine cftleaf(n, isplt, a, nw, w)
@@ -2609,7 +2618,7 @@
       do j = 2, m - 2, 2
           k = n - j
           kk = kk + ks
-          wkr = 0.5d0 - c(nc - kk)
+          wkr = 0.5e0_16 - c(nc - kk)
           wki = c(kk)
           xr = a(j) - a(k)
           xi = a(j + 1) + a(k + 1)
@@ -2631,7 +2640,7 @@
       do j = 2, m - 2, 2
           k = n - j
           kk = kk + ks
-          wkr = 0.5d0 - c(nc - kk)
+          wkr = 0.5e0_16 - c(nc - kk)
           wki = c(kk)
           xr = a(j) - a(k)
           xi = a(j + 1) + a(k + 1)

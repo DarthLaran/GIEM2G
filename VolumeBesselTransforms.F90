@@ -15,9 +15,9 @@ PRIVATE
 	REAL(dp),PARAMETER::xi=-4.82205425726955430357775925664462079e-0002_dp!*2e0_dp
 	REAL(dp),PARAMETER::q=y_step/2.0_dp
 	REAL(dp),PARAMETER::p=q+xi
-		COMPLEX(dp),TARGET::f1(0:N-1)
+	COMPLEX(dp),TARGET::f1(0:N-1)
 	INTEGER::INDS(0:N-1)
-	COMPLEX(dp),TARGET::WORK(0:N-1)
+	REAL(dp),TARGET::WORK(0:2*N-1)
 	REAL(dp),TARGET::explt(0:N-1)
 	REAL(dp),TARGET::explt2(0:N-1)
 	REAL(dp),TARGET::explt3(0:N-1)
@@ -58,15 +58,15 @@ SUBROUTINE VBTransformInit(lms) !NOT THREAD SAFETY!
 	REAL(dp)::y1,theta,y2
 	INTEGER::I,J,K,I2
 	
-	CALL makewt(N/4, INDS, WORK)
+	CALL makewt(N/2, INDS, WORK)
 
 	lms=xi+(/((J+N2)*y_step,J=Nfirst,Nlast)/)
 	lms=EXP(lms)
 	DO I=0,N-1,2
 		y1=(I+N2)*y_step+q
-		f1(INDS(I))=inputfunction(y1)
+		f1(I)=inputfunction(y1)
 		y1=y1+y_step
-		f1(INDS(I+1))=-inputfunction(y1)
+		f1(I+1)=-inputfunction(y1)
 
 		y2=(I+N2)*y_step+p
 		explt(I)=EXP(y2)
@@ -194,18 +194,18 @@ END SUBROUTINE
 		sphi=SIN(phi)
 		DO I=0,N-1,2
 			y2=(I+N2)*y_step+p
-			g11(INDS(I))=outfunc(explt(I),cphi,sphi,alpha,beta)
+			g11(I)=outfunc(explt(I),cphi,sphi,alpha,beta)
 !			g11(INDS(I))=outfunc(y2,phi,alpha,beta)
 
 			y2=y2+y_step
 !			g11(INDS(I+1))=-outfunc(y2,phi,alpha,beta)
-			g11(INDS(I+1))=-outfunc(explt(I+1),cphi,sphi,alpha,beta)
+			g11(I+1)=-outfunc(explt(I+1),cphi,sphi,alpha,beta)
 		ENDDO
 		CALL FFT_16(g11,FWD)
 		h=g11/inputfunc;
 		DO J=0,N-1,2
-			h(INDS(J))=g11(J)/inputfunc(J)
-			h(INDS(J+1))=-g11(J+1)/inputfunc(J+1)
+			h(J)=g11(J)/inputfunc(J)
+			h(J+1)=-g11(J+1)/inputfunc(J+1)
 		ENDDO
 		CALL FFT_16(h,BWD)
 		DO J=1,N-1,2
@@ -279,14 +279,14 @@ SUBROUTINE CalcWeights2(edt,WT,outfunc)
 		COMPLEX(dp)::h(0:N-1),tmp
 		g11=1.0_dp
 		DO I=0,N-1,2
-			g11(INDS(I))=outfunc(edt,I)
-			g11(INDS(I+1))=-outfunc(edt,I+1)
+			g11(I)=outfunc(edt,I)
+			g11(I+1)=-outfunc(edt,I+1)
 		ENDDO
 		CALL FFT_16(g11,FWD)
-		h=g11/f1;
+!		h=g11/f1;
 		DO J=0,N-1,2
-			h(INDS(J))=g11(J)/f1(J)
-			h(INDS(J+1))=-g11(J+1)/f1(J+1)
+			h(J)=g11(J)/f1(J)
+			h(J+1)=-g11(J+1)/f1(J+1)
 		ENDDO
 		CALL FFT_16(h,BWD)
 		DO J=1,N-1,2
@@ -439,8 +439,6 @@ FUNCTION outfunci4dxdxcl2(edt,I) RESULT(R)
 		REAL(dp)::fx(1:3),fy(1:3)
 		fx=INT_D2TEXPd4_2d_edt(edt,I,JX)
 		fy=INT_TEXPd4_2d_edt(edt,I,JY)
-		fy=0
-		fy(1:2)=1
 		R=fx(3)*fy(1)+fx(1)*fy(3)+2.0_dp*fx(2)*fy(2)
 		R=R/explt(I)
 END FUNCTION
@@ -627,8 +625,6 @@ FUNCTION INT_t4EXP_d0xd2y(lx,ly,hx,hy) RESULT(R)
 	REAL(dp)::fx(1:3),fy(1:3)
 	fx=INT_D2TEXPd4_2d(lx,hx)
 	fy=INT_TEXPd4_2d(ly,hy)
-	fy=0
-	fy(1:2)=1
 		R=fx(3)*fy(1)+fx(1)*fy(3)+2.0_dp*fx(2)*fy(2)
 END FUNCTION
 
@@ -896,12 +892,13 @@ END FUNCTION
 !-------------------------------------------------------------!
 
 	SUBROUTINE FFT_16(X,dir)!x MUST be after bit reverse, wp -array of coefficients for forward or backward FT
-		COMPLEX(dp), DIMENSION(0:N-1), INTENT(inout) :: x
+		USE ISO_C_BINDING
+		COMPLEX(dp),TARGET ,DIMENSION(0:N-1), INTENT(inout) :: x
 		INTEGER,INTENT(IN)::dir
-		REAL(dp) ::temp(0:2*N-1)
-		temp(0:N-1)=REAL(X)
-		temp(N:2*N-1)=AIMAG(X)
-		CALL cdft(N,dir, temp, INDS, WORK)
-		X=temp(0:N-1)+(0.0_dp,1.0_dp)*temp(N:2*N-1)
+		REAL(dp),POINTER ::pX(:)
+		TYPE(C_PTR)::cp
+		cp=C_LOC(x)
+		CALL C_F_POINTER(cp,pX,(/2*N/))
+		CALL cdft(N*2,dir, pX, INDS, WORK)
 	END SUBROUTINE FFT_16
 END
