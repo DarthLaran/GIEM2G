@@ -314,6 +314,7 @@ CONTAINS
 		COMPLEX(REALPARM)::G1(EXX:EZZ,anomaly%Nz,anomaly%Nz)
 		REAL(REALPARM2)::r,WT(Nfirst:Nlast,1:6),W(1:6),dx,dy
 		REAL(REALPARM2)::WT0(Nfirst:Nlast,1:6)
+		REAL(REALPARM2)::WT1(Nfirst:Nlast,1:6)
 		REAL(REALPARM)::x,y,lm,W0(1:6),Wm(1:6),time1,time2
 		INTEGER::K,Iz,IERROR,I,Ik,Iz0,Ic,Iwt(6)
 		time1=MPI_Wtime()
@@ -329,6 +330,26 @@ CONTAINS
 		WT(:,IE_DX)=WT0(:,4)
 		WT(:,IE_DYY)=WT0(:,5)
 		WT(:,IE_DY)=WT0(:,6)
+#define no_compile
+#ifndef no_compile
+			CALL VBTransformWeights(x,y,dx,dy,WT1(:,1),INT4,IERROR)
+			PRINT*,'int4',MAXVAL(ABS(WT0(:,1)-WT1(:,1)))
+
+			CALL VBTransformWeights(x,y,dx,dy,WT1(:,2),INT4DXX,IERROR)
+			PRINT*,'int4dxx',MAXVAL(ABS(WT0(:,2)-WT1(:,2)))
+
+			CALL VBTransformWeights(x,y,dx,dy,WT1(:,3),INT4DXY,IERROR)
+			PRINT*,'int4dxy',MAXVAL(ABS(WT0(:,3)-WT1(:,3)))
+
+			CALL VBTransformWeights(x,y,dx,dy,WT1(:,4),INT4DX,IERROR)
+			PRINT*,'int4dx',MAXVAL(ABS(WT0(:,4)-WT1(:,4)))
+
+			CALL VBTransformWeights(x,y,dx,dy,WT1(:,5),INT4DYY,IERROR)
+			PRINT*,'int4dyy',MAXVAL(ABS(WT0(:,5)-WT1(:,5)))
+
+			CALL VBTransformWeights(x,y,dx,dy,WT1(:,6),INT4DY,IERROR)
+			PRINT*,'int4dy',MAXVAL(ABS(WT0(:,6)-WT1(:,6)))
+#endif
 		W0(IE_DXX)=maxval(ABS(WT(:,IE_DXX)))
 		IF ((lx/=0).AND.((ly/=0))) THEN
 			W0(IE_DXY:IE_DY)=maxval(ABS(WT(:,IE_DXY:IE_DY)));

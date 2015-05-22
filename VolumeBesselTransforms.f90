@@ -261,7 +261,7 @@ SUBROUTINE VBTransformWeightsAllInt4(x,y,hx,hy,WT)
 	phi=ATAN2(xq,yq);
 	CALL  PrepareExps4(phi,alpha,beta,edt)
 
-	outfunc=>outfunci4cl2
+	outfunc=>outfunci4dxdxcl2
 	CALL CalcWeights2(edt,WT(:,5),outfunc)
 	outfunc=>outfunci4dxcl2
 	CALL CalcWeights2(edt,WT(:,6),outfunc)
@@ -818,13 +818,13 @@ FUNCTION INT_D2TEXPd4_2d_edt(edt,I,J) RESULT(R)
 	TYPE (EXP_DATA_TYPE),INTENT(IN)::edt
 	INTEGER,INTENT(IN)::I,J
 	REAL(dp)::R(1:3)
-	REAL(dp)::f(1:3),l2,h2,x(1:3),x2(1:3),ex(1:3)
+	REAL(dp)::f(1:3),x(1:3),x2(1:3),ex(1:3)
 	x=edt%xy(:,I,J)
 	x2=edt%xy2(:,I,J)
-	ex=x*edt%xy_exp2(:,I,J)/2.0_dp
-	f=x2*ex
+	ex=edt%xy_exp2(:,I,J)/2.0_dp
+	f=x2*ex*4.0_dp
 	R(2)=f(2)+f(3)-2.0_dp*f(1)
-	f=x2*f
+	f=x2*f*4.0_dp
 	R(1)=f(2)+f(3)-2.0_dp*f(1)
 	f=ex
 	R(3)=f(2)+f(3)-2.0_dp*f(1)

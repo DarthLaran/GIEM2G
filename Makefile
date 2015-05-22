@@ -24,7 +24,7 @@ zfgmres:
 giem2g:  $(ALL_O) giem2g.F90 $(MAKECMDGOALS).make Makefile	
 	$(FC_Link)   $(FOPTS)   -o giem2g $(ALL_O) giem2g.F90 $(LIBS)  -I$(INCLUDE) 
 	
-ifneq ($(INSTALL_PATH), '')
+ifdef INSTALL_PATH
 	cp giem2g $(INSTALL_PATH)/giem2g
 endif
 %.o:%.f90
