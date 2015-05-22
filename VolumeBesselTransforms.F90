@@ -3,6 +3,7 @@
 MODULE VolumeBesselTransforms 
 	USE IntegralCodes
 	USE Const_module,ONLY: RealParm2,REALPARM
+	USE FFT_QUAD
 PRIVATE
 	INTEGER ,PARAMETER::dp=16
 		REAL (dp),PARAMETER :: PI=3.1415926535897932384626433832795028841971693993751058209_dp
@@ -16,12 +17,14 @@ PRIVATE
 	REAL(dp),PARAMETER::p=q+xi
 		COMPLEX(dp),TARGET::f1(0:N-1)
 	INTEGER::INDS(0:N-1)
-	COMPLEX(dp),TARGET::W_fwd(0:N-1),W_bwd(0:N-1)
+	COMPLEX(dp),TARGET::WORK(0:N-1)
 	REAL(dp),TARGET::explt(0:N-1)
 	REAL(dp),TARGET::explt2(0:N-1)
 	REAL(dp),TARGET::explt3(0:N-1)
 	INTEGER,PARAMETER::JX=1
 	INTEGER,PARAMETER::JY=2
+	INTEGER,PARAMETER::FWD=1
+	INTEGER,PARAMETER::BWD=-1
 TYPE EXP_DATA_TYPE
 	REAL(dp),DIMENSION(0:N-1)::x1,y1,dx,dy
 	REAL(dp),DIMENSION(3,0:N-1,2)::xy
@@ -54,17 +57,9 @@ SUBROUTINE VBTransformInit(lms) !NOT THREAD SAFETY!
 	COMPLEX(dp)::f11(0:N-1),f21(0:N-1),tmp
 	REAL(dp)::y1,theta,y2
 	INTEGER::I,J,K,I2
-	INDS=bit_reverse((/(I,I=0,N-1)/));
-	I2=0
-	DO I=0,Log2N-1
-		K=2**I
-		DO J=0,K-1
-			theta=-PI/K*J
-			W_fwd(I2)=EXP(theta*(0e0_dp,1e0_dp))
-			W_bwd(I2)=CONJG(W_fwd(I2))
-			I2=I2+1
-		ENDDO
-	ENDDO
+	
+	CALL makewt(N/4, INDS, WORK)
+
 	lms=xi+(/((J+N2)*y_step,J=Nfirst,Nlast)/)
 	lms=EXP(lms)
 	DO I=0,N-1,2
@@ -82,7 +77,8 @@ SUBROUTINE VBTransformInit(lms) !NOT THREAD SAFETY!
 		explt2(I+1)=explt(I+1)*explt(I+1)
 		explt3(I+1)=explt2(I+1)*explt(I+1)
 	ENDDO
-	CALL FFT_16(f1,W_fwd)
+
+	CALL FFT_16(f1,FWD)
 	
 END SUBROUTINE
 SUBROUTINE VBTransformWeights(x,y,hx,hy,WT,c,IERROR)
@@ -205,13 +201,13 @@ END SUBROUTINE
 !			g11(INDS(I+1))=-outfunc(y2,phi,alpha,beta)
 			g11(INDS(I+1))=-outfunc(explt(I+1),cphi,sphi,alpha,beta)
 		ENDDO
-		CALL FFT_16(g11,W_fwd)
+		CALL FFT_16(g11,FWD)
 		h=g11/inputfunc;
 		DO J=0,N-1,2
 			h(INDS(J))=g11(J)/inputfunc(J)
 			h(INDS(J+1))=-g11(J+1)/inputfunc(J+1)
 		ENDDO
-		CALL FFT_16(h,W_bwd)
+		CALL FFT_16(h,BWD)
 		DO J=1,N-1,2
 			h(J-1)=h(J-1)/N
 			h(J)=-h(J)/N
@@ -286,13 +282,13 @@ SUBROUTINE CalcWeights2(edt,WT,outfunc)
 			g11(INDS(I))=outfunc(edt,I)
 			g11(INDS(I+1))=-outfunc(edt,I+1)
 		ENDDO
-		CALL FFT_16(g11,W_fwd)
+		CALL FFT_16(g11,FWD)
 		h=g11/f1;
 		DO J=0,N-1,2
 			h(INDS(J))=g11(J)/f1(J)
 			h(INDS(J+1))=-g11(J+1)/f1(J+1)
 		ENDDO
-		CALL FFT_16(h,W_bwd)
+		CALL FFT_16(h,BWD)
 		DO J=1,N-1,2
 			h(J-1)=h(J-1)/N
 			h(J)=-h(J)/N
@@ -443,6 +439,8 @@ FUNCTION outfunci4dxdxcl2(edt,I) RESULT(R)
 		REAL(dp)::fx(1:3),fy(1:3)
 		fx=INT_D2TEXPd4_2d_edt(edt,I,JX)
 		fy=INT_TEXPd4_2d_edt(edt,I,JY)
+		fy=0
+		fy(1:2)=1
 		R=fx(3)*fy(1)+fx(1)*fy(3)+2.0_dp*fx(2)*fy(2)
 		R=R/explt(I)
 END FUNCTION
@@ -629,6 +627,8 @@ FUNCTION INT_t4EXP_d0xd2y(lx,ly,hx,hy) RESULT(R)
 	REAL(dp)::fx(1:3),fy(1:3)
 	fx=INT_D2TEXPd4_2d(lx,hx)
 	fy=INT_TEXPd4_2d(ly,hy)
+	fy=0
+	fy(1:2)=1
 		R=fx(3)*fy(1)+fx(1)*fy(3)+2.0_dp*fx(2)*fy(2)
 END FUNCTION
 
@@ -895,34 +895,13 @@ END FUNCTION
 
 !-------------------------------------------------------------!
 
-	ELEMENTAL  FUNCTION bit_reverse(I) RESULT(R)
-		INTEGER, INTENT(in) :: I
-		INTEGER ::R 
-		INTEGER :: J, temp
-		temp = I
-		DO J = Log2N, 2, -1
-			   temp = ISHFTC(temp, -1,J)
-		END DO
-		R = temp
-	END FUNCTION bit_reverse
-	SUBROUTINE FFT_16(x,wp)!x MUST be after bit reverse, wp -array of coefficients for forward or backward FT
+	SUBROUTINE FFT_16(X,dir)!x MUST be after bit reverse, wp -array of coefficients for forward or backward FT
 		COMPLEX(dp), DIMENSION(0:N-1), INTENT(inout) :: x
-		COMPLEX(dp),INTENT(IN)::wp(0:N-1)
-		COMPLEX(dp) ::	temp
-		INTEGER :: I,J,J2,I2,Istep,Ip,Iq
-			I2=0
-		DO I=0,Log2N-1
-			J2=2**I
-			Lstep = 2 * J2
-			DO J = 0, J2-1
-				DO Ip=J, N-1, Lstep
-					Iq=Ip+J2
-					temp = wp(I2)*x(Iq)
-					x(Iq) = x(Ip) - temp
-					x(Ip) = x(Ip) + temp
-				END DO
-				I2=I2+1
-			END DO
-		END DO
+		INTEGER,INTENT(IN)::dir
+		REAL(dp) ::temp(0:2*N-1)
+		temp(0:N-1)=REAL(X)
+		temp(N:2*N-1)=AIMAG(X)
+		CALL cdft(N,dir, temp, INDS, WORK)
+		X=temp(0:N-1)+(0.0_dp,1.0_dp)*temp(N:2*N-1)
 	END SUBROUTINE FFT_16
 END

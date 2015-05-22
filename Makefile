@@ -2,7 +2,8 @@ ifneq ($(MAKECMDGOALS), clean)
 include $(MAKECMDGOALS).make	
 endif
 MISC_O=const_module.o mpi_module.o fftw3_mod.o
-FILTER_WEIGHTS_O=IntegralCodes.o VolumeBesselTransforms.o  
+#FILTER_WEIGHTS_O=IntegralCodes.o VolumeBesselTransforms.o  
+FILTER_WEIGHTS_O=IntegralCodes.o FFT_Quadruple.o  VolumeBesselTransforms.o  
 MODEL_O=data_types_module.o mpi_saveload_module.o
 IMAGE_O= apq_module.o  ie_kernel_hankel_module.o  rc_kernel_hankel_module.o 
 IE_O=Integral_Equation_Module.o calc_ie_tensor_module.o ie_solver_module.o   
