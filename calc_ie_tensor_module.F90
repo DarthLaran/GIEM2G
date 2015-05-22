@@ -104,7 +104,7 @@ CONTAINS
 				!$OMP DO SCHEDULE(GUIDED)&
 				!$OMP& REDUCTION (MAX:time1,time2,time3,time4)
 				DO Ix=xfirst,xlast
-					CALL CalcIntegralGreenTensor3dElement(Ix,ly,G_symm(:,:,Ix,Iy),&
+					CALL CalcIntegralGreenTensor3dElement2(Ix,ly,G_symm(:,:,Ix,Iy),&
 					&G_asym(:,:,:,Ix,Iy),Wt_Threshold,time,anomaly,bkg,matrix%dz)
 				ENDDO
 				!$OMP ENDDO
@@ -268,6 +268,91 @@ CONTAINS
 			W0(IE_DY)=-W0(IE_DXX)
 		ENDIF
 		CALL VBTransformWeights(x,y,dx,dy,WT(:,IE_D0),W_IND(IE_D0),IERROR)
+		W0(IE_D0)=maxval(ABS(WT(:,IE_D0)))
+		G1=C_ZERO		
+		time2=MPI_Wtime()
+		calc_time(1)=calc_time(1)+time2-time1
+		time1=time2
+		DO K=Nfirst,Nlast
+			Wm=ABS(WT(K,:)/W0(:))
+			IF (MAXVAL(Wm)>Wt_Threshold) THEN
+				lm=lms(K)/r
+				W(IE_DXX)=WT(K,IE_DXX)/lm
+				W(IE_DYY)=WT(K,IE_DYY)/lm
+				W(IE_DXY)=WT(K,IE_DXY)/lm
+				W(IE_DX)=WT(K,IE_DX)*lm
+				W(IE_DY)=WT(K,IE_DY)*lm
+				W(IE_D0)=WT(K,IE_D0)*lm
+				CALL Calc_Double_Integral_U(anomaly,bkg,dz,lm,W,G1,calc_time(3:4))
+
+			ENDIF
+		ENDDO
+		G_asym(:,:,A_EXZ)=(G1(EXZ,:,:)/PI/4.0_REALPARM)
+		G_asym(:,:,A_EYZ)=(G1(EYZ,:,:)/PI/4.0_REALPARM)
+				
+		DO Iz=1,anomaly%Nz
+			DO Iz0=1,Iz
+				G_symm(Iz0+Iz*(Iz-1)/2,S_EXX)=G1(EXX,Iz0,Iz)/PI/4.0_REALPARM
+				G_symm(Iz0+Iz*(Iz-1)/2,S_EXY)=G1(EXY,Iz0,Iz)/PI/4.0_REALPARM
+				G_symm(Iz0+Iz*(Iz-1)/2,S_EYY)=G1(EYY,Iz0,Iz)/PI/4.0_REALPARM
+				G_symm(Iz0+Iz*(Iz-1)/2,S_EZZ)=G1(EZZ,Iz0,Iz)/PI/4.0_REALPARM
+			ENDDO
+		ENDDO
+		time2=MPI_WTIME()
+		calc_time(2)=calc_time(2)+time2-time1
+	END SUBROUTINE
+	SUBROUTINE CalcIntegralGreenTensor3dElement2(lx,ly,G_symm,G_asym,Wt_Threshold,calc_time,anomaly,bkg,dz)
+		IMPLICIT NONE
+		INTEGER, INTENT(IN)::lx,ly
+		TYPE (BKG_DATA_TYPE),INTENT(IN)::bkg
+		TYPE (ANOMALY_TYPE),INTENT(IN)::anomaly
+		REAL(REALPARM),INTENT(IN)::dz(anomaly%Nz)
+		COMPLEX(REALPARM),INTENT(OUT)::G_symm(anomaly%Nz*(anomaly%Nz+1)/2,S_EXX:S_EZZ)
+		COMPLEX(REALPARM),INTENT(OUT)::G_asym(anomaly%Nz,anomaly%Nz,A_EXZ:A_EYZ)
+		REAL(REALPARM),INTENT(IN)::Wt_Threshold
+		REAL(REALPARM),INTENT(INOUT)::calc_time(4)
+		COMPLEX(REALPARM)::G1(EXX:EZZ,anomaly%Nz,anomaly%Nz)
+		REAL(REALPARM2)::r,WT(Nfirst:Nlast,1:6),W(1:6),dx,dy
+		REAL(REALPARM2)::WT0(Nfirst:Nlast,1:6)
+		REAL(REALPARM)::x,y,lm,W0(1:6),Wm(1:6),time1,time2
+		INTEGER::K,Iz,IERROR,I,Ik,Iz0,Ic,Iwt(6)
+		time1=MPI_Wtime()
+		dx=anomaly%dx
+		dy=anomaly%dy
+		x=lx*dx+dx/2d0
+		y=ly*dy+dy/2d0
+		r=SQRT(x*x+y*y)
+		CALL VBTransformWeightsAllInt4(x,y,dx,dy,WT0)
+		WT(:,IE_D0)=WT0(:,1)
+		WT(:,IE_DXX)=WT0(:,2)
+		WT(:,IE_DXY)=WT0(:,3)
+		WT(:,IE_DX)=WT0(:,4)
+		WT(:,IE_DYY)=WT0(:,5)
+		WT(:,IE_DY)=WT0(:,6)
+		W0(IE_DXX)=maxval(ABS(WT(:,IE_DXX)))
+		IF ((lx/=0).AND.((ly/=0))) THEN
+			W0(IE_DXY:IE_DY)=maxval(ABS(WT(:,IE_DXY:IE_DY)));
+		ELSEIF(lx==0)THEN
+			WT(:,IE_DXY)=0d0
+			W0(IE_DXY)=-W0(IE_DXX)
+			W0(IE_DYY)=maxval(ABS(WT(:,IE_DYY)))
+			Iwt(IE_DYY)=MAXLOC(ABS(WT(:,IE_DYY)),1)
+			WT(:,IE_DX)=0d0
+			W0(IE_DX)=-W0(IE_DXX)
+			IF (ly/=0) THEN
+				W0(IE_DY)=maxval(ABS(WT(:,IE_DY)))
+			ELSE
+				WT(:,IE_DY)=0d0
+				W0(IE_DY)=-W0(IE_DXX)
+			ENDIF
+		ELSE
+			WT(:,IE_DXY)=0d0
+			W0(IE_DXY)=-W0(IE_DXX)
+			W0(IE_DYY)=maxval(ABS(WT(:,IE_DYY)))
+			W0(IE_DX)=maxval(ABS(WT(:,IE_DX)))
+			WT(:,IE_DY)=0d0
+			W0(IE_DY)=-W0(IE_DXX)
+		ENDIF
 		W0(IE_D0)=maxval(ABS(WT(:,IE_D0)))
 		G1=C_ZERO		
 		time2=MPI_Wtime()

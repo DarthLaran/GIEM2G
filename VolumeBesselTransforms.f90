@@ -18,21 +18,39 @@ PRIVATE
 	INTEGER::INDS(0:N-1)
 	COMPLEX(dp),TARGET::W_fwd(0:N-1),W_bwd(0:N-1)
 	REAL(dp),TARGET::explt(0:N-1)
+	REAL(dp),TARGET::explt2(0:N-1)
+	REAL(dp),TARGET::explt3(0:N-1)
+	INTEGER,PARAMETER::JX=1
+	INTEGER,PARAMETER::JY=2
+TYPE EXP_DATA_TYPE
+	REAL(dp),DIMENSION(0:N-1)::x1,y1,dx,dy
+	REAL(dp),DIMENSION(3,0:N-1,2)::xy
+	REAL(dp),DIMENSION(3,0:N-1,2)::xy_exp2
+	REAL(dp),DIMENSION(3,0:N-1,2)::xy_erf
+END TYPE
 INTERFACE
 	FUNCTION outfunction(lt,cphi,sphi,dxr,dyr) RESULT(R)
-		INTEGER ,PARAMETER::dp=16
+		IMPORT dp
 		REAL(dp),INTENT(IN)::lt,cphi,sphi,dxr,dyr
+		REAL(dp)::R
+	END FUNCTION
+	FUNCTION outfunction2(edt,I) RESULT(R)
+		IMPORT EXP_DATA_TYPE,dp
+		INTEGER,INTENT(IN)::I
+		TYPE (EXP_DATA_TYPE),INTENT(IN)::edt
 		REAL(dp)::R
 	END FUNCTION
 END INTERFACE
 
-PUBLIC ::VBTransformWeights,VBTransformInit 
+
+
+PUBLIC ::VBTransformWeights,VBTransformInit, VBTransformWeightsAllInt4
 
 CONTAINS
 
 SUBROUTINE VBTransformInit(lms) !NOT THREAD SAFETY!
 	REAL(RealParm2),INTENT(OUT)::lms(Nfirst:Nlast)
-		COMPLEX(dp)::f11(0:N-1),f21(0:N-1),tmp
+	COMPLEX(dp)::f11(0:N-1),f21(0:N-1),tmp
 	REAL(dp)::y1,theta,y2
 	INTEGER::I,J,K,I2
 	INDS=bit_reverse((/(I,I=0,N-1)/));
@@ -56,8 +74,12 @@ SUBROUTINE VBTransformInit(lms) !NOT THREAD SAFETY!
 
 		y2=(I+N2)*y_step+p
 		explt(I)=EXP(y2)
+		explt2(I)=explt(I)*explt(I)
+		explt3(I)=explt2(I)*explt(I)
 		y2=y2+y_step
 		explt(I+1)=EXP(y2)
+		explt2(I+1)=explt(I+1)*explt(I+1)
+		explt3(I+1)=explt2(I+1)*explt(I+1)
 	ENDDO
 	CALL FFT_16(f1,W_fwd)
 	
@@ -96,27 +118,27 @@ SUBROUTINE VBTransformWeights(x,y,hx,hy,WT,c,IERROR)
 				CASE (INT4)
 						outfunc=>outfunci4cl
 						inputfunc=>f1
-			rp=rho*rho*rho
+						rp=rho*rho*rho
 				CASE (INT4DXX)
 						outfunc=>outfunci4dxdxcl
 						inputfunc=>f1
-			rp=rho
+						rp=rho
 				CASE (INT4DXY)
 						outfunc=>outfunci4dxdycl
 						inputfunc=>f1
-			rp=rho
+						rp=rho
 				CASE (INT4DX)
 						outfunc=>outfunci4dxcl
 						inputfunc=>f1
-			rp=rho*rho
-				CASE  (8)  ! (INT4DYY)
+						rp=rho*rho
+				CASE  (INT4DYY)
 						outfunc=>outfunci4dxdxcl
 						inputfunc=>f1
-			rp=rho
-				CASE (10) !(INT4DY)
+						rp=rho
+				CASE (INT4DY)
 						outfunc=>outfunci4dxcl
 						inputfunc=>f1
-			rp=rho*rho
+						rp=rho*rho
 !--------------- INT2 ----------------!
 				CASE (INT2)
 						outfunc=>outfunci2cl
@@ -196,6 +218,90 @@ END SUBROUTINE
 		
 		WT=REAL(h(Nfirst:Nlast),KIND=REALPARM2);
 	END SUBROUTINE
+SUBROUTINE VBTransformWeightsAllInt4(x,y,hx,hy,WT)
+	IMPLICIT NONE
+	REAL(RealParm),INTENT(IN)::x,y,hx,hy
+	REAL(RealParm2),INTENT(OUT)::WT(Nfirst:Nlast,6)
+		TYPE (EXP_DATA_TYPE)::edt
+	REAL(dp)::rho,phi,alpha,beta
+	REAL(dp)::xq,yq,hxq,hyq
+	PROCEDURE(outfunction2),POINTER::outfunc
+	REAL(RealParm2)::rp(6)
+	
+	xq=x;
+	yq=y;
+	hxq=hx;
+	hyq=hy;
+	rho=SQRT(xq*xq+yq*yq);
+
+	rp(1)=rho*rho*rho
+	rp(2)=rho
+	rp(3)=rho
+	rp(4)=rho*rho
+	rp(5)=rho
+	rp(6)=rho*rho
+
+	alpha=hyq/rho;
+	beta=hxq/rho;
+	phi=ATAN2(xq,yq);
+	CALL  PrepareExps4(phi,alpha,beta,edt)
+	outfunc=>outfunci4cl2
+	CALL CalcWeights2(edt,WT(:,1),outfunc)
+
+	outfunc=>outfunci4dxdxcl2
+	CALL CalcWeights2(edt,WT(:,2),outfunc)
+	outfunc=>outfunci4dxdycl2
+	CALL CalcWeights2(edt,WT(:,3),outfunc)
+	outfunc=>outfunci4dxcl2
+	CALL CalcWeights2(edt,WT(:,4),outfunc)
+
+	alpha=hxq/rho;
+	beta=hyq/rho;
+	phi=ATAN2(yq,xq);
+	CALL  PrepareExps4(phi,alpha,beta,edt)
+
+	outfunc=>outfunci4cl2
+	CALL CalcWeights2(edt,WT(:,5),outfunc)
+	outfunc=>outfunci4dxcl2
+	CALL CalcWeights2(edt,WT(:,6),outfunc)
+	
+	WT(:,1)=WT(:,1)/hx/hy*rp(1)
+	WT(:,2)=WT(:,2)/hx/hy*rp(2) 
+	WT(:,3)=WT(:,3)/hx/hy*rp(3)
+	WT(:,4)=WT(:,4)/hx/hy*rp(4)
+	WT(:,5)=WT(:,5)/hx/hy*rp(5)
+	WT(:,6)=WT(:,6)/hx/hy*rp(6) 
+END SUBROUTINE
+SUBROUTINE CalcWeights2(edt,WT,outfunc)
+		TYPE (EXP_DATA_TYPE),INTENT(IN)::edt
+		PROCEDURE(outfunction2),POINTER,INTENT(IN)::outfunc
+		REAL(RealParm2),INTENT(OUT)::WT(Nfirst:Nlast)
+		REAL(dp)::y2
+		REAL(dp)::cphi,sphi
+		COMPLEX(dp)::g11(0:N-1)
+		COMPLEX(dp)::h(0:N-1),tmp
+		g11=1d0
+		DO I=0,N-1,2
+			y2=(I+N2)*y_step+p
+			g11(INDS(I))=outfunc(edt,I)
+
+			y2=y2+y_step
+			g11(INDS(I+1))=-outfunc(edt,I)
+		ENDDO
+		CALL FFT_16(g11,W_fwd)
+		h=g11/f1;
+		DO J=0,N-1,2
+			h(INDS(J))=g11(J)/f1(J)
+			h(INDS(J+1))=-g11(J+1)/f1(J+1)
+		ENDDO
+		CALL FFT_16(h,W_bwd)
+		DO J=1,N-1,2
+			h(J-1)=h(J-1)/N
+			h(J)=-h(J)/N
+		ENDDO
+		
+		WT=REAL(h(Nfirst:Nlast),KIND=REALPARM2);
+	END SUBROUTINE
 !------------------------ Input Function  -------------------------------------!
 
 FUNCTION inputfunction(t) RESULT (R)
@@ -208,13 +314,48 @@ FUNCTION inputfunction(t) RESULT (R)
 		R=8.0_dp*EXP(-y2)*(y4-4.0_dp*y2+2.0_dp)*y;
 END FUNCTION
 
+!--------------------------------------------------------------------------------!
+
+SUBROUTINE PrepareExps4(phi,alpha,beta,edt)
+		REAL(dp),INTENT(IN)::phi,alpha,beta
+		TYPE (EXP_DATA_TYPE),INTENT(INOUT)::edt
+		REAL(dp)::cphi,sphi,x(3),y(3),x2(3),y2(3)
+		INTEGER::I
+
+		cphi=COS(phi)
+		sphi=SIN(phi)
+		edt%x1=explt*cphi
+		edt%y1=explt*sphi
+		edt%dx=alpha*explt
+		edt%dy=beta*explt
+		edt%x1=edt%x1-edt%dx*0.5_dp
+		edt%y1=edt%y1-edt%dy*0.5_dp
+		DO I=0,N-1
+			x(1)=edt%x1(I)
+			x(2)=x(1)+edt%dx(I)
+			x(3)=x(1)-edt%dx(I)
+			x=x*0.5_dp
+			x2=x*x
+			edt%xy_exp2(:,I,JX)=EXP(-x2)
+			edt%xy_erf(:,I,JX)=ERF(-x)
+			edt%xy(:,I,JX)=x
+			y(1)=edt%y1(I)
+			y(2)=y(1)+edt%dy(I)
+			y(3)=y(1)-edt%dy(I)
+			y=y*0.5_dp
+			y2=y*y
+			edt%xy_exp2(:,I,JY)=EXP(-y2)
+			edt%xy_erf(:,I,JY)=ERF(-y)
+			edt%xy(:,I,JY)=y
+		ENDDO
+ENDSUBROUTINE
 
 !------------------------ Output Functions	-------------------------------------!
 !----------------- INT4 ---------------------------------------------------------!
 !lt is distance between bottom left corner of the first rectangle and center of the second. The sizes of rectangles are the same
 
 FUNCTION outfunci4cl(lt,cphi,sphi,dxr,dyr) RESULT(R)	
-		REAL(dp),INTENT(IN)::lt,phi,dxr,dyr
+		REAL(dp),INTENT(IN)::lt,dxr,dyr
 		REAL(dp),INTENT(IN)::cphi,sphi
 	REAL(dp)::R
 	REAL(dp)::t,x1,y1,dx,dy,t3,p
@@ -238,7 +379,6 @@ FUNCTION outfunci4dxdxcl(lt,cphi,sphi,dxr,dyr) RESULT(R)
 	REAL(dp)::t,x1,y1,dx,dy,t3,p
 !	t=EXP(lt)
 	t=lt
-	t3=t*t*t
 	x1=t*cphi
 	y1=t*sphi
 	dx=dxr*t
@@ -256,11 +396,10 @@ FUNCTION outfunci4dxdycl(lt,cphi,sphi,dxr,dyr) RESULT(R)
 	REAL(dp)::t,x1,y1,dx,dy,t2,p
 !	t=EXP(lt)
 	t=lt	
-	t2=t*t
-		x1=t*cphi
-		y1=t*sphi
-		dx=dxr*t
-		dy=dyr*t
+	x1=t*cphi
+	y1=t*sphi
+	dx=dxr*t
+	dy=dyr*t
 !	PRINT*, x1/dx*2.0_dp-1.0_dp,y1/dy*2.0_dp-1.0_dp
 	x1=x1-dx*0.5_dp
 	y1=y1-dy*0.5_dp
@@ -268,23 +407,66 @@ FUNCTION outfunci4dxdycl(lt,cphi,sphi,dxr,dyr) RESULT(R)
 	R=R/t
 END FUNCTION
 FUNCTION outfunci4dxcl(lt,cphi,sphi,dxr,dyr) RESULT(R)	
-		REAL(dp),INTENT(IN)::lt,phi,dxr,dyr
-		REAL(dp),INTENT(IN)::cphi,sphi
+	REAL(dp),INTENT(IN)::lt,dxr,dyr
+	REAL(dp),INTENT(IN)::cphi,sphi
 	REAL(dp)::R
 	REAL(dp)::t,x1,y1,dx,dy,t2,p
 !	t=EXP(lt)
 	t=lt
 	t2=t*t
-		x1=t*cphi
-		y1=t*sphi
-		dx=dxr*t
-		dy=dyr*t
+	x1=t*cphi
+	y1=t*sphi
+	dx=dxr*t
+	dy=dyr*t
 	x1=x1-dx*0.5_dp
 	y1=y1-dy*0.5_dp
 	R=INT_t4EXP_d1xd2y(x1,y1,dx,dy)
 	R=R/t2
 END FUNCTION
 
+!------------------------------ ---------------------------------------!
+FUNCTION outfunci4cl2(edt,I) RESULT(R)	
+		TYPE (EXP_DATA_TYPE),INTENT(IN)::edt
+		INTEGER,INTENT(IN)::I
+		REAL(dp)::R
+		REAL(dp)::fx(1:3),fy(1:3)
+		fx=INT_TEXPd4_2d_edt(edt,I,JX)
+		fy=INT_TEXPd4_2d_edt(edt,I,JY)
+		R=fx(3)*fy(1)+fx(1)*fy(3)+2.0_dp*fx(2)*fy(2)
+		R=R/explt3(I)
+END FUNCTION
+
+FUNCTION outfunci4dxdxcl2(edt,I) RESULT(R)	
+		TYPE (EXP_DATA_TYPE),INTENT(IN)::edt
+		INTEGER,INTENT(IN)::I
+		REAL(dp)::R
+		REAL(dp)::fx(1:3),fy(1:3)
+		fx=INT_D2TEXPd4_2d_edt(edt,I,JX)
+		fy=INT_TEXPd4_2d_edt(edt,I,JY)
+		R=fx(3)*fy(1)+fx(1)*fy(3)+2.0_dp*fx(2)*fy(2)
+		R=R/explt(I)
+END FUNCTION
+
+FUNCTION outfunci4dxdycl2(edt,I) RESULT(R)	
+		TYPE (EXP_DATA_TYPE),INTENT(IN)::edt
+		INTEGER,INTENT(IN)::I
+		REAL(dp)::R
+		REAL(dp)::fx(1:3),fy(1:3)
+		fx=INT_D1TEXPd4_2d_edt(edt,I,JX)
+		fy=INT_D1TEXPd4_2d_edt(edt,I,JY)
+		R=fx(3)*fy(1)+fx(1)*fy(3)+2.0_dp*fx(2)*fy(2)
+		R=R/explt(I)
+END FUNCTION
+FUNCTION outfunci4dxcl2(edt,I) RESULT(R)	
+		TYPE (EXP_DATA_TYPE),INTENT(IN)::edt
+		INTEGER,INTENT(IN)::I
+		REAL(dp)::R
+		REAL(dp)::fx(1:3),fy(1:3)
+		fx=INT_D1TEXPd4_2d_edt(edt,I,JX)
+		fy=INT_TEXPd4_2d_edt(edt,I,JY)
+		R=fx(3)*fy(1)+fx(1)*fy(3)+2.0_dp*fx(2)*fy(2)
+		R=R/explt2(I)
+END FUNCTION
 !------------------------------ ---------------------------------------!
 !lt is distance between centers of two rectangles of the same size dxr*dyr
 
@@ -415,7 +597,7 @@ END FUNCTION
 
 !-------------------------------------------------------------------------------------!
 SUBROUTINE CalcXY2(lt,cphi,sphi,dxr,dyr,x1,x2,y1,y2,t) 
-	REAL(dp),INTENT(IN)::lt,phi,dxr,dyr
+	REAL(dp),INTENT(IN)::lt,dxr,dyr
 	REAL(dp),INTENT(IN)::cphi,sphi
 	REAL(dp),INTENT(OUT)::x1,x2,y1,y2,t
 	REAL(dp)::dx,dy
@@ -629,6 +811,86 @@ FUNCTION INT_I2(y1,y2) RESULT(R)
 	f2=X3EXP2(y2)
 	R=R-8.0_dp*(f2-f1)
 END FUNCTION
+!-----------------------------------------------------------------------------!
+
+
+FUNCTION INT_D2TEXPd4_2d_edt(edt,I,J) RESULT(R)
+	TYPE (EXP_DATA_TYPE),INTENT(IN)::edt
+	INTEGER,INTENT(IN)::I,J
+	REAL(dp)::R(1:3)
+	REAL(dp)::f(1:3),l2,h2,x(1:3),x2(1:3),ex(1:3)
+	x=edt%xy(:,I,J)
+	x2=x*x
+	ex=x*edt%xy_exp2(:,I,J)/2.0_dp
+	f=x2*ex
+	R(2)=f(2)+f(3)-2.0_dp*f(1)
+	f=x2*f
+	R(1)=f(2)+f(3)-2.0_dp*f(1)
+	f=ex
+	R(3)=f(2)+f(3)-2.0_dp*f(1)
+
+END FUNCTION
+
+FUNCTION INT_D1TEXPd4_2d_edt(edt,I,J) RESULT(R)
+	TYPE (EXP_DATA_TYPE),INTENT(IN)::edt
+	INTEGER,INTENT(IN)::I,J
+	REAL(dp)::R(1:3)
+	REAL(dp)::f(1:3)
+	f=INT_1d_edt(edt,I,J)
+	R(1)=-8.0_dp*f(3)-12.0_dp*f(2)+12.0_dp*f(1);
+	R(2)=-2.0_dp*f(2)+2.0_dp*f(1)
+		R(3)=f(1)
+!R=R*0.5_dp
+END FUNCTION
+FUNCTION INT_1d_edt(edt,I,J)RESULT(R)
+	TYPE (EXP_DATA_TYPE),INTENT(IN)::edt
+	INTEGER,INTENT(IN)::I,J
+	REAL(dp)::R(1:3)
+	REAL(dp)::x(1:3),f(1:3),x2(1:3)
+	x=edt%xy(:,I,J)
+	x2=x*x
+	f=x*edt%xy_erf(:,I,J)
+	R(1)=f(2)+f(3)-2.0_dp*f(1)
+	R(1)=R(1)*SPI*0.5_dp
+
+	f=edt%xy_exp2(:,I,J)*x
+	R(2)=f(2)+f(3)-2.0_dp*f(1)
+	f=f*x2
+	R(3)=f(2)+f(3)-2.0_dp*f(1)
+END FUNCTION
+
+FUNCTION INT_TEXPd4_2d_edt(edt,I,J) RESULT(R)
+	TYPE (EXP_DATA_TYPE),INTENT(IN)::edt
+	INTEGER,INTENT(IN)::I,J
+	REAL(dp)::R(1:3)
+	REAL(dp)::f(1:3)
+	f=INT_2d_edt(edt,I,J)
+	R(1)=32.0_dp*(1.5_dp*f(1)+f(2)+f(3))
+	R(2)=8.0_dp*f(1)+4.0_dp*f(2)
+	R(3)=4.0_dp*f(1)+f(2);
+END FUNCTION
+
+
+FUNCTION INT_2d_edt(edt,I,J)RESULT(R)
+
+	TYPE (EXP_DATA_TYPE),INTENT(IN)::edt
+	INTEGER,INTENT(IN)::I,J
+	REAL(dp)::R(1:3)
+	REAL(dp)::x(1:3),f(1:3),x2(1:3)
+	x=edt%xy(:,I,J)
+	x2=x*x
+	f=x*edt%xy_erf(:,I,J)
+	R(1)=f(2)+f(3)-2.0_dp*f(1)
+	R(1)=R(1)*SPI*0.25_dp
+
+	f=edt%xy_exp2(:,I,J)
+	R(2)=f(2)+f(3)-2.0_dp*f(1)!h should be lagrger than 1e-5l
+   !	 R(2)=EXP(-l*l)*(-2.0_dp+4.0*l*l)*h*h
+	f=edt%xy_exp2(:,I,J)*x2/4.0_dp
+	R(3)=f(2)+f(3)-2.0_dp*f(1)
+END FUNCTION
+
+
 
 
 !-------------------------------------------------------------!
