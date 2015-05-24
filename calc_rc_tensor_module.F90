@@ -140,6 +140,8 @@ CONTAINS
 		REAL(REALPARM2)::r,WT(Nfirst:Nlast,1:6),W(1:6),dx,dy,s
 		REAL(REALPARM)::x,y,lm,W0(1:6),Wm(1:6),time1,time2,time3
 		INTEGER::K,Iz,IERROR,I,Ik,Iz0,Ic,Iwt(6),Irecv
+		REAL(REALPARM2)::WT0(Nfirst:Nlast,1:6)
+		REAL(REALPARM2)::WT1(Nfirst:Nlast,1:6)
 		time3=MPI_Wtime()
 		dx=anomaly%dx
 		dy=anomaly%dy
@@ -149,9 +151,35 @@ CONTAINS
 			x=lx*dx-dx/2d0+recvs(Irecv)%x_shift
 			y=ly*dy-dy/2d0+recvs(Irecv)%y_shift
 			r=SQRT(x*x+y*y)
-			DO Ic=RC_DXX,RC_D0
-				CALL VBTransformWeights(x,y,dx,dy,WT(:,Ic),WR_IND(Ic),IERROR)
-			ENDDO
+!			DO Ic=RC_DXX,RC_D0
+!				CALL VBTransformWeights(x,y,dx,dy,WT(:,Ic),WR_IND(Ic),IERROR)
+!			ENDDO
+		CALL VBTransformWeightsAllInt22(x,y,dx,dy,WT0)
+			WT(:,RC_D0)=WT0(:,1)
+			WT(:,RC_DXX)=WT0(:,2)
+			WT(:,RC_DXY)=WT0(:,3)
+			WT(:,RC_DX)=WT0(:,4)
+			WT(:,RC_DYY)=WT0(:,5)
+			WT(:,RC_DY)=WT0(:,6)
+#ifndef no_compile
+			CALL VBTransformWeights(x,y,dx,dy,WT1(:,1),INT2,IERROR)
+			PRINT*,'int2',MAXVAL(ABS(WT0(:,1)/WT1(:,1)))
+
+			CALL VBTransformWeights(x,y,dx,dy,WT1(:,2),INT2DXX,IERROR)
+			PRINT*,'int2dxx',MAXVAL(ABS(WT0(:,2)/WT1(:,2)))
+
+			CALL VBTransformWeights(x,y,dx,dy,WT1(:,3),INT2DXY,IERROR)
+			PRINT*,'int2dxy',MAXVAL(ABS(WT0(:,3)/WT1(:,3)))
+
+			CALL VBTransformWeights(x,y,dx,dy,WT1(:,4),INT2DX,IERROR)
+			PRINT*,'int2dx',MAXVAL(ABS(WT0(:,4)/WT1(:,4)))
+
+			CALL VBTransformWeights(x,y,dx,dy,WT1(:,5),INT2DYY,IERROR)
+			PRINT*,'int2dyy',MAXVAL(ABS(WT0(:,5)/WT1(:,5)))
+
+			CALL VBTransformWeights(x,y,dx,dy,WT1(:,6),INT2DY,IERROR)
+			PRINT*,'int2dy',MAXVAL(ABS(WT0(:,6)/WT1(:,6)))
+#endif
 			W0=MAXVAL(ABS(WT));
 				   
 			time2=MPI_Wtime()
