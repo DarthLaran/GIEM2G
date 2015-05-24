@@ -323,7 +323,7 @@ CONTAINS
 		x=lx*dx+dx/2d0
 		y=ly*dy+dy/2d0
 		r=SQRT(x*x+y*y)
-		CALL VBTransformWeightsAllInt4(x,y,dx,dy,WT0)
+		CALL VBTransformWeightsAllInt42(x,y,dx,dy,WT0)
 		WT(:,IE_D0)=WT0(:,1)
 		WT(:,IE_DXX)=WT0(:,2)
 		WT(:,IE_DXY)=WT0(:,3)
