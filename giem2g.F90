@@ -146,6 +146,8 @@ PROGRAM GIEMIEMG
 		CALL CalcRecalculationGreenTensor(rc_op,bkg,anomaly,RC_Threshold)
 		CALL CalcFFTofRCTensor(rc_op)
 
+#define not_compile
+#ifndef not_compile
 		DO Ia=1,Na
 			WRITE (fnum2,'(I5.5)') Ia
 			IF (me==0)	PRINT*, 'Anomaly ', Ia, ' from ', trim(anom_list(Ia))
@@ -160,7 +162,6 @@ PROGRAM GIEMIEMG
 			ENDIF
 				IF (me==0) PRINT*, 'FY=', FY
 			CALL SolveEquation(int_eq,fgmres_ctl)
-#define not_compile
 
 			CALL ReCalculation(rc_op,int_eq%Esol,Ea,Ha)
 			IF (int_eq%real_space) THEN
@@ -199,7 +200,6 @@ PROGRAM GIEMIEMG
 !				CALL SaveOutputOneFile(Ea,Et,Ha,Ht,anomaly,recvs,freqs(Ifreq),real_comm,'PX_F'//trim(fnum1)//'T_'//trim(fnum2))
 			ENDIF
 		ENDDO
-#ifndef not_compile
 #endif
 	ENDDO
 	 CALL DeleteIE_OP(int_eq)

@@ -1,10 +1,10 @@
-FC=mpif77
+FC=mpif90
 F77=mpif77
-FC_Link=mpif77
+FC_Link=mpif90
 AR=xiar
 
-FOPTS= -g    -openmp  -i4 -mcmodel=large  -O3 -traceback    -xHost -prec-div -inline speed -ipo=15 
-#FOPTS= -g    -openmp  -i4 -mcmodel=large  -O0
+FOPTS= -g    -openmp  -i4 -mcmodel=large  -O3 -traceback    -xHost -prec-div -inline speed -ipo=15
+ #FOPTS= -g    -openmp  -i4 -mcmodel=large  -O0
 
 
 LIB_FFTW=  -L$(HOME)/Soft/lib/lib -lfftw3_omp -lfftw3_mpi  -lfftw3 
