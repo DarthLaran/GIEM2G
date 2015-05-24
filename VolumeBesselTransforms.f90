@@ -3,6 +3,7 @@
 MODULE VolumeBesselTransforms 
 	USE IntegralCodes
 	USE Const_module,ONLY: RealParm2,REALPARM
+	IMPLICIT NONE
 PRIVATE
 	INTEGER ,PARAMETER::dp=16
 		REAL (dp),PARAMETER :: PI=3.1415926535897932384626433832795028841971693993751058209_dp
@@ -205,6 +206,7 @@ END SUBROUTINE
 		REAL(dp)::cphi,sphi
 		COMPLEX(dp)::g11(0:N-1)
 		COMPLEX(dp)::h(0:N-1),tmp
+		INTEGER::I,J
 		g11=1d0
 		cphi=COS(phi)
 		sphi=SIN(phi)
@@ -347,10 +349,12 @@ SUBROUTINE VBTransformWeightsAllInt22(x,y,hx,hy,WT)
 	CALL CalcWeights22(edt,WT,out2)
 
 	
-	WT(:,1)=WT(:,1)*rho
-	WT(:,2)=WT(:,2)rho 
-	WT(:,3)=WT(:,3)/rho
-	WT(:,5)=WT(:,5)/rho
+	WT(:,1)=WT(:,1)*rho!/hx/hy
+	WT(:,2)=WT(:,2)/rho!/hx/hy
+	WT(:,3)=WT(:,3)/rho!/hx/hy
+!	WT(:,4)=WT(:,4)/hx/hy
+	WT(:,5)=WT(:,5)/rho!/hx/hy
+!	WT(:,6)=WT(:,6)/hx/hy
 END SUBROUTINE
 SUBROUTINE CalcWeights2(edt,WT,outfunc)
 		TYPE (EXP_DATA_TYPE),INTENT(IN)::edt
@@ -360,6 +364,7 @@ SUBROUTINE CalcWeights2(edt,WT,outfunc)
 		REAL(dp)::cphi,sphi
 		COMPLEX(dp)::g11(0:N-1)
 		COMPLEX(dp)::h(0:N-1),tmp
+		INTEGER::I,J
 		g11=1.0_dp
 		DO I=0,N-1,2
 			g11(INDS(I))=outfunc(edt,I)
@@ -385,6 +390,7 @@ SUBROUTINE CalcWeights22(edt,WT,outfunc)
 		REAL(RealParm2),INTENT(OUT)::WT(Nfirst:Nlast,6)
 		COMPLEX(dp)::g11(0:N-1,6)
 		COMPLEX(dp)::h(0:N-1,6),tmp
+		INTEGER::I,J
 		g11=1.0_dp
 		DO I=0,N-1,2
 			g11(INDS(I),:)=outfunc(edt,I)
@@ -782,6 +788,7 @@ FUNCTION outfunc_int2_all(edt,I) RESULT(R)
 		INTEGER,INTENT(IN)::I
 		REAL(dp)::R(6)
 		REAL(dp)::fx(1:3,3),fy(1:3,3)
+		REAL(dp)::t(4),q(4)
 		fx(:,D0)=SINGLE_INT_D0(edt,I,JX)
 		fx(:,D1)=SINGLE_INT_D1(edt,I,JX)
 		fx(:,D2)=SINGLE_INT_D2(edt,I,JX)
@@ -792,7 +799,9 @@ FUNCTION outfunc_int2_all(edt,I) RESULT(R)
 
 		R(1)=fx(3,D0)*fy(1,D0)+fx(1,D0)*fy(3,D0)+2.0_dp*fx(2,D0)*fy(2,D0)
 		R(2)=fx(3,D2)*fy(1,D0)+fx(1,D2)*fy(3,D0)+2.0_dp*fx(2,D2)*fy(2,D0)
+
 		R(3)=fx(3,D1)*fy(1,D1)+fx(1,D1)*fy(3,D1)+2.0_dp*fx(2,D1)*fy(2,D1)
+
 		R(4)=fx(3,D1)*fy(1,D0)+fx(1,D1)*fy(3,D0)+2.0_dp*fx(2,D1)*fy(2,D0)
 		R(5)=fx(3,D0)*fy(1,D2)+fx(1,D0)*fy(3,D2)+2.0_dp*fx(2,D0)*fy(2,D2)
 		R(6)=fx(3,D0)*fy(1,D1)+fx(1,D0)*fy(3,D1)+2.0_dp*fx(2,D0)*fy(2,D1)
@@ -1150,7 +1159,6 @@ FUNCTION SINGLE_INT_D0(edt,I,J) RESULT(R)
 	f=f*edt%xy2(1:2,I,J)
 	c=f(2)-f(1)
 	R(3)=6.0_dp*a-12.0_dp*b-8.0_dp*c
-	R=R/2.0_dp
 END FUNCTION
 
 FUNCTION SINGLE_INT_D1(edt,I,J) RESULT(R)
@@ -1166,7 +1174,9 @@ FUNCTION SINGLE_INT_D1(edt,I,J) RESULT(R)
 
 	f=f*edt%xy2(1:2,I,J)
 	R(3)=f(2)-f(1)
-	R=R/2.0_dp
+	R(1)=R(1)/2.0_dp
+	R(2)=R(2)*2.0_dp
+	R(3)=R(3)*8.0_dp
 END FUNCTION
 
 FUNCTION SINGLE_INT_D2(edt,I,J) RESULT(R)
@@ -1176,13 +1186,15 @@ FUNCTION SINGLE_INT_D2(edt,I,J) RESULT(R)
 	REAL(dp)::f(2),a,b,c
 	f=edt%xy(1:2,I,J)*edt%xy_exp2(1:2,I,J)
 	a=f(2)-f(1)
-	R(1)=-a
+	R(1)=-a*0.5_dp
 	f=f*edt%xy2(1:2,I,J)
 	b=f(2)-f(1)
-	R(2)=-b+a*2.0_dp
+	R(2)=2.0_dp*(a-b)
 	f=f*edt%xy2(1:2,I,J)
 	c=f(2)-f(1)
-	R(3)=-c+4.0*b
+	R(3)=16.0_dp*b-8.0_dp*c
+
+
 END FUNCTION
 
 
@@ -1202,7 +1214,7 @@ END FUNCTION
 		COMPLEX(dp), DIMENSION(0:N-1), INTENT(inout) :: x
 		COMPLEX(dp),INTENT(IN)::wp(0:N-1)
 		COMPLEX(dp) ::	temp
-		INTEGER :: I,J,J2,I2,Istep,Ip,Iq
+		INTEGER :: I,J,J2,I2,Istep,Ip,Iq,Lstep
 			I2=0
 		DO I=0,Log2N-1
 			J2=2**I
