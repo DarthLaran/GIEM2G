@@ -548,8 +548,8 @@ FUNCTION outfunci4dxdycl(lt,cphi,sphi,dxr,dyr) RESULT(R)
 	R=R/t
 END FUNCTION
 FUNCTION outfunci4dxcl(lt,cphi,sphi,dxr,dyr) RESULT(R)	
-		REAL(dp),INTENT(IN)::lt,dxr,dyr
-		REAL(dp),INTENT(IN)::cphi,sphi
+	REAL(dp),INTENT(IN)::lt,dxr,dyr
+	REAL(dp),INTENT(IN)::cphi,sphi
 	REAL(dp)::R
 	REAL(dp)::t,x1,y1,dx,dy,t2,p
 !	t=EXP(lt)
