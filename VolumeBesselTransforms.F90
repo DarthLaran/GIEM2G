@@ -4,6 +4,7 @@ MODULE VolumeBesselTransforms
 	USE IntegralCodes
 	USE Const_module,ONLY: RealParm2,REALPARM
 	IMPLICIT NONE
+	USE FFT_QUAD
 PRIVATE
 	INTEGER ,PARAMETER::dp=16
 		REAL (dp),PARAMETER :: PI=3.1415926535897932384626433832795028841971693993751058209_dp
@@ -15,9 +16,9 @@ PRIVATE
 	REAL(dp),PARAMETER::xi=-4.82205425726955430357775925664462079e-0002_dp!*2e0_dp
 	REAL(dp),PARAMETER::q=y_step/2.0_dp
 	REAL(dp),PARAMETER::p=q+xi
-		COMPLEX(dp),TARGET::f1(0:N-1)
+	COMPLEX(dp),TARGET::f1(0:N-1)
 	INTEGER::INDS(0:N-1)
-	COMPLEX(dp),TARGET::W_fwd(0:N-1),W_bwd(0:N-1)
+	REAL(dp),TARGET::WORK(0:2*N-1)
 	REAL(dp),TARGET::explt(0:N-1)
 	REAL(dp),TARGET::explt2(0:N-1)
 	REAL(dp),TARGET::explt3(0:N-1)
@@ -27,6 +28,8 @@ PRIVATE
 	INTEGER,PARAMETER::D0=1
 	INTEGER,PARAMETER::D1=2
 	INTEGER,PARAMETER::D2=3
+	INTEGER,PARAMETER::FWD=1
+	INTEGER,PARAMETER::BWD=-1
 TYPE EXP_DATA_TYPE
 	REAL(dp),DIMENSION(0:N-1)::x1,y1,dx,dy
 	REAL(dp),DIMENSION(3,0:N-1,2)::xy
@@ -60,8 +63,9 @@ PUBLIC ::VBTransformWeights,VBTransformInit, VBTransformWeightsAllInt4,VBTransfo
 PUBLIC ::VBTransformWeightsAllInt22
 
 
+#define Ooura
 CONTAINS
-
+#ifndef Ooura
 SUBROUTINE VBTransformInit(lms) !NOT THREAD SAFETY!
 	REAL(RealParm2),INTENT(OUT)::lms(Nfirst:Nlast)
 	COMPLEX(dp)::f11(0:N-1),f21(0:N-1),tmp
@@ -98,6 +102,38 @@ SUBROUTINE VBTransformInit(lms) !NOT THREAD SAFETY!
 	CALL FFT_16(f1,W_fwd)
 	
 END SUBROUTINE
+#else
+SUBROUTINE VBTransformInit(lms) !NOT THREAD SAFETY!
+	REAL(RealParm2),INTENT(OUT)::lms(Nfirst:Nlast)
+	COMPLEX(dp)::f11(0:N-1),f21(0:N-1),tmp
+	REAL(dp)::y1,theta,y2
+	INTEGER::I,J,K,I2
+	
+	CALL makewt(N/2, INDS, WORK)
+
+	lms=xi+(/((J+N2)*y_step,J=Nfirst,Nlast)/)
+	lms=EXP(lms)
+	DO I=0,N-1,2
+		y1=(I+N2)*y_step+q
+		f1(I)=inputfunction(y1)
+		y1=y1+y_step
+		f1(I+1)=-inputfunction(y1)
+
+		y2=(I+N2)*y_step+p
+		explt(I)=EXP(y2)
+		explt2(I)=explt(I)*explt(I)
+		explt3(I)=explt2(I)*explt(I)
+		y2=y2+y_step
+		explt(I+1)=EXP(y2)
+		explt2(I+1)=explt(I+1)*explt(I+1)
+		explt3(I+1)=explt2(I+1)*explt(I+1)
+	ENDDO
+
+	CALL FFT_16(f1,FWD)
+	
+END SUBROUTINE
+#endif
+
 SUBROUTINE VBTransformWeights(x,y,hx,hy,WT,c,IERROR)
 	IMPLICIT NONE
 	REAL(RealParm),INTENT(IN)::x,y,hx,hy
@@ -212,20 +248,20 @@ END SUBROUTINE
 		sphi=SIN(phi)
 		DO I=0,N-1,2
 			y2=(I+N2)*y_step+p
-			g11(INDS(I))=outfunc(explt(I),cphi,sphi,alpha,beta)
+			g11(I)=outfunc(explt(I),cphi,sphi,alpha,beta)
 !			g11(INDS(I))=outfunc(y2,phi,alpha,beta)
 
 			y2=y2+y_step
 !			g11(INDS(I+1))=-outfunc(y2,phi,alpha,beta)
-			g11(INDS(I+1))=-outfunc(explt(I+1),cphi,sphi,alpha,beta)
+			g11(I+1)=-outfunc(explt(I+1),cphi,sphi,alpha,beta)
 		ENDDO
-		CALL FFT_16(g11,W_fwd)
+		CALL FFT_16(g11,FWD)
 		h=g11/inputfunc;
 		DO J=0,N-1,2
-			h(INDS(J))=g11(J)/inputfunc(J)
-			h(INDS(J+1))=-g11(J+1)/inputfunc(J+1)
+			h(J)=g11(J)/inputfunc(J)
+			h(J+1)=-g11(J+1)/inputfunc(J+1)
 		ENDDO
-		CALL FFT_16(h,W_bwd)
+		CALL FFT_16(h,BWD)
 		DO J=1,N-1,2
 			h(J-1)=h(J-1)/N
 			h(J)=-h(J)/N
@@ -367,16 +403,16 @@ SUBROUTINE CalcWeights2(edt,WT,outfunc)
 		INTEGER::I,J
 		g11=1.0_dp
 		DO I=0,N-1,2
-			g11(INDS(I))=outfunc(edt,I)
-			g11(INDS(I+1))=-outfunc(edt,I+1)
+			g11(I)=outfunc(edt,I)
+			g11(I+1)=-outfunc(edt,I+1)
 		ENDDO
-		CALL FFT_16(g11,W_fwd)
-		h=g11/f1;
+		CALL FFT_16(g11,FWD)
+!		h=g11/f1;
 		DO J=0,N-1,2
-			h(INDS(J))=g11(J)/f1(J)
-			h(INDS(J+1))=-g11(J+1)/f1(J+1)
+			h(J)=g11(J)/f1(J)
+			h(J+1)=-g11(J+1)/f1(J+1)
 		ENDDO
-		CALL FFT_16(h,W_bwd)
+		CALL FFT_16(h,BWD)
 		DO J=1,N-1,2
 			h(J-1)=h(J-1)/N
 			h(J)=-h(J)/N
@@ -384,6 +420,7 @@ SUBROUTINE CalcWeights2(edt,WT,outfunc)
 		
 		WT=REAL(h(Nfirst:Nlast),KIND=REALPARM2);
 	END SUBROUTINE
+#ifndef Ooura
 SUBROUTINE CalcWeights22(edt,WT,outfunc)
 		TYPE (EXP_DATA_TYPE),INTENT(IN)::edt
 		PROCEDURE(out_all),POINTER::outfunc
@@ -411,6 +448,34 @@ SUBROUTINE CalcWeights22(edt,WT,outfunc)
 		
 		WT=REAL(h(Nfirst:Nlast,:),KIND=REALPARM2);
 	END SUBROUTINE
+#else
+SUBROUTINE CalcWeights22(edt,WT,outfunc)
+		TYPE (EXP_DATA_TYPE),INTENT(IN)::edt
+		PROCEDURE(out_all),POINTER::outfunc
+		REAL(RealParm2),INTENT(OUT)::WT(Nfirst:Nlast,6)
+		COMPLEX(dp)::g11(0:N-1,6)
+		COMPLEX(dp)::h(0:N-1,6),tmp
+		INTEGER::I,J
+		DO I=0,N-1,2
+			g11(I,:)=outfunc(edt,I)
+			g11(I+1,:)=-outfunc(edt,I+1)
+		ENDDO
+		DO I=1,6
+			CALL FFT_16(g11(:,I),FWD)
+			DO J=0,N-1,2
+				h(J,I)=g11(J,I)/f1(J)
+				h(J+1,I)=-g11(J+1,I)/f1(J+1)
+			ENDDO
+			CALL FFT_16(h(:,I),BWD)
+			DO J=1,N-1,2
+				h(J-1,I)=h(J-1,I)/N
+				h(J,I)=-h(J,I)/N
+			ENDDO
+		ENDDO
+		
+		WT=REAL(h(Nfirst:Nlast,:),KIND=REALPARM2);
+	END SUBROUTINE
+#endif
 !------------------------ Input Function  -------------------------------------!
 
 FUNCTION inputfunction(t) RESULT (R)
@@ -1210,7 +1275,7 @@ END FUNCTION
 		END DO
 		R = temp
 	END FUNCTION bit_reverse
-	SUBROUTINE FFT_16(x,wp)!x MUST be after bit reverse, wp -array of coefficients for forward or backward FT
+	SUBROUTINE FFT_16_old(x,wp)!x MUST be after bit reverse, wp -array of coefficients for forward or backward FT
 		COMPLEX(dp), DIMENSION(0:N-1), INTENT(inout) :: x
 		COMPLEX(dp),INTENT(IN)::wp(0:N-1)
 		COMPLEX(dp) ::	temp
@@ -1229,5 +1294,16 @@ END FUNCTION
 				I2=I2+1
 			END DO
 		END DO
-	END SUBROUTINE FFT_16
+	END SUBROUTINE
+ 
+	SUBROUTINE FFT_16(X,dir)!x MUST be after bit reverse, wp -array of coefficients for forward or backward FT
+		USE ISO_C_BINDING
+		COMPLEX(dp),TARGET ,DIMENSION(0:N-1), INTENT(inout) :: x
+		INTEGER,INTENT(IN)::dir
+		REAL(dp),POINTER ::pX(:)
+		TYPE(C_PTR)::cp
+		cp=C_LOC(x)
+		CALL C_F_POINTER(cp,pX,(/2*N/))
+		CALL cdft(N*2,dir, pX, INDS, WORK)
+	END SUBROUTINE 
 END
