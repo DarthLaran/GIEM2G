@@ -151,36 +151,13 @@ CONTAINS
 			x=lx*dx-dx/2d0+recvs(Irecv)%x_shift
 			y=ly*dy-dy/2d0+recvs(Irecv)%y_shift
 			r=SQRT(x*x+y*y)
-!			DO Ic=RC_DXX,RC_D0
-!				CALL VBTransformWeights(x,y,dx,dy,WT(:,Ic),WR_IND(Ic),IERROR)
-!			ENDDO
-		CALL VBTransformWeightsAllInt22(x,y,dx,dy,WT0)
+			CALL VBTransformWeightsAllInt22(x,y,dx,dy,WT0)
 			WT(:,RC_D0)=WT0(:,1)
 			WT(:,RC_DXX)=WT0(:,2)
 			WT(:,RC_DXY)=WT0(:,3)
 			WT(:,RC_DX)=WT0(:,4)
 			WT(:,RC_DYY)=WT0(:,5)
 			WT(:,RC_DY)=WT0(:,6)
-#define no_compile
-#ifndef no_compile
-			CALL VBTransformWeights(x,y,dx,dy,WT1(:,1),INT2,IERROR)
-			PRINT*,'int2',(WT0(1024,1)/WT1(1024,1)),lx,ly
-
-			CALL VBTransformWeights(x,y,dx,dy,WT1(:,2),INT2DXX,IERROR)
-
-			PRINT*,'int2dxx',(WT0(1024,2)/WT1(1024,2)),lx,ly
-			CALL VBTransformWeights(x,y,dx,dy,WT1(:,3),INT2DXY,IERROR)
-
-			PRINT*,'int2dxy',(WT0(1024,3)/WT1(1024,3)),lx,ly
-			CALL VBTransformWeights(x,y,dx,dy,WT1(:,4),INT2DX,IERROR)
-
-			PRINT*,'int2dx',(WT0(1024,4)/WT1(1024,4)),lx,ly
-			CALL VBTransformWeights(x,y,dx,dy,WT1(:,5),INT2DYY,IERROR)
-
-			PRINT*,'int2dyy',(WT0(1024,5)/WT1(1024,5)),lx,ly
-			CALL VBTransformWeights(x,y,dx,dy,WT1(:,6),INT2DY,IERROR)
-			PRINT*,'int2dy',(WT0(1024,6)/WT1(1024,6)),lx,ly
-#endif
 			W0=MAXVAL(ABS(WT));
 				   
 			time2=MPI_Wtime()
