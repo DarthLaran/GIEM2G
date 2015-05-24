@@ -29,22 +29,22 @@
 !             ip(0) = 0  ! first time only
 !             call cdft(2*n, -1, a, ip, w)
 !     [parameters]
-!         2*n          :data length (integer)
+!         2*n          :data length (INTEGER)
 !                       n >= 1, n = power of 2
-!         a(0:2*n-1)   :input/output data (real*16)
+!         a(0:2*n-1)   :input/output data (REAL(QUAD_PRECISION))
 !                       input data
 !                           a(2*j) = Re(x(j)), 
 !                           a(2*j+1) = Im(x(j)), 0<=j<n
 !                       output data
 !                           a(2*k) = Re(X(k)), 
 !                           a(2*k+1) = Im(X(k)), 0<=k<n
-!         ip(0:*)      :work area for bit reversal (integer)
+!         ip(0:*)      :work area for bit reversal (INTEGER)
 !                       length of ip >= 2+sqrt(n)
 !                       strictly, 
 !                       length of ip >= 
 !                           2+2**(int(log(n+0.5)/log(2.0))/2).
 !                       ip(0),ip(1) are pointers of the cos/sin table.
-!         w(0:n/2-1)   :cos/sin table (real*16)
+!         w(0:n/2-1)   :cos/sin table (REAL(QUAD_PRECISION))
 !                       w(),ip() are initialized if ip(0) = 0.
 !     [remark]
 !         Inverse of 
@@ -74,9 +74,9 @@
 !             ip(0) = 0  ! first time only
 !             call rdft(n, -1, a, ip, w)
 !     [parameters]
-!         n            :data length (integer)
+!         n            :data length (INTEGER)
 !                       n >= 2, n = power of 2
-!         a(0:n-1)     :input/output data (real*16)
+!         a(0:n-1)     :input/output data (REAL(QUAD_PRECISION))
 !                       <case1>
 !                           output data
 !                               a(2*k) = R(k), 0<=k<n/2
@@ -87,13 +87,13 @@
 !                               a(2*j) = R(j), 0<=j<n/2
 !                               a(2*j+1) = I(j), 0<j<n/2
 !                               a(1) = R(n/2)
-!         ip(0:*)      :work area for bit reversal (integer)
+!         ip(0:*)      :work area for bit reversal (INTEGER)
 !                       length of ip >= 2+sqrt(n/2)
 !                       strictly, 
 !                       length of ip >= 
 !                           2+2**(int(log(n/2+0.5)/log(2.0))/2).
 !                       ip(0),ip(1) are pointers of the cos/sin table.
-!         w(0:n/2-1)   :cos/sin table (real*16)
+!         w(0:n/2-1)   :cos/sin table (REAL(QUAD_PRECISION))
 !                       w(),ip() are initialized if ip(0) = 0.
 !     [remark]
 !         Inverse of 
@@ -120,18 +120,18 @@
 !             ip(0) = 0  ! first time only
 !             call ddct(n, -1, a, ip, w)
 !     [parameters]
-!         n            :data length (integer)
+!         n            :data length (INTEGER)
 !                       n >= 2, n = power of 2
-!         a(0:n-1)     :input/output data (real*16)
+!         a(0:n-1)     :input/output data (REAL(QUAD_PRECISION))
 !                       output data
 !                           a(k) = C(k), 0<=k<n
-!         ip(0:*)      :work area for bit reversal (integer)
+!         ip(0:*)      :work area for bit reversal (INTEGER)
 !                       length of ip >= 2+sqrt(n/2)
 !                       strictly, 
 !                       length of ip >= 
 !                           2+2**(int(log(n/2+0.5)/log(2.0))/2).
 !                       ip(0),ip(1) are pointers of the cos/sin table.
-!         w(0:n*5/4-1) :cos/sin table (real*16)
+!         w(0:n*5/4-1) :cos/sin table (REAL(QUAD_PRECISION))
 !                       w(),ip() are initialized if ip(0) = 0.
 !     [remark]
 !         Inverse of 
@@ -159,9 +159,9 @@
 !             ip(0) = 0  ! first time only
 !             call ddst(n, -1, a, ip, w)
 !     [parameters]
-!         n            :data length (integer)
+!         n            :data length (INTEGER)
 !                       n >= 2, n = power of 2
-!         a(0:n-1)     :input/output data (real*16)
+!         a(0:n-1)     :input/output data (REAL(QUAD_PRECISION))
 !                       <case1>
 !                           input data
 !                               a(j) = A(j), 0<j<n
@@ -172,13 +172,13 @@
 !                           output data
 !                               a(k) = S(k), 0<k<n
 !                               a(0) = S(n)
-!         ip(0:*)      :work area for bit reversal (integer)
+!         ip(0:*)      :work area for bit reversal (INTEGER)
 !                       length of ip >= 2+sqrt(n/2)
 !                       strictly, 
 !                       length of ip >= 
 !                           2+2**(int(log(n/2+0.5)/log(2.0))/2).
 !                       ip(0),ip(1) are pointers of the cos/sin table.
-!         w(0:n*5/4-1) :cos/sin table (real*16)
+!         w(0:n*5/4-1) :cos/sin table (REAL(QUAD_PRECISION))
 !                       w(),ip() are initialized if ip(0) = 0.
 !     [remark]
 !         Inverse of 
@@ -199,19 +199,19 @@
 !         ip(0) = 0  ! first time only
 !         call dfct(n, a, t, ip, w)
 !     [parameters]
-!         n            :data length - 1 (integer)
+!         n            :data length - 1 (INTEGER)
 !                       n >= 2, n = power of 2
-!         a(0:n)       :input/output data (real*16)
+!         a(0:n)       :input/output data (REAL(QUAD_PRECISION))
 !                       output data
 !                           a(k) = C(k), 0<=k<=n
-!         t(0:n/2)     :work area (real*16)
-!         ip(0:*)      :work area for bit reversal (integer)
+!         t(0:n/2)     :work area (REAL(QUAD_PRECISION))
+!         ip(0:*)      :work area for bit reversal (INTEGER)
 !                       length of ip >= 2+sqrt(n/4)
 !                       strictly, 
 !                       length of ip >= 
 !                           2+2**(int(log(n/4+0.5)/log(2.0))/2).
 !                       ip(0),ip(1) are pointers of the cos/sin table.
-!         w(0:n*5/8-1) :cos/sin table (real*16)
+!         w(0:n*5/8-1) :cos/sin table (REAL(QUAD_PRECISION))
 !                       w(),ip() are initialized if ip(0) = 0.
 !     [remark]
 !         Inverse of 
@@ -235,20 +235,20 @@
 !         ip(0) = 0  ! first time only
 !         call dfst(n, a, t, ip, w)
 !     [parameters]
-!         n            :data length + 1 (integer)
+!         n            :data length + 1 (INTEGER)
 !                       n >= 2, n = power of 2
-!         a(0:n-1)     :input/output data (real*16)
+!         a(0:n-1)     :input/output data (REAL(QUAD_PRECISION))
 !                       output data
 !                           a(k) = S(k), 0<k<n
 !                       (a(0) is used for work area)
-!         t(0:n/2-1)   :work area (real*16)
-!         ip(0:*)      :work area for bit reversal (integer)
+!         t(0:n/2-1)   :work area (REAL(QUAD_PRECISION))
+!         ip(0:*)      :work area for bit reversal (INTEGER)
 !                       length of ip >= 2+sqrt(n/4)
 !                       strictly, 
 !                       length of ip >= 
 !                           2+2**(int(log(n/4+0.5)/log(2.0))/2).
 !                       ip(0),ip(1) are pointers of the cos/sin table.
-!         w(0:n*5/8-1) :cos/sin table (real*16)
+!         w(0:n*5/8-1) :cos/sin table (REAL(QUAD_PRECISION))
 !                       w(),ip() are initialized if ip(0) = 0.
 !     [remark]
 !         Inverse of 
@@ -266,14 +266,17 @@
 !     w() and ip() are compatible with all routines.
 !
 !
-		MODULE FFT_QUAD
+MODULE FFT_QUAD
+        IMPLICIT NONE
+        INTEGER,PARAMETER::QUAD_PRECISION=16
+      REAL(QUAD_PRECISION),PARAMETER::HALF=0.5_QUAD_PRECISION
 		CONTAINS
 	subroutine cdft(n, isgn, a, ip, w)
-      integer,INTENT(IN):: n, isgn
-	  integer,INTENT(IN):: ip(0:)
-      real*16,INTENT(INOUT):: a(0 : n - 1)
-	  REAL(16),INTENT(IN):: w(0:)
-	  integer:: nw
+      INTEGER,INTENT(IN):: n, isgn
+	  INTEGER,INTENT(IN):: ip(0:)
+      REAL(QUAD_PRECISION),INTENT(INOUT):: a(0 : n - 1)
+	  REAL(QUAD_PRECISION),INTENT(IN):: w(0:)
+	  INTEGER:: nw
       nw = ip(0)
 !      if (n .gt. 4 * nw) then
 !          nw = n / 4
@@ -290,10 +293,10 @@
 ! -------- initializing routines --------
 !
       subroutine makewt(nw, ip, w)
-      integer,INTENT(IN)::nw
+      INTEGER,INTENT(IN)::nw
 	  INTEGER,INTENT(INOUT):: ip(0: )
-      real(16),INTENT(INOUT):: w(0: )
-	  REAL(16):: delta, wn4r, wk1r, wk1i, wk3r, wk3i
+      REAL(QUAD_PRECISION),INTENT(INOUT):: w(0: )
+	  REAL(QUAD_PRECISION):: delta, wn4r, wk1r, wk1i, wk3r, wk3i
 	  INTEGER:: j, nwh, nw0, nw1
       ip(0) = nw
       ip(1) = 1
@@ -308,8 +311,8 @@
               w(3) = sin(delta * 2)
           else if (nwh .gt. 4) then
               call makeipt(nw, ip)
-              w(2) = 0.5e0_16 / cos(delta * 2)
-              w(3) = 0.5e0_16 / cos(delta * 6)
+              w(2) = HALF / cos(delta * 2)
+              w(3) = HALF / cos(delta * 6)
               do j = 4, nwh - 4, 4
                   w(j) = cos(delta * j)
                   w(j + 1) = sin(delta * j)
@@ -331,8 +334,8 @@
               else if (nwh .gt. 4) then
                   wk1r = w(nw0 + 4)
                   wk3r = w(nw0 + 6)
-                  w(nw1 + 2) = 0.5e0_16 / wk1r
-                  w(nw1 + 3) = 0.5e0_16 / wk3r
+                  w(nw1 + 2) = HALF / wk1r
+                  w(nw1 + 3) = HALF / wk3r
                   do j = 4, nwh - 4, 4
                       wk1r = w(nw0 + 2 * j)
                       wk1i = w(nw0 + 2 * j + 1)
@@ -350,7 +353,9 @@
       end subroutine
 !
       subroutine makeipt(nw, ip)
-      integer nw, ip(0 : *), j, l, m, m2, p, q
+      INTEGER,intent(in):: nw
+        INTEGER,INTENT(OUT):: ip(0 : )
+        INTEGER:: j, l, m, m2, p, q
       ip(2) = 0
       ip(3) = 16
       m = 2
@@ -369,17 +374,17 @@
       endsubroutine
 !
       subroutine makect(nc, ip, c)
-      integer nc, ip(0 : *), j, nch
-      real*16 c(0 : nc - 1), delta
+      INTEGER nc, ip(0 : *), j, nch
+      REAL(QUAD_PRECISION) c(0 : nc - 1), delta
       ip(1) = nc
       if (nc .gt. 1) then
           nch = nc / 2
           delta = atan(1.0e0_16) / nch
           c(0) = cos(delta * nch)
-          c(nch) = 0.5e0_16 * c(0)
+          c(nch) = HALF * c(0)
           do j = 1, nch - 1
-              c(j) = 0.5e0_16 * cos(delta * j)
-              c(nc - j) = 0.5e0_16 * sin(delta * j)
+              c(j) = HALF * cos(delta * j)
+              c(nc - j) = HALF * sin(delta * j)
           end do
       end if
       endsubroutine
@@ -387,9 +392,9 @@
 ! -------- child routines --------
 !
       subroutine cftfsub(n, a, ip, nw, w)
-      integer,intent(in):: n, ip(0 : *), nw
-      real(16),intent(out):: a(0 : n - 1)
-	  real(16),intent(in):: w(0 : nw - 1)
+      INTEGER,intent(in):: n, ip(0 : *), nw
+      REAL(QUAD_PRECISION),intent(out):: a(0 : n - 1)
+	  REAL(QUAD_PRECISION),intent(in):: w(0 : nw - 1)
       if (n .gt. 8) then
           if (n .gt. 32) then
               call cftf1st(n, a, w(nw - n / 4))
@@ -416,9 +421,9 @@
       endsubroutine
 !
       subroutine cftbsub(n, a, ip, nw, w)
-      integer,INTENT(IN):: n, ip(0 : ), nw
-      real(16),INTENT(INOUT):: a(0 : n - 1)
-	  real(16),INTENT(IN):: w(0 : nw - 1)
+      INTEGER,INTENT(IN):: n, ip(0 : ), nw
+      REAL(QUAD_PRECISION),INTENT(INOUT):: a(0 : n - 1)
+	  REAL(QUAD_PRECISION),INTENT(IN):: w(0 : nw - 1)
       if (n .gt. 8) then
           if (n .gt. 32) then
               call cftb1st(n, a, w(nw - n / 4))
@@ -445,8 +450,8 @@
       endsubroutine
 !
       subroutine bitrv2(n, ip, a)
-      integer n, ip(0 : *), j, j1, k, k1, l, m, nh, nm
-      real*16 a(0 : n - 1), xr, xi, yr, yi
+      INTEGER n, ip(0 : *), j, j1, k, k1, l, m, nh, nm
+      REAL(QUAD_PRECISION) a(0 : n - 1), xr, xi, yr, yi
       m = 1
       l = n / 4
       do while (l .gt. 8)
@@ -791,8 +796,8 @@
       endsubroutine
 !
       subroutine bitrv2conj(n, ip, a)
-      integer n, ip(0 : *), j, j1, k, k1, l, m, nh, nm
-      real*16 a(0 : n - 1), xr, xi, yr, yi
+      INTEGER n, ip(0 : *), j, j1, k, k1, l, m, nh, nm
+      REAL(QUAD_PRECISION) a(0 : n - 1), xr, xi, yr, yi
       m = 1
       l = n / 4
       do while (l .gt. 8)
@@ -1145,9 +1150,9 @@
       endsubroutine
 !
       subroutine bitrv216(a)
-      real*16 a(0 : 31), x1r, x1i, x2r, x2i, x3r, x3i, x4r, x4i
-      real*16 x5r, x5i, x7r, x7i, x8r, x8i, x10r, x10i
-      real*16 x11r, x11i, x12r, x12i, x13r, x13i, x14r, x14i
+      REAL(QUAD_PRECISION) a(0 : 31), x1r, x1i, x2r, x2i, x3r, x3i, x4r, x4i
+      REAL(QUAD_PRECISION) x5r, x5i, x7r, x7i, x8r, x8i, x10r, x10i
+      REAL(QUAD_PRECISION) x11r, x11i, x12r, x12i, x13r, x13i, x14r, x14i
       x1r = a(2)
       x1i = a(3)
       x2r = a(4)
@@ -1199,10 +1204,10 @@
       endsubroutine
 !
       subroutine bitrv216neg(a)
-      real*16 a(0 : 31), x1r, x1i, x2r, x2i, x3r, x3i, x4r, x4i
-      real*16 x5r, x5i, x6r, x6i, x7r, x7i, x8r, x8i
-      real*16 x9r, x9i, x10r, x10i, x11r, x11i, x12r, x12i
-      real*16 x13r, x13i, x14r, x14i, x15r, x15i
+      REAL(QUAD_PRECISION) a(0 : 31), x1r, x1i, x2r, x2i, x3r, x3i, x4r, x4i
+      REAL(QUAD_PRECISION) x5r, x5i, x6r, x6i, x7r, x7i, x8r, x8i
+      REAL(QUAD_PRECISION) x9r, x9i, x10r, x10i, x11r, x11i, x12r, x12i
+      REAL(QUAD_PRECISION) x13r, x13i, x14r, x14i, x15r, x15i
       x1r = a(2)
       x1i = a(3)
       x2r = a(4)
@@ -1266,7 +1271,7 @@
       endsubroutine
 !
       subroutine bitrv208(a)
-      real*16 a(0 : 15), x1r, x1i, x3r, x3i, x4r, x4i, x6r, x6i
+      REAL(QUAD_PRECISION) a(0 : 15), x1r, x1i, x3r, x3i, x4r, x4i, x6r, x6i
       x1r = a(2)
       x1i = a(3)
       x3r = a(6)
@@ -1286,8 +1291,8 @@
       endsubroutine
 !
       subroutine bitrv208neg(a)
-      real*16 a(0 : 15), x1r, x1i, x2r, x2i, x3r, x3i, x4r, x4i
-      real*16 x5r, x5i, x6r, x6i, x7r, x7i
+      REAL(QUAD_PRECISION) a(0 : 15), x1r, x1i, x2r, x2i, x3r, x3i, x4r, x4i
+      REAL(QUAD_PRECISION) x5r, x5i, x6r, x6i, x7r, x7i
       x1r = a(2)
       x1i = a(3)
       x2r = a(4)
@@ -1319,12 +1324,12 @@
       endsubroutine
 !
       subroutine cftf1st(n, a, w)
-      integer n, j, j0, j1, j2, j3, k, m, mh
-      real*16 a(0 : n - 1), w(0 : *)
-      real*16 wn4r, csc1, csc3, wk1r, wk1i, wk3r, wk3i
-      real*16 wd1r, wd1i, wd3r, wd3i
-      real*16 x0r, x0i, x1r, x1i, x2r, x2i, x3r, x3i
-      real*16 y0r, y0i, y1r, y1i, y2r, y2i, y3r, y3i
+      INTEGER n, j, j0, j1, j2, j3, k, m, mh
+      REAL(QUAD_PRECISION) a(0 : n - 1), w(0 : *)
+      REAL(QUAD_PRECISION) wn4r, csc1, csc3, wk1r, wk1i, wk3r, wk3i
+      REAL(QUAD_PRECISION) wd1r, wd1i, wd3r, wd3i
+      REAL(QUAD_PRECISION) x0r, x0i, x1r, x1i, x2r, x2i, x3r, x3i
+      REAL(QUAD_PRECISION) y0r, y0i, y1r, y1i, y2r, y2i, y3r, y3i
       mh = n / 8
       m = 2 * mh
       j1 = m
@@ -1523,12 +1528,12 @@
       endsubroutine
 !
       subroutine cftb1st(n, a, w)
-      integer n, j, j0, j1, j2, j3, k, m, mh
-      real*16 a(0 : n - 1), w(0 : *)
-      real*16 wn4r, csc1, csc3, wk1r, wk1i, wk3r, wk3i
-      real*16 wd1r, wd1i, wd3r, wd3i
-      real*16 x0r, x0i, x1r, x1i, x2r, x2i, x3r, x3i
-      real*16 y0r, y0i, y1r, y1i, y2r, y2i, y3r, y3i
+      INTEGER n, j, j0, j1, j2, j3, k, m, mh
+      REAL(QUAD_PRECISION) a(0 : n - 1), w(0 : *)
+      REAL(QUAD_PRECISION) wn4r, csc1, csc3, wk1r, wk1i, wk3r, wk3i
+      REAL(QUAD_PRECISION) wd1r, wd1i, wd3r, wd3i
+      REAL(QUAD_PRECISION) x0r, x0i, x1r, x1i, x2r, x2i, x3r, x3i
+      REAL(QUAD_PRECISION) y0r, y0i, y1r, y1i, y2r, y2i, y3r, y3i
       mh = n / 8
       m = 2 * mh
       j1 = m
@@ -1727,8 +1732,8 @@
       endsubroutine
 !
       subroutine cftrec4(n, a, nw, w)
-      integer n, nw,  isplt, j, k, m
-      real*16 a(0 : n - 1), w(0 : nw - 1)
+      INTEGER n, nw,  isplt, j, k, m
+      REAL(QUAD_PRECISION) a(0 : n - 1), w(0 : nw - 1)
       m = n
       do while (m .gt. 512)
           m = m / 4
@@ -1744,9 +1749,9 @@
       endsubroutine
 !
       function cfttree(n, j, k, a, nw, w) result(R)
-      integer n, j, k, nw, i, isplt, m
-	  integer::R
-      real*16 a(0 : j - 1), w(0 : nw - 1)
+      INTEGER n, j, k, nw, i, isplt, m
+	  INTEGER::R
+      REAL(QUAD_PRECISION) a(0 : j - 1), w(0 : nw - 1)
       if (mod(k, 4) .ne. 0) then
           isplt = mod(k, 2)
           if (isplt .ne. 0) then
@@ -1778,8 +1783,8 @@
       endfunction
 !
       subroutine cftleaf(n, isplt, a, nw, w)
-      integer n, isplt, nw
-      real*16 a(0 : n - 1), w(0 : nw - 1)
+      INTEGER n, isplt, nw
+      REAL(QUAD_PRECISION) a(0 : n - 1), w(0 : nw - 1)
       if (n .eq. 512) then
           call cftmdl1(128, a, w(nw - 64))
           call cftf161(a, w(nw - 8))
@@ -1836,10 +1841,10 @@
       endsubroutine
 !
       subroutine cftmdl1(n, a, w)
-      integer n, j, j0, j1, j2, j3, k, m, mh
-      real*16 a(0 : n - 1), w(0 : *)
-      real*16 wn4r, wk1r, wk1i, wk3r, wk3i
-      real*16 x0r, x0i, x1r, x1i, x2r, x2i, x3r, x3i
+      INTEGER n, j, j0, j1, j2, j3, k, m, mh
+      REAL(QUAD_PRECISION) a(0 : n - 1), w(0 : *)
+      REAL(QUAD_PRECISION) wn4r, wk1r, wk1i, wk3r, wk3i
+      REAL(QUAD_PRECISION) x0r, x0i, x1r, x1i, x2r, x2i, x3r, x3i
       mh = n / 8
       m = 2 * mh
       j1 = m
@@ -1944,11 +1949,11 @@
       endsubroutine
 !
       subroutine cftmdl2(n, a, w)
-      integer n, j, j0, j1, j2, j3, k, kr, m, mh
-      real*16 a(0 : n - 1), w(0 : *)
-      real*16 wn4r, wk1r, wk1i, wk3r, wk3i, wd1r, wd1i, wd3r, wd3i
-      real*16 x0r, x0i, x1r, x1i, x2r, x2i, x3r, x3i
-      real*16 y0r, y0i, y2r, y2i
+      INTEGER n, j, j0, j1, j2, j3, k, kr, m, mh
+      REAL(QUAD_PRECISION) a(0 : n - 1), w(0 : *)
+      REAL(QUAD_PRECISION) wn4r, wk1r, wk1i, wk3r, wk3i, wd1r, wd1i, wd3r, wd3i
+      REAL(QUAD_PRECISION) x0r, x0i, x1r, x1i, x2r, x2i, x3r, x3i
+      REAL(QUAD_PRECISION) y0r, y0i, y2r, y2i
       mh = n / 8
       m = 2 * mh
       wn4r = w(1)
@@ -2077,8 +2082,8 @@
       endsubroutine
 !
       subroutine cftfx41(n, a, nw, w)
-      integer n, nw
-      real*16 a(0 : n - 1), w(0 : nw - 1)
+      INTEGER n, nw
+      REAL(QUAD_PRECISION) a(0 : n - 1), w(0 : nw - 1)
       if (n .eq. 128) then
           call cftf161(a, w(nw - 8))
           call cftf162(a(32), w(nw - 32))
@@ -2093,12 +2098,12 @@
       endsubroutine
 !
       subroutine cftf161(a, w)
-      real*16 a(0 : 31), w(0 : *), wn4r, wk1r, wk1i
-      real*16 x0r, x0i, x1r, x1i, x2r, x2i, x3r, x3i
-      real*16 y0r, y0i, y1r, y1i, y2r, y2i, y3r, y3i
-      real*16 y4r, y4i, y5r, y5i, y6r, y6i, y7r, y7i
-      real*16 y8r, y8i, y9r, y9i, y10r, y10i, y11r, y11i
-      real*16 y12r, y12i, y13r, y13i, y14r, y14i, y15r, y15i
+      REAL(QUAD_PRECISION) a(0 : 31), w(0 : *), wn4r, wk1r, wk1i
+      REAL(QUAD_PRECISION) x0r, x0i, x1r, x1i, x2r, x2i, x3r, x3i
+      REAL(QUAD_PRECISION) y0r, y0i, y1r, y1i, y2r, y2i, y3r, y3i
+      REAL(QUAD_PRECISION) y4r, y4i, y5r, y5i, y6r, y6i, y7r, y7i
+      REAL(QUAD_PRECISION) y8r, y8i, y9r, y9i, y10r, y10i, y11r, y11i
+      REAL(QUAD_PRECISION) y12r, y12i, y13r, y13i, y14r, y14i, y15r, y15i
       wn4r = w(1)
       wk1r = w(2)
       wk1i = w(3)
@@ -2249,13 +2254,13 @@
       endsubroutine
 !
       subroutine cftf162(a, w)
-      real*16 a(0 : 31), w(0 : *)
-      real*16 wn4r, wk1r, wk1i, wk2r, wk2i, wk3r, wk3i
-      real*16 x0r, x0i, x1r, x1i, x2r, x2i
-      real*16 y0r, y0i, y1r, y1i, y2r, y2i, y3r, y3i
-      real*16 y4r, y4i, y5r, y5i, y6r, y6i, y7r, y7i
-      real*16 y8r, y8i, y9r, y9i, y10r, y10i, y11r, y11i
-      real*16 y12r, y12i, y13r, y13i, y14r, y14i, y15r, y15i
+      REAL(QUAD_PRECISION) a(0 : 31), w(0 : *)
+      REAL(QUAD_PRECISION) wn4r, wk1r, wk1i, wk2r, wk2i, wk3r, wk3i
+      REAL(QUAD_PRECISION) x0r, x0i, x1r, x1i, x2r, x2i
+      REAL(QUAD_PRECISION) y0r, y0i, y1r, y1i, y2r, y2i, y3r, y3i
+      REAL(QUAD_PRECISION) y4r, y4i, y5r, y5i, y6r, y6i, y7r, y7i
+      REAL(QUAD_PRECISION) y8r, y8i, y9r, y9i, y10r, y10i, y11r, y11i
+      REAL(QUAD_PRECISION) y12r, y12i, y13r, y13i, y14r, y14i, y15r, y15i
       wn4r = w(1)
       wk1r = w(4)
       wk1i = w(5)
@@ -2430,10 +2435,10 @@
       endsubroutine
 !
       subroutine cftf081(a, w)
-      real*16 a(0 : 15), w(0 : *)
-      real*16 wn4r, x0r, x0i, x1r, x1i, x2r, x2i, x3r, x3i
-      real*16 y0r, y0i, y1r, y1i, y2r, y2i, y3r, y3i
-      real*16 y4r, y4i, y5r, y5i, y6r, y6i, y7r, y7i
+      REAL(QUAD_PRECISION) a(0 : 15), w(0 : *)
+      REAL(QUAD_PRECISION) wn4r, x0r, x0i, x1r, x1i, x2r, x2i, x3r, x3i
+      REAL(QUAD_PRECISION) y0r, y0i, y1r, y1i, y2r, y2i, y3r, y3i
+      REAL(QUAD_PRECISION) y4r, y4i, y5r, y5i, y6r, y6i, y7r, y7i
       wn4r = w(1)
       x0r = a(0) + a(8)
       x0i = a(1) + a(9)
@@ -2490,10 +2495,10 @@
       endsubroutine
 !
       subroutine cftf082(a, w)
-      real*16 a(0 : 15), w(0 : *)
-      real*16 wn4r, wk1r, wk1i, x0r, x0i, x1r, x1i
-      real*16 y0r, y0i, y1r, y1i, y2r, y2i, y3r, y3i
-      real*16 y4r, y4i, y5r, y5i, y6r, y6i, y7r, y7i
+      REAL(QUAD_PRECISION) a(0 : 15), w(0 : *)
+      REAL(QUAD_PRECISION) wn4r, wk1r, wk1i, x0r, x0i, x1r, x1i
+      REAL(QUAD_PRECISION) y0r, y0i, y1r, y1i, y2r, y2i, y3r, y3i
+      REAL(QUAD_PRECISION) y4r, y4i, y5r, y5i, y6r, y6i, y7r, y7i
       wn4r = w(1)
       wk1r = w(2)
       wk1i = w(3)
@@ -2560,7 +2565,7 @@
       endsubroutine
 !
       subroutine cftf040(a)
-      real*16 a(0 : 7), x0r, x0i, x1r, x1i, x2r, x2i, x3r, x3i
+      REAL(QUAD_PRECISION) a(0 : 7), x0r, x0i, x1r, x1i, x2r, x2i, x3r, x3i
       x0r = a(0) + a(4)
       x0i = a(1) + a(5)
       x1r = a(0) - a(4)
@@ -2580,7 +2585,7 @@
       endsubroutine
 !
       subroutine cftb040(a)
-      real*16 a(0 : 7), x0r, x0i, x1r, x1i, x2r, x2i, x3r, x3i
+      REAL(QUAD_PRECISION) a(0 : 7), x0r, x0i, x1r, x1i, x2r, x2i, x3r, x3i
       x0r = a(0) + a(4)
       x0i = a(1) + a(5)
       x1r = a(0) - a(4)
@@ -2600,7 +2605,7 @@
       endsubroutine
 !
       subroutine cftx020(a)
-      real*16 a(0 : 3), x0r, x0i
+      REAL(QUAD_PRECISION) a(0 : 3), x0r, x0i
       x0r = a(0) - a(2)
       x0i = a(1) - a(3)
       a(0) = a(0) + a(2)
@@ -2610,15 +2615,15 @@
       endsubroutine
 !
       subroutine rftfsub(n, a, nc, c)
-      integer n, nc, j, k, kk, ks, m
-      real*16 a(0 : n - 1), c(0 : nc - 1), wkr, wki, xr, xi, yr, yi
+      INTEGER n, nc, j, k, kk, ks, m
+      REAL(QUAD_PRECISION) a(0 : n - 1), c(0 : nc - 1), wkr, wki, xr, xi, yr, yi
       m = n / 2
       ks = 2 * nc / m
       kk = 0
       do j = 2, m - 2, 2
           k = n - j
           kk = kk + ks
-          wkr = 0.5e0_16 - c(nc - kk)
+          wkr = HALF - c(nc - kk)
           wki = c(kk)
           xr = a(j) - a(k)
           xi = a(j + 1) + a(k + 1)
@@ -2632,15 +2637,15 @@
       endsubroutine
 !
       subroutine rftbsub(n, a, nc, c)
-      integer n, nc, j, k, kk, ks, m
-      real*16 a(0 : n - 1), c(0 : nc - 1), wkr, wki, xr, xi, yr, yi
+      INTEGER n, nc, j, k, kk, ks, m
+      REAL(QUAD_PRECISION) a(0 : n - 1), c(0 : nc - 1), wkr, wki, xr, xi, yr, yi
       m = n / 2
       ks = 2 * nc / m
       kk = 0
       do j = 2, m - 2, 2
           k = n - j
           kk = kk + ks
-          wkr = 0.5e0_16 - c(nc - kk)
+          wkr = HALF - c(nc - kk)
           wki = c(kk)
           xr = a(j) - a(k)
           xi = a(j + 1) + a(k + 1)
@@ -2654,8 +2659,8 @@
       endsubroutine
 !
       subroutine dctsub(n, a, nc, c)
-      integer n, nc, j, k, kk, ks, m
-      real*16 a(0 : n - 1), c(0 : nc - 1), wkr, wki, xr
+      INTEGER n, nc, j, k, kk, ks, m
+      REAL(QUAD_PRECISION) a(0 : n - 1), c(0 : nc - 1), wkr, wki, xr
       m = n / 2
       ks = nc / n
       kk = 0
@@ -2672,8 +2677,11 @@
       endsubroutine
 !
       subroutine dstsub(n, a, nc, c)
-      integer n, nc, j, k, kk, ks, m
-      real*16 a(0 : n - 1), c(0 : nc - 1), wkr, wki, xr
+      INTEGER,INTENT(IN):: n, nc
+      REAL(QUAD_PRECISION),INTENT(IN)::  c(0 : nc - 1)
+      REAL(QUAD_PRECISION),INTENT(INOUT):: a(0 : n - 1)
+      INTEGER :: j, k, kk, ks, m
+       REAL(QUAD_PRECISION)::wkr, wki, xr
       m = n / 2
       ks = nc / n
       kk = 0
@@ -2688,5 +2696,5 @@
       end do
       a(m) = c(0) * a(m)
       endsubroutine
-		END MODULE
+END MODULE
 !

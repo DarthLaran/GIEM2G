@@ -3,13 +3,14 @@
 MODULE VolumeBesselTransforms 
 	USE IntegralCodes
 	USE Const_module,ONLY: RealParm2,REALPARM
-	IMPLICIT NONE
 	USE FFT_QUAD
+	IMPLICIT NONE
 PRIVATE
 	INTEGER ,PARAMETER::dp=16
-		REAL (dp),PARAMETER :: PI=3.1415926535897932384626433832795028841971693993751058209_dp
+	REAL(dp),PARAMETER :: PI=3.1415926535897932384626433832795028841971693993751058209_dp
 	REAL(dp),PARAMETER::SPI=SQRT(PI)
 	INTEGER,PARAMETER::Log2N=11
+	INTEGER,PARAMETER::NI=2**(Log2N/2+1)+2
 	INTEGER, PARAMETER::N=2**Log2N
 	INTEGER, PARAMETER::N2=-N/2
 	REAL(dp),PARAMETER::y_step=1e-1_dp!*2e0_dp
@@ -17,8 +18,8 @@ PRIVATE
 	REAL(dp),PARAMETER::q=y_step/2.0_dp
 	REAL(dp),PARAMETER::p=q+xi
 	COMPLEX(dp),TARGET::f1(0:N-1)
-	INTEGER::INDS(0:N-1)
-	REAL(dp),TARGET::WORK(0:2*N-1)
+	INTEGER::INDS(0:NI)
+	REAL(dp),TARGET::WORK(0:N/2-1)
 	REAL(dp),TARGET::explt(0:N-1)
 	REAL(dp),TARGET::explt2(0:N-1)
 	REAL(dp),TARGET::explt3(0:N-1)
@@ -435,11 +436,17 @@ SUBROUTINE CalcWeights22(edt,WT,outfunc)
 		ENDDO
 		DO I=1,6
 			CALL FFT_16(g11(:,I),W_fwd)
+		ENDDO
+		DO I=1,6
 			DO J=0,N-1,2
 				h(INDS(J),I)=g11(J,I)/f1(J)
 				h(INDS(J+1),I)=-g11(J+1,I)/f1(J+1)
 			ENDDO
+		ENDDO
+		DO I=1,6
 			CALL FFT_16(h(:,I),W_bwd)
+		ENDDO
+		DO I=1,6
 			DO J=1,N-1,2
 				h(J-1,I)=h(J-1,I)/N
 				h(J,I)=-h(J,I)/N
@@ -462,11 +469,17 @@ SUBROUTINE CalcWeights22(edt,WT,outfunc)
 		ENDDO
 		DO I=1,6
 			CALL FFT_16(g11(:,I),FWD)
+                ENDDO
+		DO I=1,6
 			DO J=0,N-1,2
 				h(J,I)=g11(J,I)/f1(J)
 				h(J+1,I)=-g11(J+1,I)/f1(J+1)
 			ENDDO
+		ENDDO
+		DO I=1,6
 			CALL FFT_16(h(:,I),BWD)
+		ENDDO
+		DO I=1,6
 			DO J=1,N-1,2
 				h(J-1,I)=h(J-1,I)/N
 				h(J,I)=-h(J,I)/N
@@ -1275,7 +1288,8 @@ END FUNCTION
 		END DO
 		R = temp
 	END FUNCTION bit_reverse
-	SUBROUTINE FFT_16_old(x,wp)!x MUST be after bit reverse, wp -array of coefficients for forward or backward FT
+#ifndef Ooura
+	SUBROUTINE FFT_16(x,wp)!x MUST be after bit reverse, wp -array of coefficients for forward or backward FT
 		COMPLEX(dp), DIMENSION(0:N-1), INTENT(inout) :: x
 		COMPLEX(dp),INTENT(IN)::wp(0:N-1)
 		COMPLEX(dp) ::	temp
@@ -1296,6 +1310,7 @@ END FUNCTION
 		END DO
 	END SUBROUTINE
  
+#else
 	SUBROUTINE FFT_16(X,dir)!x MUST be after bit reverse, wp -array of coefficients for forward or backward FT
 		USE ISO_C_BINDING
 		COMPLEX(dp),TARGET ,DIMENSION(0:N-1), INTENT(inout) :: x
@@ -1306,4 +1321,5 @@ END FUNCTION
 		CALL C_F_POINTER(cp,pX,(/2*N/))
 		CALL cdft(N*2,dir, pX, INDS, WORK)
 	END SUBROUTINE 
+#endif
 END
