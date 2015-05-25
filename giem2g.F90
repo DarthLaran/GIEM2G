@@ -146,7 +146,6 @@ PROGRAM GIEMIEMG
 		CALL CalcRecalculationGreenTensor(rc_op,bkg,anomaly,RC_Threshold)
 		CALL CalcFFTofRCTensor(rc_op)
 
-#define not_compile
 #ifndef not_compile
 		DO Ia=1,Na
 			WRITE (fnum2,'(I5.5)') Ia

@@ -3,7 +3,7 @@ F77=mpif77
 FC_Link=mpif90
 AR=xiar
 
-FOPTS= -g    -openmp  -i4 -mcmodel=large  -O3    -xHost -prec-div -inline speed -ipo=20
+FOPTS= -g    -openmp  -i4 -mcmodel=large  -O3    -xHost -prec-div -inline speed -ipo=22
  #FOPTS= -g    -openmp  -i4 -mcmodel=large  -O0
 
 
