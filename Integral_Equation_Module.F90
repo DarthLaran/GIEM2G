@@ -40,7 +40,7 @@ MODULE INTEGRAL_EQUATION_MODULE
 
 		TYPE(C_PTR)::pG_asym
 		TYPE(C_PTR)::pG_symm
-		INTEGER:: matrix_comm
+		INTEGER::matrix_comm
 		INTEGER::me
 		INTEGER::master_proc
 		LOGICAL::master
@@ -165,14 +165,16 @@ CONTAINS
 		INTEGER(C_INTPTR_T)::tsize8(2)
 		INTEGER(C_INTPTR_T)::Nz3
 		INTEGER(C_INTPTR_T)::block
-		INTEGER(C_INTPTR_T):: CNy,CNy_offset !size and offset for electrical current in Y direction at this process 
+		INTEGER(C_INTPTR_T):: CNy,CNy_offset !size and offset for electrical current in Y direction at this process 		  INTEGE
+		INTEGER(FFTW_COMM_SIZE)::comm
 		REAL(REALPARM)::size_symm,size_asym
 		REAL(REALPARM)::tensor_size
 
 		tsize8=(/ie_op%Ny*2,ie_op%Nx*2/)
 		block=FFTW_MPI_DEFAULT_BLOCK!(0)
 		Nz3=ie_op%Nz*3
-		ie_op%localsize = fftw_mpi_local_size_many(FFTW_TWO,tsize8,Nz3,block,ie_op%matrix_comm, &
+		comm=ie_op%matrix_comm
+		ie_op%localsize = fftw_mpi_local_size_many(FFTW_TWO,tsize8,Nz3,block,comm, &
 			& CNy, CNy_offset)
 		ie_op%Ny_loc=INT(CNy,KIND(ie_op%Ny_loc))
 		ie_op%Ny_offset=INT(CNy_offset,KIND(ie_op%Ny_offset))
@@ -236,7 +238,8 @@ CONTAINS
 		INTEGER(C_INTPTR_T)::Nz3
 		INTEGER(C_INTPTR_T)::block
 		INTEGER::IERROR
-				INTEGER::omp_get_max_threads,nt
+		INTEGER::omp_get_max_threads,nt
+		INTEGER(FFTW_COMM_SIZE)::COMM, FFTW_NT
 		REAL(8)::time1,time2
 		fftwsize=(/ie_op%Ny*2,ie_op%Nx*2/)
 		block=FFTW_MPI_DEFAULT_BLOCK
@@ -245,14 +248,16 @@ CONTAINS
 		time1=MPI_WTIME()
 		IF (ie_op%fftw_threads_ok) THEN
 			NT=OMP_GET_MAX_THREADS()
-			CALL FFTW_PLAN_WITH_NTHREADS(NT)
+			FFTW_NT=NT
+			CALL FFTW_PLAN_WITH_NTHREADS(FFTW_NT)
 		ENDIF
+		COMM=ie_op%matrix_comm
 !		 CALL fftw_set_timelimit(5d0)
 				 
 		ie_op%planFWD=fftw_mpi_plan_many_dft(FFTW_TWO,fftwsize,Nz3,block,block,&
-		&ie_op%field_in4,ie_op%field_in4,ie_op%matrix_comm, FFTW_FORWARD ,FFTW_MEASURE)!FFTW_PATIENT);
+		&ie_op%field_in4,ie_op%field_in4,COMM, FFTW_FORWARD ,FFTW_MEASURE)!FFTW_PATIENT);
 		ie_op%planBWD=fftw_mpi_plan_many_dft(FFTW_TWO,fftwsize,Nz3,block,block,&
-		&ie_op%field_out4,ie_op%field_out4,ie_op%matrix_comm, FFTW_BACKWARD ,FFTW_MEASURE)!FFTW_PATIENT);
+		&ie_op%field_out4,ie_op%field_out4,COMM, FFTW_BACKWARD ,FFTW_MEASURE)!FFTW_PATIENT);
 		time2=MPI_WTIME()
 		ie_op%counter%plans=time2-time1
 		IF (VERBOSE) THEN
