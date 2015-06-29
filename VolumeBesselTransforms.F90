@@ -30,11 +30,13 @@ PRIVATE
 	INTEGER,PARAMETER::D1=2
 	INTEGER,PARAMETER::D2=3
 
+	REAL(dp),TARGET::lambda_shift
+	INTEGER::INDS(0:N-1)
 #ifdef  FFT_QUAD_OOURA
 	INTEGER,PARAMETER::FWD=1
 	INTEGER,PARAMETER::BWD=-1
+	REAL(dp),TARGET::WORK(0:N/2-1)
 #else
-	INTEGER::INDS(0:N-1)
 	COMPLEX(dp),TARGET::W_fwd(0:N-1),W_bwd(0:N-1)
 #endif
 	TYPE EXP_DATA_TYPE
@@ -55,13 +57,14 @@ END INTERFACE
 
 
 
-PUBLIC ::VBTransformInit, VBTransformWeightsAllInt42
-PUBLIC ::VBTransformWeightsAllInt22
+PUBLIC ::VBTransformInit, VBTransformWeightsAllDoubleInt
+PUBLIC ::VBTransformWeightsAllSingleInt
 
 
 CONTAINS
 #ifdef  FFT_QUAD_OOURA
-SUBROUTINE VBTransformInit(lms) !NOT THREAD SAFETY!
+SUBROUTINE VBTransformInit(s,lms) !NOT THREAD SAFETY!
+	REAL(RealParm2),INTENT(IN)::s
 	REAL(RealParm2),INTENT(OUT)::lms(Nfirst:Nlast)
 	COMPLEX(dp)::f11(0:N-1),f21(0:N-1),tmp
 	REAL(dp)::y1,theta,y2
@@ -70,27 +73,21 @@ SUBROUTINE VBTransformInit(lms) !NOT THREAD SAFETY!
 	CALL makewt(N/2, INDS, WORK)
 
 	lms=xi+(/((J+N2)*y_step,J=Nfirst,Nlast)/)
-	lms=EXP(lms)
+	lms=EXP(lms)/s
+        lambda_shift=LOG(s)	
 	DO I=0,N-1,2
 		y1=(I+N2)*y_step+q
 		f1(I)=inputfunction(y1)
 		y1=y1+y_step
 		f1(I+1)=-inputfunction(y1)
 
-		y2=(I+N2)*y_step+p
-		explt(I)=EXP(y2)
-		explt2(I)=explt(I)*explt(I)
-		explt3(I)=explt2(I)*explt(I)
-		y2=y2+y_step
-		explt(I+1)=EXP(y2)
-		explt2(I+1)=explt(I+1)*explt(I+1)
-		explt3(I+1)=explt2(I+1)*explt(I+1)
 	ENDDO
-
 	CALL FFT_16(f1,FWD)
 	
 END SUBROUTINE
-SUBROUTINE VBTransformInit(lms) !NOT THREAD SAFETY!
+#else
+SUBROUTINE VBTransformInit(s,lms) !NOT THREAD SAFETY!
+	REAL(RealParm2),INTENT(IN)::s
 	REAL(RealParm2),INTENT(OUT)::lms(Nfirst:Nlast)
 	COMPLEX(dp)::f11(0:N-1),f21(0:N-1),tmp
 	REAL(dp)::y1,theta,y2
@@ -107,14 +104,25 @@ SUBROUTINE VBTransformInit(lms) !NOT THREAD SAFETY!
 		ENDDO
 	ENDDO
 	lms=xi+(/((J+N2)*y_step,J=Nfirst,Nlast)/)
-	lms=EXP(lms)
+	lms=EXP(lms)/s
+        lambda_shift=LOG(s)	
 	DO I=0,N-1,2
-		y1=(I+N2)*y_step+q
+		y1=(I+N2)*y_step+q!+lambda_shift
 		f1(INDS(I))=inputfunction(y1)
 		y1=y1+y_step
 		f1(INDS(I+1))=-inputfunction(y1)
 
-		y2=(I+N2)*y_step+p
+	ENDDO
+	CALL FFT_16(f1,W_fwd)
+END SUBROUTINE
+#endif
+
+SUBROUTINE CALC_EXP_LT(s)
+        REAL(dp),INTENT(IN)::s
+	INTEGER::I
+	REAL(dp)::y2
+	DO I=0,N-1,2
+		y2=(I+N2)*y_step+p+s
 		explt(I)=EXP(y2)
 		explt2(I)=explt(I)*explt(I)
 		explt3(I)=explt2(I)*explt(I)
@@ -123,202 +131,9 @@ SUBROUTINE VBTransformInit(lms) !NOT THREAD SAFETY!
 		explt2(I+1)=explt(I+1)*explt(I+1)
 		explt3(I+1)=explt2(I+1)*explt(I+1)
 	ENDDO
-	CALL FFT_16(f1,W_fwd)
-	
-END SUBROUTINE
-#else
-#endif
-
-SUBROUTINE VBTransformWeights(x,y,hx,hy,WT,c,IERROR)
-	IMPLICIT NONE
-	REAL(RealParm),INTENT(IN)::x,y,hx,hy
-	INTEGER,INTENT(IN)::c
-	INTEGER,OPTIONAL,INTENT(OUT)::IERROR
-	REAL(RealParm2),INTENT(OUT)::WT(Nfirst:Nlast)
-	REAL(dp)::rho,phi,alpha,beta
-	REAL(dp)::xq,yq,hxq,hyq
-		COMPLEX(dp),POINTER::inputfunc(:)
-	REAL(RealParm2)::rp
-	PROCEDURE(outfunction),POINTER::outfunc
-	
-	xq=x;
-	yq=y;
-	hxq=hx;
-	hyq=hy;
-	rho=SQRT(xq*xq+yq*yq);
-	rp=1e0_dp
-		SELECT CASE (c)
-				 CASE (INT4DYY:INT4DY,INT2DYY:INT2DY)
-					alpha=hyq/rho;
-					beta=hxq/rho;
-					phi=ATAN2(xq,yq);
-				CASE DEFAULT
-					alpha=hxq/rho;
-					beta=hyq/rho;
-					phi=ATAN2(yq,xq);
-		END SELECT
-
-		SELECT CASE (c)
-!--------------- INT4 ----------------!
-				CASE (INT4)
-						outfunc=>outfunci4cl
-						inputfunc=>f1
-						rp=rho*rho*rho
-				CASE (INT4DXX)
-						outfunc=>outfunci4dxdxcl
-						inputfunc=>f1
-						rp=rho
-				CASE (INT4DXY)
-						outfunc=>outfunci4dxdycl
-						inputfunc=>f1
-						rp=rho
-				CASE (INT4DX)
-						outfunc=>outfunci4dxcl
-						inputfunc=>f1
-						rp=rho*rho
-				CASE  (INT4DYY)
-						outfunc=>outfunci4dxdxcl
-						inputfunc=>f1
-						rp=rho
-				CASE (INT4DY)
-						outfunc=>outfunci4dxcl
-						inputfunc=>f1
-						rp=rho*rho
-!--------------- INT2 ----------------!
-				CASE (INT2)
-						outfunc=>outfunci2cl
-						inputfunc=>f1
-			rp=rho
-				CASE (INT2DXX)
-						outfunc=>outfunci2dxdxcl
-						inputfunc=>f1
-			rp=1e0_dp/rho
-				CASE (INT2DXY)
-						outfunc=>outfunci2dxdycl
-						inputfunc=>f1
-			rp=1e0_dp/rho
-				CASE (INT2DX)
-						outfunc=>outfunci2dxcl
-						inputfunc=>f1
-				CASE (28)!(INT2DYY)
-						outfunc=>outfunci2dxdxcl
-						inputfunc=>f1
-			rp=1e0_dp/rho
-				CASE (30)!(INT2DY)
-						outfunc=>outfunci2dxcl
-						inputfunc=>f1
-			   CASE DEFAULT
-				PRINT*, 'ERROR! The wrong type', c ,'. May be in future? '
-			IF (PRESENT(IERROR)) THEN
-				IF (c/=0) THEN 
-					IERROR=c
-					PRINT*,x,y,hx,hy
-				ELSE
-					IERROR=-1
-					PRINT*,x,y,hx,hy
-				ENDIF
-			ENDIF
-					return
-		END SELECT
-	CALL CalcWeights(phi,alpha,beta,WT,inputfunc,outfunc);
-	
-		WT=WT/hx/hy*rp 
-	IF (PRESENT(IERROR)) THEN
-		IERROR=0
-	ENDIF
 END SUBROUTINE
 
-	SUBROUTINE CalcWeights(phi,alpha,beta,WT,inputfunc,outfunc)
-		REAL(dp),INTENT(IN)::phi,alpha,beta
-		COMPLEX(dp),INTENT(IN)::inputfunc(0:N-1)
-		PROCEDURE(outfunction),POINTER,INTENT(IN)::outfunc
-		REAL(RealParm2),INTENT(OUT)::WT(Nfirst:Nlast)
-		REAL(dp)::y2
-		REAL(dp)::cphi,sphi
-		COMPLEX(dp)::g11(0:N-1)
-		COMPLEX(dp)::h(0:N-1),tmp
-		INTEGER::I,J
-		g11=1d0
-		cphi=COS(phi)
-		sphi=SIN(phi)
-		DO I=0,N-1,2
-			y2=(I+N2)*y_step+p
-			g11(I)=outfunc(explt(I),cphi,sphi,alpha,beta)
-!			g11(INDS(I))=outfunc(y2,phi,alpha,beta)
-
-			y2=y2+y_step
-!			g11(INDS(I+1))=-outfunc(y2,phi,alpha,beta)
-			g11(I+1)=-outfunc(explt(I+1),cphi,sphi,alpha,beta)
-		ENDDO
-		CALL FFT_16(g11,FWD)
-		h=g11/inputfunc;
-		DO J=0,N-1,2
-			h(J)=g11(J)/inputfunc(J)
-			h(J+1)=-g11(J+1)/inputfunc(J+1)
-		ENDDO
-		CALL FFT_16(h,BWD)
-		DO J=1,N-1,2
-			h(J-1)=h(J-1)/N
-			h(J)=-h(J)/N
-		ENDDO
-		
-		WT=REAL(h(Nfirst:Nlast),KIND=REALPARM2);
-	END SUBROUTINE
-SUBROUTINE VBTransformWeightsAllInt4(x,y,hx,hy,WT)
-	IMPLICIT NONE
-	REAL(RealParm),INTENT(IN)::x,y,hx,hy
-	REAL(RealParm),INTENT(OUT)::WT(Nfirst:Nlast,6)
-		TYPE (EXP_DATA_TYPE)::edt
-	REAL(dp)::rho,phi,alpha,beta
-	REAL(dp)::xq,yq,hxq,hyq
-	PROCEDURE(outfunction2),POINTER::outfunc
-	REAL(RealParm)::rp(6)
-	
-	xq=x;
-	yq=y;
-	hxq=hx;
-	hyq=hy;
-	rho=SQRT(xq*xq+yq*yq);
-
-	rp(1)=rho*rho*rho
-	rp(2)=rho
-	rp(3)=rho
-	rp(4)=rho*rho
-	rp(5)=rho
-	rp(6)=rho*rho
-
-	alpha=hxq/rho;
-	beta=hyq/rho;
-	phi=ATAN2(yq,xq);
-	CALL  PrepareExps4(phi,alpha,beta,edt)
-	outfunc=>outfunci4cl2
-	CALL CalcWeights2(edt,WT(:,1),outfunc)
-
-	outfunc=>outfunci4dxdxcl2
-	CALL CalcWeights2(edt,WT(:,2),outfunc)
-	outfunc=>outfunci4dxdycl2
-	CALL CalcWeights2(edt,WT(:,3),outfunc)
-	outfunc=>outfunci4dxcl2
-	CALL CalcWeights2(edt,WT(:,4),outfunc)
-
-	alpha=hyq/rho;
-	beta=hxq/rho;
-	phi=ATAN2(xq,yq);
-!	CALL  PrepareExps4(phi,alpha,beta,edt)
-
-	outfunc=>outfunci4dydycl2
-	CALL CalcWeights2(edt,WT(:,5),outfunc)
-	outfunc=>outfunci4dycl2
-	CALL CalcWeights2(edt,WT(:,6),outfunc)
-	
-	WT(:,1)=WT(:,1)/hx/hy*rp(1)
-	WT(:,2)=WT(:,2)/hx/hy*rp(2) 
-	WT(:,3)=WT(:,3)/hx/hy*rp(3)
-	WT(:,4)=WT(:,4)/hx/hy*rp(4)
-	WT(:,5)=WT(:,5)/hx/hy*rp(5)
-	WT(:,6)=WT(:,6)/hx/hy*rp(6) 
-END SUBROUTINE
-SUBROUTINE VBTransformWeightsAllInt42(x,y,hx,hy,WT)
+SUBROUTINE VBTransformWeightsAllDoubleInt(x,y,hx,hy,WT)
 	IMPLICIT NONE
 	REAL(RealParm),INTENT(IN)::x,y,hx,hy
 	REAL(RealParm),INTENT(OUT)::WT(Nfirst:Nlast,6)
@@ -344,6 +159,7 @@ SUBROUTINE VBTransformWeightsAllInt42(x,y,hx,hy,WT)
 	alpha=hxq/rho;
 	beta=hyq/rho;
 	phi=ATAN2(yq,xq);
+        CALL CALC_EXP_LT(LOG(rho)-lambda_shift)
 	CALL  PrepareExps4(phi,alpha,beta,edt)
 	out4=>outfunc_int4_all
 	CALL CalcWeights22(edt,WT,out4)
@@ -356,7 +172,7 @@ SUBROUTINE VBTransformWeightsAllInt42(x,y,hx,hy,WT)
 	WT(:,5)=WT(:,5)/hx/hy*rp(5)
 	WT(:,6)=WT(:,6)/hx/hy*rp(6) 
 END SUBROUTINE
-SUBROUTINE VBTransformWeightsAllInt22(x,y,hx,hy,WT)
+SUBROUTINE VBTransformWeightsAllSingleInt(x,y,hx,hy,WT)
 	IMPLICIT NONE
 	REAL(RealParm),INTENT(IN)::x,y,hx,hy
 	REAL(RealParm),INTENT(OUT)::WT(Nfirst:Nlast,6)
@@ -375,6 +191,7 @@ SUBROUTINE VBTransformWeightsAllInt22(x,y,hx,hy,WT)
 	alpha=hxq/rho;
 	beta=hyq/rho;
 	phi=ATAN2(yq,xq);
+        CALL CALC_EXP_LT(LOG(rho)-lambda_shift)
 	CALL  PrepareExps2(phi,alpha,beta,edt)
 	out2=>outfunc_int2_all
 	CALL CalcWeights22(edt,WT,out2)
@@ -387,69 +204,7 @@ SUBROUTINE VBTransformWeightsAllInt22(x,y,hx,hy,WT)
 	WT(:,5)=WT(:,5)/rho!/hx/hy
 !	WT(:,6)=WT(:,6)/hx/hy
 END SUBROUTINE
-SUBROUTINE CalcWeights2(edt,WT,outfunc)
-		TYPE (EXP_DATA_TYPE),INTENT(IN)::edt
-		PROCEDURE(outfunction2),POINTER,INTENT(IN)::outfunc
-		REAL(RealParm2),INTENT(OUT)::WT(Nfirst:Nlast)
-		REAL(dp)::y2
-		REAL(dp)::cphi,sphi
-		COMPLEX(dp)::g11(0:N-1)
-		COMPLEX(dp)::h(0:N-1),tmp
-		INTEGER::I,J
-		g11=1.0_dp
-		DO I=0,N-1,2
-			g11(I)=outfunc(edt,I)
-			g11(I+1)=-outfunc(edt,I+1)
-		ENDDO
-		CALL FFT_16(g11,FWD)
-!		h=g11/f1;
-		DO J=0,N-1,2
-			h(J)=g11(J)/f1(J)
-			h(J+1)=-g11(J+1)/f1(J+1)
-		ENDDO
-		CALL FFT_16(h,BWD)
-		DO J=1,N-1,2
-			h(J-1)=h(J-1)/N
-			h(J)=-h(J)/N
-		ENDDO
-		
-		WT=REAL(h(Nfirst:Nlast),KIND=REALPARM2);
-	END SUBROUTINE
-#ifndef Ooura
-SUBROUTINE CalcWeights22(edt,WT,outfunc)
-		TYPE (EXP_DATA_TYPE),INTENT(IN)::edt
-		PROCEDURE(out_all),POINTER::outfunc
-		REAL(RealParm2),INTENT(OUT)::WT(Nfirst:Nlast,6)
-		COMPLEX(dp)::g11(0:N-1,6)
-		COMPLEX(dp)::h(0:N-1,6),tmp
-		INTEGER::I,J
-		g11=1.0_dp
-		DO I=0,N-1,2
-			g11(INDS(I),:)=outfunc(edt,I)
-			g11(INDS(I+1),:)=-outfunc(edt,I+1)
-		ENDDO
-		DO I=1,6
-			CALL FFT_16(g11(:,I),W_fwd)
-		ENDDO
-		DO I=1,6
-			DO J=0,N-1,2
-				h(INDS(J),I)=g11(J,I)/f1(J)
-				h(INDS(J+1),I)=-g11(J+1,I)/f1(J+1)
-			ENDDO
-		ENDDO
-		DO I=1,6
-			CALL FFT_16(h(:,I),W_bwd)
-		ENDDO
-		DO I=1,6
-			DO J=1,N-1,2
-				h(J-1,I)=h(J-1,I)/N
-				h(J,I)=-h(J,I)/N
-			ENDDO
-		ENDDO
-		
-		WT=REAL(h(Nfirst:Nlast,:),KIND=REALPARM2);
-	END SUBROUTINE
-#else
+#ifdef  FFT_QUAD_OOURA
 SUBROUTINE CalcWeights22(edt,WT,outfunc)
 		TYPE (EXP_DATA_TYPE),INTENT(IN)::edt
 		PROCEDURE(out_all),POINTER::outfunc
@@ -481,6 +236,32 @@ SUBROUTINE CalcWeights22(edt,WT,outfunc)
 		ENDDO
 		
 		WT=REAL(h(Nfirst:Nlast,:),KIND=REALPARM2);
+	END SUBROUTINE
+#else
+	SUBROUTINE CalcWeights22(edt,WT,outfunc)
+		TYPE (EXP_DATA_TYPE),INTENT(IN)::edt
+		PROCEDURE(out_all),POINTER::outfunc
+		REAL(RealParm2),INTENT(OUT)::WT(Nfirst:Nlast,6)
+		COMPLEX(dp)::g11(6,0:N-1)
+		COMPLEX(dp)::h(6,0:N-1),tmp
+		INTEGER::I,J
+		g11=1.0_dp
+		DO I=0,N-1,2
+			g11(:,INDS(I))=outfunc(edt,I)
+			g11(:,INDS(I+1))=-outfunc(edt,I+1)
+		ENDDO
+		CALL FFT_16_6(g11,W_fwd)
+		DO J=0,N-1,2
+			h(:,INDS(J))=g11(:,J)/f1(J)
+			h(:,INDS(J+1))=-g11(:,J+1)/f1(J+1)
+		ENDDO
+		CALL FFT_16_6(h,W_bwd)
+		DO J=1,N-1,2
+				h(:,J-1)=h(:,J-1)/N
+				h(:,J)=-h(:,J)/N
+		ENDDO
+		
+		WT=TRANSPOSE(REAL(h(:,Nfirst:Nlast),KIND=REALPARM2));
 	END SUBROUTINE
 #endif
 !------------------------ Input Function  -------------------------------------!
@@ -1272,6 +1053,18 @@ END FUNCTION
 
 !-------------------------------------------------------------!
 
+#ifdef  FFT_QUAD_OOURA
+	SUBROUTINE FFT_16(X,dir)!x MUST be after bit reverse, wp -array of coefficients for forward or backward FT
+		USE ISO_C_BINDING
+		COMPLEX(dp),TARGET ,DIMENSION(0:N-1), INTENT(inout) :: x
+		INTEGER,INTENT(IN)::dir
+		REAL(dp),POINTER ::pX(:)
+		TYPE(C_PTR)::cp
+		cp=C_LOC(x)
+		CALL C_F_POINTER(cp,pX,(/2*N/))
+		CALL cdft(N*2,dir, pX, INDS, WORK)
+	END SUBROUTINE 
+#else
 	ELEMENTAL  FUNCTION bit_reverse(I) RESULT(R)
 		INTEGER, INTENT(in) :: I
 		INTEGER ::R 
@@ -1282,7 +1075,6 @@ END FUNCTION
 		END DO
 		R = temp
 	END FUNCTION bit_reverse
-#ifndef Ooura
 	SUBROUTINE FFT_16(x,wp)!x MUST be after bit reverse, wp -array of coefficients for forward or backward FT
 		COMPLEX(dp), DIMENSION(0:N-1), INTENT(inout) :: x
 		COMPLEX(dp),INTENT(IN)::wp(0:N-1)
@@ -1324,16 +1116,5 @@ END FUNCTION
 			J2=Lstep
 		END DO
 	END SUBROUTINE FFT_16_6
-#else
-	SUBROUTINE FFT_16(X,dir)!x MUST be after bit reverse, wp -array of coefficients for forward or backward FT
-		USE ISO_C_BINDING
-		COMPLEX(dp),TARGET ,DIMENSION(0:N-1), INTENT(inout) :: x
-		INTEGER,INTENT(IN)::dir
-		REAL(dp),POINTER ::pX(:)
-		TYPE(C_PTR)::cp
-		cp=C_LOC(x)
-		CALL C_F_POINTER(cp,pX,(/2*N/))
-		CALL cdft(N*2,dir, pX, INDS, WORK)
-	END SUBROUTINE 
 #endif
 END
