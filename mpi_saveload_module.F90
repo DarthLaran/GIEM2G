@@ -126,6 +126,8 @@ CONTAINS
 		INTEGER::IERROR,me,csize
 		INTEGER::Nc,io,I
 		INTEGER:: REC_STATUS(MPI_STATUS_SIZE)
+		REAL(8)::time1,time2
+		time1=MPI_WTIME()
 		CALL MPI_COMM_RANK(comm, me, IERROR)
 		CALL MPI_COMM_SIZE(comm, csize, IERROR)
 		Nc=anomaly%Nx*anomaly%Nz*anomaly%Ny_loc
@@ -143,9 +145,10 @@ CONTAINS
 			CALL MPI_RECV(anomaly%siga, Nc, MPI_DOUBLE_PRECISION,0, me,  comm,REC_STATUS, IERROR)
 		ENDIF
 		CALL MPI_BARRIER(comm,IERROR)
+		time2=MPI_WTIME()
 		IF (me==0) THEN
 			DEALLOCATE(siga1)
-			PRINT*, 'Sigma loaded'
+			PRINT "(A, ES10.2E3, A)", 'Sigma loaded in' ,time2-time1, 's' 
 		ENDIF
 	ENDSUBROUTINE
 	SUBROUTINE LoadFrequencies(freq,comm,frequencies)
