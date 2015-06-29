@@ -253,7 +253,6 @@ MODULE IE_SOLVER_MODULE
 			nbscal = irc(5)
 			v_in=>work_fgmres(colx:colx+int_eq%Nloc-1)
 			v_out=>work_fgmres(colz:colz+int_eq%Nloc-1)
-			PRINT *,'in fgmres', int_eq%me,REVCOM,colx,work_fgmres(colx)
 			IF ((info(1)==77).OR.(info(1)==0).OR.(info(1)==-4)) THEN
 				Nfgmres=Nfgmres+1
 				IF ((int_eq%master) .AND.(FGMRES_VERBOSE)) THEN
@@ -262,7 +261,6 @@ MODULE IE_SOLVER_MODULE
 			ENDIF
 			SELECT CASE(REVCOM)
 			CASE (MATVEC)
-				PRINT*,'mv0',colx,colz
 				IF (.NOT. int_eq%master) THEN
 					CALL MPI_BCAST(NextMult,1,MPI_LOGICAL, &
 					&int_eq%master_proc, int_eq%matrix_comm, IERROR)
@@ -373,7 +371,6 @@ MODULE IE_SOLVER_MODULE
 		time1=MPI_Wtime()
 		field_in(1:int_eq%Nz,1:3,1:int_eq%Nx,1:int_eq%Ny_loc)=>v_in
 		field_out(1:int_eq%Nz,1:3,1:int_eq%Nx,1:int_eq%Ny_loc)=>v_out
-		PRINT*,int_eq%me,'in',v_in(1:5)
 		DO Iy=1,int_eq%Ny_loc
 		!$OMP PARALLEL DEFAULT(SHARED),PRIVATE(Ix,Ic,Iz)
 			!$OMP DO SCHEDULE(GUIDED)

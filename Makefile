@@ -24,16 +24,16 @@ zfgmres:
 		$(MAKE) -C ZFGMRES FC=$(F77)  FOPTS='$(FOPTS)' AR=$(AR) FGMRES_PATH='$(FGMRES_PATH)'
 
 giem2g:  $(ALL_O) giem2g.F90 $(MAKECMDGOALS).make Makefile	
-	$(FC_Link)   $(FOPTS)   -o giem2g $(ALL_O) giem2g.F90 $(LIBS)  -I$(INCLUDE) 
+	$(FC_Link)   $(FOPTS)   -o giem2g $(ALL_O) giem2g.F90 $(LIBS)  $(INCLUDE) 
 	
 ifdef INSTALL_PATH
 	cp giem2g $(INSTALL_PATH)/giem2g
 endif
 %.o:%.f90
-	$(FC) $(FOPTS) -c $*.f90 -I$(INCLUDE)
+	$(FC) $(FOPTS) -c $*.f90 -o $*.o $(INCLUDE)
 
 %.o:%.F90
-	$(FC) $(FOPTS) -c $*.F90 -I$(INCLUDE)
+	$(FC) $(FOPTS) -c $*.F90 -o $*.o $(INCLUDE)
 clean:
 	rm $(ALL_O)   *.mod
 	$(MAKE) -C ZFGMRES clean

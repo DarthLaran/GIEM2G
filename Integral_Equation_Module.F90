@@ -163,7 +163,6 @@ CONTAINS
 	SUBROUTINE CalcSizesForIE_OP(ie_op) 
 		TYPE(IntegralEquation),INTENT(INOUT)::ie_op
 		INTEGER(C_INTPTR_T)::tsize8(2)
-		INTEGER(C_INTPTR_T),PARAMETER::TWO=2
 		INTEGER(C_INTPTR_T)::Nz3
 		INTEGER(C_INTPTR_T)::block
 		INTEGER(C_INTPTR_T):: CNy,CNy_offset !size and offset for electrical current in Y direction at this process 
@@ -171,10 +170,9 @@ CONTAINS
 		REAL(REALPARM)::tensor_size
 
 		tsize8=(/ie_op%Ny*2,ie_op%Nx*2/)
-		
 		block=FFTW_MPI_DEFAULT_BLOCK!(0)
 		Nz3=ie_op%Nz*3
-		ie_op%localsize = fftw_mpi_local_size_many(TWO,tsize8,Nz3,block,ie_op%matrix_comm, &
+		ie_op%localsize = fftw_mpi_local_size_many(FFTW_TWO,tsize8,Nz3,block,ie_op%matrix_comm, &
 			& CNy, CNy_offset)
 		ie_op%Ny_loc=INT(CNy,KIND(ie_op%Ny_loc))
 		ie_op%Ny_offset=INT(CNy_offset,KIND(ie_op%Ny_offset))
@@ -237,7 +235,6 @@ CONTAINS
 		INTEGER(C_INTPTR_T)::fftwsize(2)
 		INTEGER(C_INTPTR_T)::Nz3
 		INTEGER(C_INTPTR_T)::block
-		INTEGER(C_INTPTR_T),PARAMETER::TWO=2
 		INTEGER::IERROR
 				INTEGER::omp_get_max_threads,nt
 		REAL(8)::time1,time2
@@ -252,9 +249,9 @@ CONTAINS
 		ENDIF
 !		 CALL fftw_set_timelimit(5d0)
 				 
-		ie_op%planFWD=fftw_mpi_plan_many_dft(TWO,fftwsize,Nz3,block,block,&
+		ie_op%planFWD=fftw_mpi_plan_many_dft(FFTW_TWO,fftwsize,Nz3,block,block,&
 		&ie_op%field_in4,ie_op%field_in4,ie_op%matrix_comm, FFTW_FORWARD ,FFTW_MEASURE)!FFTW_PATIENT);
-		ie_op%planBWD=fftw_mpi_plan_many_dft(TWO,fftwsize,Nz3,block,block,&
+		ie_op%planBWD=fftw_mpi_plan_many_dft(FFTW_TWO,fftwsize,Nz3,block,block,&
 		&ie_op%field_out4,ie_op%field_out4,ie_op%matrix_comm, FFTW_BACKWARD ,FFTW_MEASURE)!FFTW_PATIENT);
 		time2=MPI_WTIME()
 		ie_op%counter%plans=time2-time1

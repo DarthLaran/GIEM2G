@@ -186,7 +186,6 @@ CONTAINS
 	SUBROUTINE CalcSizesForRC_OP(rc_op) 
 		TYPE(RC_Operator),INTENT(INOUT)::rc_op
 		INTEGER(C_INTPTR_T)::tsize8(2)
-		INTEGER(C_INTPTR_T),PARAMETER::TWO=2
 		INTEGER(C_INTPTR_T)::Nz3,Nr3
 		INTEGER(C_INTPTR_T)::block
 		INTEGER(C_INTPTR_T):: CNy,CNy_offset !size and offset for electrical current in Y direction at this process 
@@ -197,7 +196,7 @@ CONTAINS
 		block=FFTW_MPI_DEFAULT_BLOCK!(0)
 !----------------------------------------------------------------------------------------------------------!
 		Nz3=rc_op%Nz*3
-		rc_op%localsize_in = fftw_mpi_local_size_many(TWO,tsize8,Nz3,block,rc_op%matrix_comm, &
+		rc_op%localsize_in = fftw_mpi_local_size_many(FFTW_TWO,tsize8,Nz3,block,rc_op%matrix_comm, &
 			& CNy, CNy_offset)
 		rc_op%Ny_loc=INT(CNy,KIND(rc_op%Ny_loc))
 		rc_op%Ny_offset=INT(CNy_offset,KIND(rc_op%Ny_offset))
@@ -206,7 +205,7 @@ CONTAINS
 		rc_op%Nx2Ny2=rc_op%Nx*rc_op%Ny*4
 
 		Nr3=rc_op%Nr*3
-		rc_op%localsize_out = fftw_mpi_local_size_many(TWO,tsize8,Nr3,block,rc_op%matrix_comm, &
+		rc_op%localsize_out = fftw_mpi_local_size_many(FFTW_TWO,tsize8,Nr3,block,rc_op%matrix_comm, &
 			& CNy, CNy_offset)
 
 
@@ -264,7 +263,6 @@ CONTAINS
 		INTEGER(C_INTPTR_T)::fftwsize(2)
 		INTEGER(C_INTPTR_T)::Nz3,Nr3
 		INTEGER(C_INTPTR_T)::block
-		INTEGER(C_INTPTR_T),PARAMETER::TWO=2
 		INTEGER::IERROR
 		INTEGER::omp_get_max_threads,nt
 		REAL(8)::time1,time2
@@ -280,10 +278,10 @@ CONTAINS
 		ENDIF
 !		 CALL fftw_set_timelimit(5d0)
 				 
-		rc_op%planFWD=fftw_mpi_plan_many_dft(TWO,fftwsize,Nz3,block,block,&
+		rc_op%planFWD=fftw_mpi_plan_many_dft(FFTW_TWO,fftwsize,Nz3,block,block,&
 		&rc_op%field_in4,rc_op%field_in4,rc_op%matrix_comm, FFTW_FORWARD ,FFTW_MEASURE)!FFTW_PATIENT);
 
-		rc_op%planBWD=fftw_mpi_plan_many_dft(TWO,fftwsize,Nr3,block,block,&
+		rc_op%planBWD=fftw_mpi_plan_many_dft(FFTW_TWO,fftwsize,Nr3,block,block,&
 		&rc_op%field_out4,rc_op%field_out4,rc_op%matrix_comm, FFTW_BACKWARD ,FFTW_MEASURE)!FFTW_PATIENT);
 		time2=MPI_WTIME()
 		rc_op%counter%plans=time2-time1
