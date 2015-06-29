@@ -14,7 +14,7 @@ MODULE Calc_IE_Tensor_Module
 	PUBLIC::CalcIntegralGreenTensor
 CONTAINS
 	SUBROUTINE CalcIntegralGreenTensor(matrix,bkg,anomaly,Wt_Threshold)
-		CLASS(IE_MATRIX),INTENT(INOUT)::matrix
+		TYPE(IntegralEquation),INTENT(INOUT)::matrix
 		TYPE (BKG_DATA_TYPE),TARGET,INTENT(INOUT)::bkg
 		TYPE (ANOMALY_TYPE),TARGET,INTENT(INOUT)::anomaly
 		REAL(REALPARM),INTENT(IN)::Wt_Threshold
@@ -275,7 +275,7 @@ CONTAINS
 		time1=time2
 		DO K=Nfirst,Nlast
 			Wm=ABS(WT(K,:)/W0(:))
-			IF (MAXVAL(Wm)>Wt_Threshold) THEN
+!			IF (MAXVAL(Wm)>Wt_Threshold) THEN
 				lm=lms(K)/r
 				W(IE_DXX)=WT(K,IE_DXX)/lm
 				W(IE_DYY)=WT(K,IE_DYY)/lm
@@ -285,7 +285,7 @@ CONTAINS
 				W(IE_D0)=WT(K,IE_D0)*lm
 				CALL Calc_Double_Integral_U(anomaly,bkg,dz,lm,W,G1,calc_time(3:4))
 
-			ENDIF
+!			ENDIF
 		ENDDO
 		G_asym(:,:,A_EXZ)=(G1(EXZ,:,:)/PI/4.0_REALPARM)
 		G_asym(:,:,A_EYZ)=(G1(EYZ,:,:)/PI/4.0_REALPARM)

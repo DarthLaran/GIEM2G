@@ -14,7 +14,7 @@ MODULE Calc_RC_Tensor_Module
 	PUBLIC::CalcRecalculationGreenTensor
 CONTAINS
 	SUBROUTINE CalcRecalculationGreenTensor(matrix,bkg,anomaly,Wt_Threshold)
-		CLASS(RC_MATRIX),INTENT(INOUT)::matrix
+		TYPE(RC_OPERATOR),INTENT(INOUT)::matrix
 		TYPE (BKG_DATA_TYPE),TARGET,INTENT(INOUT)::bkg
 		TYPE (ANOMALY_TYPE),TARGET,INTENT(INOUT)::anomaly
 		REAL(REALPARM),INTENT(IN)::Wt_Threshold
@@ -166,7 +166,7 @@ CONTAINS
 			G_H1=C_ZERO		
 			DO K=Nfirst,Nlast
 				Wm=ABS(WT(K,:)/W0(:))
-				IF (MAXVAL(Wm)>Wt_Threshold) THEN
+!				IF (MAXVAL(Wm)>Wt_Threshold) THEN
 					lm=lms(K)/r
 					W(RC_DXX)=WT(K,RC_DXX)/lm
 					W(RC_DYY)=WT(K,RC_DYY)/lm
@@ -175,7 +175,7 @@ CONTAINS
 					W(RC_DY)=WT(K,RC_DY)*lm
 					W(RC_D0)=WT(K,RC_D0)*lm
 					CALL Calc_Integral_U(anomaly,bkg,recvs(Irecv),lm,W,G_E1,G_H1,calc_time(3:4))
-				ENDIF
+!				ENDIF
 			ENDDO
 			G_E(:,Irecv,:)=TRANSPOSE(G_E1)*s
 			G_H(:,Irecv,:)=TRANSPOSE(G_H1)*s
