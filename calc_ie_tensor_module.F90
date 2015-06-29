@@ -14,7 +14,7 @@ MODULE Calc_IE_Tensor_Module
 	PUBLIC::CalcIntegralGreenTensor
 CONTAINS
 	SUBROUTINE CalcIntegralGreenTensor(matrix,bkg,anomaly,Wt_Threshold)
-		CLASS(IE_MATRIX),INTENT(INOUT)::matrix
+		TYPE(IntegralEquation),INTENT(INOUT)::matrix
 		TYPE (BKG_DATA_TYPE),TARGET,INTENT(INOUT)::bkg
 		TYPE (ANOMALY_TYPE),TARGET,INTENT(INOUT)::anomaly
 		REAL(REALPARM),INTENT(IN)::Wt_Threshold

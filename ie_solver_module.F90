@@ -15,7 +15,7 @@ MODULE IE_SOLVER_MODULE
 	CONTAINS
 
 	SUBROUTINE SolveEquation(int_eq,fgmres_ctl,guess)
-		CLASS(IntegralEquation),INTENT(INOUT)::int_eq
+		TYPE(IntegralEquation),INTENT(INOUT)::int_eq
 		TYPE (FGMRES_CTL_TYPE),INTENT(IN)::fgmres_ctl
 		COMPLEX(REALPARM),POINTER,INTENT(IN),OPTIONAL::guess(:,:,:,:) !
 		COMPLEX(REALPARM),POINTER::tmp(:,:,:,:)
@@ -89,7 +89,8 @@ MODULE IE_SOLVER_MODULE
 				PRINT info_fmt, 'Time for multiplications:				', int_eq%counter%apply
 				PRINT info_fmt, 'Time for dot products:					', int_eq%counter%dotprod
 				PRINT info_fmt, 'Average dot product:					', int_eq%counter%dotprod/int_eq%counter%dotprod_num
-				PRINT info_fmt, 'Average fftw:							', int_eq%counter%mult_fftw/int_eq%counter%mult_num
+				PRINT info_fmt, 'Average fftw forward:					', int_eq%counter%mult_fftw/int_eq%counter%mult_num
+				PRINT info_fmt, 'Average fftw backward:					', int_eq%counter%mult_fftw_b/int_eq%counter%mult_num
 				PRINT info_fmt, 'Average zgemv:							', int_eq%counter%mult_zgemv/int_eq%counter%mult_num
 				PRINT info_fmt, 'Average mult:							', int_eq%counter%apply/int_eq%counter%mult_num
 				PRINT info_fmt, 'Total mult/dp:							', int_eq%counter%apply/int_eq%counter%dotprod
@@ -150,7 +151,7 @@ MODULE IE_SOLVER_MODULE
 
 !-------------------------------------PRIVATE---------------------------------------------------------------------!
 	SUBROUTINE GIEM2G_FGMRES(int_eq,fgmres_ctl)
-		CLASS(IntegralEquation),INTENT(INOUT)::int_eq
+		TYPE(IntegralEquation),INTENT(INOUT)::int_eq
 		TYPE (FGMRES_CTL_TYPE),INTENT(IN)::fgmres_ctl
 		INTEGER :: buf_length,maxit,maxit_precond
 		REAL(REALPARM)::misfit
@@ -185,6 +186,7 @@ MODULE IE_SOLVER_MODULE
 		int_eq%counter%dotprod_num=0
 		int_eq%counter%apply=0d0
 		int_eq%counter%mult_fftw=0d0
+		int_eq%counter%mult_fftw_b=0d0
 		int_eq%counter%mult_zgemv=0d0
 		int_eq%counter%dotprod=0d0
 		NextMult=.FALSE.
@@ -216,6 +218,7 @@ MODULE IE_SOLVER_MODULE
 		IF (int_eq%master) PRINT*,'Solver needs',(l_fgmres+l_gmres+int_eq%Nloc+2)*16.0/1024/1024/1024, 'Gb for workspace'
 		ALLOCATE(work_fgmres(l_fgmres),work_gmres(l_gmres))
 		ALLOCATE(aux(int_eq%Nloc+2)) ! possible it is greater than necessary
+
 		cntl(1) = misfit
 		cntl2(1) = misfit
 
@@ -250,7 +253,7 @@ MODULE IE_SOLVER_MODULE
 			nbscal = irc(5)
 			v_in=>work_fgmres(colx:colx+int_eq%Nloc-1)
 			v_out=>work_fgmres(colz:colz+int_eq%Nloc-1)
-!			PRINT *,'in fgmres', int_eq%me,REVCOM,colx,work_fgmres(colx)
+			PRINT *,'in fgmres', int_eq%me,REVCOM,colx,work_fgmres(colx)
 			IF ((info(1)==77).OR.(info(1)==0).OR.(info(1)==-4)) THEN
 				Nfgmres=Nfgmres+1
 				IF ((int_eq%master) .AND.(FGMRES_VERBOSE)) THEN
@@ -259,7 +262,7 @@ MODULE IE_SOLVER_MODULE
 			ENDIF
 			SELECT CASE(REVCOM)
 			CASE (MATVEC)
-!							PRINT*,'mv0',colx,colz
+				PRINT*,'mv0',colx,colz
 				IF (.NOT. int_eq%master) THEN
 					CALL MPI_BCAST(NextMult,1,MPI_LOGICAL, &
 					&int_eq%master_proc, int_eq%matrix_comm, IERROR)
@@ -281,7 +284,6 @@ MODULE IE_SOLVER_MODULE
 					coly2	= irc2(3) 
 					colz2	= irc2(4) 
 					nbscal2 = irc2(5)
-!					PRINT *,'in gmres', REVCOM2, colx2,work_gmres(colx2)
 					IF ((info2(1)==77).OR.(info2(1)==0).OR.(info2(1)==-4)) THEN
 						Ngmres=Ngmres+1
 						IF ((int_eq%master) .AND.(GMRES_VERBOSE)) THEN
@@ -290,7 +292,6 @@ MODULE IE_SOLVER_MODULE
 					ENDIF
 					SELECT CASE (REVCOM2)
 						CASE(MATVEC)
-!							PRINT*,'mv1',colx2,colz2
 							v_in2=>work_gmres(colx2:colx2+int_eq%Nloc-1)
 							v_out2=>work_gmres(colz2:colz2+int_eq%Nloc-1)
 							IF (.NOT. int_eq%master) THEN
@@ -302,7 +303,6 @@ MODULE IE_SOLVER_MODULE
 								&int_eq%master_proc, int_eq%matrix_comm, IERROR)
 							ENDIF
 							CALL APPLY_EQ_OP(int_eq,v_in2,v_out2)
-!							PRINT*,'mv2'
 						CASE (DOTPROD)
 							time1=MPI_WTIME()
 !							PRINT*,'dp1',nbscal2,int_eq%Nloc,colx2,coly2
@@ -324,16 +324,13 @@ MODULE IE_SOLVER_MODULE
 				v_out=work_gmres(1:int_eq%Nloc)
 			CASE (DOTPROD)
 				time1=MPI_WTIME()
-!				PRINT*,int_eq%me,'dpp',colx,work_fgmres(colx:colx+int_eq%Nloc-1)
 				CALL ZGEMV('C',int_eq%Nloc,nbscal,C_ONE,work_fgmres(colx:),&
 					&int_eq%Nloc,work_fgmres(coly:),ONE,C_ZERO,aux,ONE)
-!				PRINT*,int_eq%me,'dpp_ff',aux(1)
 				CALL MPI_ALLREDUCE(aux,work_fgmres(colz:),nbscal,&
 					&MPI_DOUBLE_COMPLEX,MPI_SUM,comm_outer,IERROR)
 				time2=MPI_WTIME()
 				int_eq%counter%dotprod_num=int_eq%counter%dotprod_num+nbscal
 				int_eq%counter%dotprod=int_eq%counter%dotprod+time2-time1
-!				PRINT*,int_eq%me,'dp_fgmres',work_fgmres(colz),nbscal
 			CASE DEFAULT
 				EXIT
 			END SELECT
@@ -364,7 +361,7 @@ MODULE IE_SOLVER_MODULE
 	END SUBROUTINE
 
 	SUBROUTINE Apply_EQ_OP(int_eq,v_in,v_out)
-		CLASS(IntegralEquation),INTENT(INOUT)::int_eq
+		TYPE(IntegralEquation),INTENT(INOUT)::int_eq
 		COMPLEX(REALPARM),POINTER,INTENT(IN)::v_in(:)
 		COMPLEX(REALPARM),POINTER,INTENT(OUT)::v_out(:)
 		COMPLEX(REALPARM),POINTER::field_in(:,:,:,:)
@@ -376,7 +373,7 @@ MODULE IE_SOLVER_MODULE
 		time1=MPI_Wtime()
 		field_in(1:int_eq%Nz,1:3,1:int_eq%Nx,1:int_eq%Ny_loc)=>v_in
 		field_out(1:int_eq%Nz,1:3,1:int_eq%Nx,1:int_eq%Ny_loc)=>v_out
-!		PRINT*,int_eq%me,'in',v_in(1:5)
+		PRINT*,int_eq%me,'in',v_in(1:5)
 		DO Iy=1,int_eq%Ny_loc
 		!$OMP PARALLEL DEFAULT(SHARED),PRIVATE(Ix,Ic,Iz)
 			!$OMP DO SCHEDULE(GUIDED)
@@ -422,7 +419,7 @@ MODULE IE_SOLVER_MODULE
 		int_eq%counter%apply=int_eq%counter%apply+time2-time1
 	END SUBROUTINE
 	SUBROUTINE APPLY_EQ_OP2(int_eq)
-		CLASS(IntegralEquation),INTENT(INOUT)::int_eq
+		TYPE(IntegralEquation),INTENT(INOUT)::int_eq
 
 		!$OMP PARALLEL	 DEFAULT(SHARED)
 		!$OMP WORKSHARE
@@ -432,12 +429,11 @@ MODULE IE_SOLVER_MODULE
 		CALL APPLY_IE_OP(int_eq)
 	ENDSUBROUTINE
 	SUBROUTINE APPLY_IE_OP(ie_op)
-		CLASS(IE_OPERATOR),INTENT(INOUT)::ie_op
+		TYPE(IntegralEquation),INTENT(INOUT)::ie_op
 		INTEGER::Ixy,Nz
 		REAL(8)::time1,time2,time3,time4
 		time1=MPI_WTIME()
 		CALL IE_OP_FFTW_FWD(ie_op)
-!		PRINT*,ie_op%me,'Cj',ie_op%field_in4(:,EZ,:,:)
 		time2=MPI_WTIME()
 		ie_op%counter%mult_fftw=ie_op%counter%mult_fftw+time2-time1
 		!$OMP PARALLEL	PRIVATE(Ixy) DEFAULT(SHARED)
@@ -461,18 +457,18 @@ MODULE IE_SOLVER_MODULE
 		CALL IE_OP_FFTW_BWD(ie_op)
 		time4=MPI_WTIME()
 !		PRINT*,ie_op%me,'Tj',ie_op%field_out4(:,EZ,:,:)
-		ie_op%counter%mult_fftw=ie_op%counter%mult_fftw+time4-time3
+		ie_op%counter%mult_fftw_b=ie_op%counter%mult_fftw_b+time4-time3
 		ie_op%counter%mult_zgemv=ie_op%counter%mult_zgemv+time3-time2
 	ENDSUBROUTINE
 	SUBROUTINE IE_OP_ZGEMV_SYMM(ie_op,Tc,c_in,c_out,I,ALPHA,BETA)
-			CLASS(IE_OPERATOR),INTENT(INOUT)::ie_op
+			TYPE(IntegralEquation),INTENT(INOUT)::ie_op
 			INTEGER,INTENT(IN)::Tc,c_in,c_out,I
 			COMPLEX(REALPARM),INTENT(IN)::ALPHA,BETA
 			CALL ZSPMV('U',ie_op%Nz,ALPHA,ie_op%G_symm4(:,Tc,I),&
 			&ie_op%field_in3(:,c_in,I),ONE,BETA,ie_op%field_out3(:,c_out,I),ONE)
 	END SUBROUTINE
 	SUBROUTINE IE_OP_ZGEMV_ASYM(ie_op,TRANS,Tc,c_in,c_out,I,ALPHA,BETA)
-			CLASS(IE_OPERATOR),INTENT(INOUT)::ie_op
+			TYPE(IntegralEquation),INTENT(INOUT)::ie_op
 			CHARACTER,INTENT(IN)::TRANS(*)
 			INTEGER,INTENT(IN)::Tc,c_in,c_out,I
 			COMPLEX(REALPARM),INTENT(IN)::ALPHA,BETA

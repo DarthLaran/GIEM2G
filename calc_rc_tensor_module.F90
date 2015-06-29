@@ -14,7 +14,7 @@ MODULE Calc_RC_Tensor_Module
 	PUBLIC::CalcRecalculationGreenTensor
 CONTAINS
 	SUBROUTINE CalcRecalculationGreenTensor(matrix,bkg,anomaly,Wt_Threshold)
-		CLASS(RC_MATRIX),INTENT(INOUT)::matrix
+		TYPE(RC_OPERATOR),INTENT(INOUT)::matrix
 		TYPE (BKG_DATA_TYPE),TARGET,INTENT(INOUT)::bkg
 		TYPE (ANOMALY_TYPE),TARGET,INTENT(INOUT)::anomaly
 		REAL(REALPARM),INTENT(IN)::Wt_Threshold

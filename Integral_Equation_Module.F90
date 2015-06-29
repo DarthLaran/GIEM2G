@@ -16,6 +16,7 @@ MODULE INTEGRAL_EQUATION_MODULE
 		REAL(8)::tensor_calc(5)
 		REAL(8)::tensor_fft
 		REAL(8)::mult_fftw
+		REAL(8)::mult_fftw_b
 		REAL(8)::mult_zgemv
 		REAL(8)::apply
 		REAL(8)::dotprod
@@ -23,7 +24,7 @@ MODULE INTEGRAL_EQUATION_MODULE
 		INTEGER::mult_num
 		INTEGER::dotprod_num
 	ENDTYPE
-	TYPE IE_MATRIX
+	TYPE IntegralEquation
 		INTEGER::Nx,Ny,Nz
 		INTEGER::Nx2,Ny_loc,Ny_offset
 		INTEGER::Nx2Ny2
@@ -44,16 +45,14 @@ MODULE INTEGRAL_EQUATION_MODULE
 		INTEGER::master_proc
 		LOGICAL::master
 		TYPE(TypeCounter)::counter
-	ENDTYPE
-	TYPE,EXTENDS(IE_MATRIX):: IE_OPERATOR
+
 		INTEGER (C_INTPTR_T) ::localsize
 		TYPE(C_PTR)::p_in,p_out
 		COMPLEX(REALPARM),POINTER::field_in4(:,:,:,:),field_out4(:,:,:,:)
 		COMPLEX(REALPARM),POINTER::field_in3(:,:,:),field_out3(:,:,:)
 		TYPE(C_PTR)::planFwd,planBwd
 		LOGICAL::fftw_threads_ok
-	  ENDTYPE
-	  TYPE,EXTENDS(IE_OPERATOR):: IntegralEquation
+
 		INTEGER::N,Nloc
 		REAL(REALPARM),POINTER ::siga(:,:,:)
 		REAL(REALPARM),POINTER ::sigb(:,:,:)
@@ -74,11 +73,11 @@ MODULE INTEGRAL_EQUATION_MODULE
 		INTEGER::fgmres_me
 		LOGICAL::real_space
 	  ENDTYPE
-	PUBLIC:: IE_MATRIX, IE_OPERATOR, IntegralEquation,TypeCounter
+	PUBLIC::  IntegralEquation,TypeCounter
 	PUBLIC::PrepareIntegralEquation
 CONTAINS
 	SUBROUTINE PrepareIntegralEquation(int_eq,anomaly,mcomm,fftw_threads_ok)
-		CLASS(IntegralEquation),INTENT(INOUT)::int_eq
+		TYPE(IntegralEquation),INTENT(INOUT)::int_eq
 		TYPE (ANOMALY_TYPE),INTENT(INOUT)::anomaly
 		INTEGER,INTENT(IN)::mcomm 
 		LOGICAL,OPTIONAL,INTENT(IN)::fftw_threads_ok
@@ -155,14 +154,14 @@ CONTAINS
 	ENDSUBROUTINE
 !--------------------------------------------------------------------------------------------------------------------!	
 	SUBROUTINE PrepareOperatorIE_OP(ie_op)
-		CLASS(IE_Operator),INTENT(INOUT)::ie_op
+		TYPE(IntegralEquation),INTENT(INOUT)::ie_op
 		CALL CalcSizesForIE_OP(ie_op)
 		CALL AllocateIE_OP(ie_op)
 		CALL CalcFFTWPlansIE_OP(ie_op)
 	ENDSUBROUTINE
 
 	SUBROUTINE CalcSizesForIE_OP(ie_op) 
-		CLASS(IE_Operator),INTENT(INOUT)::ie_op
+		TYPE(IntegralEquation),INTENT(INOUT)::ie_op
 		INTEGER(C_INTPTR_T)::tsize8(2)
 		INTEGER(C_INTPTR_T),PARAMETER::TWO=2
 		INTEGER(C_INTPTR_T)::Nz3
@@ -170,6 +169,7 @@ CONTAINS
 		INTEGER(C_INTPTR_T):: CNy,CNy_offset !size and offset for electrical current in Y direction at this process 
 		REAL(REALPARM)::size_symm,size_asym
 		REAL(REALPARM)::tensor_size
+
 		tsize8=(/ie_op%Ny*2,ie_op%Nx*2/)
 		
 		block=FFTW_MPI_DEFAULT_BLOCK!(0)
@@ -191,7 +191,7 @@ CONTAINS
 		 ENDIF
 	ENDSUBROUTINE
 	SUBROUTINE AllocateIEMatrix(matrix)
-		CLASS(IE_MATRIX),INTENT(INOUT)::matrix
+		TYPE(IntegralEquation),INTENT(INOUT)::matrix
 		INTEGER(C_INTPTR_T)::length
 		INTEGER::shape1(1),Nz,Nx2,Ny_loc,N1,N2
 		COMPLEX(REALPARM),POINTER::tmp(:)
@@ -220,7 +220,7 @@ CONTAINS
 		ALLOCATE(matrix%dz(1:Nz))
 	END SUBROUTINE
 	SUBROUTINE AllocateIE_OP(ie_op)
-		CLASS(IE_Operator),INTENT(INOUT)::ie_op
+		TYPE(IntegralEquation),INTENT(INOUT)::ie_op
 		INTEGER::shape4(4),shape3(3)
 		CALL AllocateIEMatrix(ie_op)
 		ie_op%p_in=fftw_alloc_complex(ie_op%localsize)
@@ -233,7 +233,7 @@ CONTAINS
 		CALL c_f_pointer(ie_op%p_out,ie_op%field_out3, shape3)
 	ENDSUBROUTINE
 	SUBROUTINE CalcFFTWPlansIE_OP(ie_op)
-		CLASS(IE_Operator),INTENT(INOUT)::ie_op
+		TYPE(IntegralEquation),INTENT(INOUT)::ie_op
 		INTEGER(C_INTPTR_T)::fftwsize(2)
 		INTEGER(C_INTPTR_T)::Nz3
 		INTEGER(C_INTPTR_T)::block
@@ -265,16 +265,16 @@ CONTAINS
 		ENDIF
 	ENDSUBROUTINE
 	SUBROUTINE IE_OP_FFTW_FWD(ie_op)
-		CLASS(IE_Operator),INTENT(INOUT)::ie_op
+		TYPE(IntegralEquation),INTENT(INOUT)::ie_op
 		CALL fftw_mpi_execute_dft(ie_op%planFWD,ie_op%field_in4,ie_op%field_in4)
 	ENDSUBROUTINE
 	SUBROUTINE IE_OP_FFTW_BWD(ie_op)
-		CLASS(IE_Operator),INTENT(INOUT)::ie_op
+		TYPE(IntegralEquation),INTENT(INOUT)::ie_op
 		CALL fftw_mpi_execute_dft(ie_op%planBWD,ie_op%field_out4,ie_op%field_out4)
 		ie_op%field_out4=ie_op%field_out4/ie_op%Nx2Ny2
 	ENDSUBROUTINE
 	SUBROUTINE CalcFFTofIETensor(ie_op)
-		CLASS(IE_Operator),INTENT(INOUT)::ie_op
+		TYPE(IntegralEquation),INTENT(INOUT)::ie_op
 		INTEGER::Iz,Is,Ia
 		INTEGER::Is1,Ia1
 		INTEGER::IERROR
@@ -374,7 +374,7 @@ CONTAINS
 	ENDSUBROUTINE
 
 	SUBROUTINE DeleteMatrix(matrix)
-		CLASS(IE_matrix),INTENT(INOUT)::matrix
+		TYPE(IntegralEquation),INTENT(INOUT)::matrix
 		CALL fftw_free(matrix%pG_symm)
 		CALL fftw_free(matrix%pG_asym)
 		matrix%G_symm=>NULL()
@@ -386,7 +386,7 @@ CONTAINS
 		DEALLOCATE(matrix%dz)
 	ENDSUBROUTINE
 	SUBROUTINE DeleteIE_OP(ie_op)
-		CLASS(IE_Operator),INTENT(INOUT)::ie_op
+		TYPE(IntegralEquation),INTENT(INOUT)::ie_op
 		CALL fftw_free(ie_op%p_in)
 		CALL fftw_free(ie_op%p_out)
 		ie_op%field_in4=>NULL()
