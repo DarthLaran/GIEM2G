@@ -3,7 +3,9 @@
 MODULE VolumeBesselTransforms 
 	USE IntegralCodes
 	USE Const_module,ONLY: RealParm2,REALPARM
+#ifdef  FFT_QUAD_OOURA
 	USE FFT_QUAD
+#endif
 	IMPLICIT NONE
 PRIVATE
 	INTEGER ,PARAMETER::dp=16
@@ -18,8 +20,6 @@ PRIVATE
 	REAL(dp),PARAMETER::q=y_step/2.0_dp
 	REAL(dp),PARAMETER::p=q+xi
 	COMPLEX(dp),TARGET::f1(0:N-1)
-	INTEGER::INDS(0:NI)
-	REAL(dp),TARGET::WORK(0:N/2-1)
 	REAL(dp),TARGET::explt(0:N-1)
 	REAL(dp),TARGET::explt2(0:N-1)
 	REAL(dp),TARGET::explt3(0:N-1)
@@ -29,27 +29,22 @@ PRIVATE
 	INTEGER,PARAMETER::D0=1
 	INTEGER,PARAMETER::D1=2
 	INTEGER,PARAMETER::D2=3
+
+#ifdef  FFT_QUAD_OOURA
 	INTEGER,PARAMETER::FWD=1
 	INTEGER,PARAMETER::BWD=-1
-TYPE EXP_DATA_TYPE
-	REAL(dp),DIMENSION(0:N-1)::x1,y1,dx,dy
-	REAL(dp),DIMENSION(3,0:N-1,2)::xy
-	REAL(dp),DIMENSION(3,0:N-1,2)::xy_exp2
-	REAL(dp),DIMENSION(3,0:N-1,2)::xy_erf
-	REAL(dp),DIMENSION(3,0:N-1,2)::xy2
-END TYPE
+#else
+	INTEGER::INDS(0:N-1)
+	COMPLEX(dp),TARGET::W_fwd(0:N-1),W_bwd(0:N-1)
+#endif
+	TYPE EXP_DATA_TYPE
+		REAL(dp),DIMENSION(0:N-1)::x1,y1,dx,dy
+		REAL(dp),DIMENSION(3,0:N-1,2)::xy
+		REAL(dp),DIMENSION(3,0:N-1,2)::xy_exp2
+		REAL(dp),DIMENSION(3,0:N-1,2)::xy_erf
+		REAL(dp),DIMENSION(3,0:N-1,2)::xy2
+	END TYPE
 INTERFACE
-	FUNCTION outfunction(lt,cphi,sphi,dxr,dyr) RESULT(R)
-		IMPORT dp
-		REAL(dp),INTENT(IN)::lt,cphi,sphi,dxr,dyr
-		REAL(dp)::R
-	END FUNCTION
-	FUNCTION outfunction2(edt,I) RESULT(R)
-		IMPORT EXP_DATA_TYPE,dp
-		INTEGER,INTENT(IN)::I
-		TYPE (EXP_DATA_TYPE),INTENT(IN)::edt
-		REAL(dp)::R
-	END FUNCTION
 	FUNCTION out_all(edt,I) RESULT(R)
 		IMPORT EXP_DATA_TYPE,dp
 		INTEGER,INTENT(IN)::I
@@ -60,13 +55,41 @@ END INTERFACE
 
 
 
-PUBLIC ::VBTransformWeights,VBTransformInit, VBTransformWeightsAllInt4,VBTransformWeightsAllInt42
+PUBLIC ::VBTransformInit, VBTransformWeightsAllInt42
 PUBLIC ::VBTransformWeightsAllInt22
 
 
-#define Ooura
 CONTAINS
-#ifndef Ooura
+#ifdef  FFT_QUAD_OOURA
+SUBROUTINE VBTransformInit(lms) !NOT THREAD SAFETY!
+	REAL(RealParm2),INTENT(OUT)::lms(Nfirst:Nlast)
+	COMPLEX(dp)::f11(0:N-1),f21(0:N-1),tmp
+	REAL(dp)::y1,theta,y2
+	INTEGER::I,J,K,I2
+	
+	CALL makewt(N/2, INDS, WORK)
+
+	lms=xi+(/((J+N2)*y_step,J=Nfirst,Nlast)/)
+	lms=EXP(lms)
+	DO I=0,N-1,2
+		y1=(I+N2)*y_step+q
+		f1(I)=inputfunction(y1)
+		y1=y1+y_step
+		f1(I+1)=-inputfunction(y1)
+
+		y2=(I+N2)*y_step+p
+		explt(I)=EXP(y2)
+		explt2(I)=explt(I)*explt(I)
+		explt3(I)=explt2(I)*explt(I)
+		y2=y2+y_step
+		explt(I+1)=EXP(y2)
+		explt2(I+1)=explt(I+1)*explt(I+1)
+		explt3(I+1)=explt2(I+1)*explt(I+1)
+	ENDDO
+
+	CALL FFT_16(f1,FWD)
+	
+END SUBROUTINE
 SUBROUTINE VBTransformInit(lms) !NOT THREAD SAFETY!
 	REAL(RealParm2),INTENT(OUT)::lms(Nfirst:Nlast)
 	COMPLEX(dp)::f11(0:N-1),f21(0:N-1),tmp
@@ -104,35 +127,6 @@ SUBROUTINE VBTransformInit(lms) !NOT THREAD SAFETY!
 	
 END SUBROUTINE
 #else
-SUBROUTINE VBTransformInit(lms) !NOT THREAD SAFETY!
-	REAL(RealParm2),INTENT(OUT)::lms(Nfirst:Nlast)
-	COMPLEX(dp)::f11(0:N-1),f21(0:N-1),tmp
-	REAL(dp)::y1,theta,y2
-	INTEGER::I,J,K,I2
-	
-	CALL makewt(N/2, INDS, WORK)
-
-	lms=xi+(/((J+N2)*y_step,J=Nfirst,Nlast)/)
-	lms=EXP(lms)
-	DO I=0,N-1,2
-		y1=(I+N2)*y_step+q
-		f1(I)=inputfunction(y1)
-		y1=y1+y_step
-		f1(I+1)=-inputfunction(y1)
-
-		y2=(I+N2)*y_step+p
-		explt(I)=EXP(y2)
-		explt2(I)=explt(I)*explt(I)
-		explt3(I)=explt2(I)*explt(I)
-		y2=y2+y_step
-		explt(I+1)=EXP(y2)
-		explt2(I+1)=explt(I+1)*explt(I+1)
-		explt3(I+1)=explt2(I+1)*explt(I+1)
-	ENDDO
-
-	CALL FFT_16(f1,FWD)
-	
-END SUBROUTINE
 #endif
 
 SUBROUTINE VBTransformWeights(x,y,hx,hy,WT,c,IERROR)
@@ -1309,7 +1303,27 @@ END FUNCTION
 			END DO
 		END DO
 	END SUBROUTINE
- 
+	SUBROUTINE FFT_16_6(x,wp)!x MUST be after bit reverse, wp -array of coefficients for forward or backward FT
+		COMPLEX(dp), DIMENSION(6,0:N-1), INTENT(inout) :: x
+		COMPLEX(dp),INTENT(IN)::wp(0:N-1)
+		COMPLEX(dp) ::	temp(6)
+		INTEGER :: I,J,J2,I2,Istep,Ip,Iq,Lstep
+		I2=0
+		J2=1
+		DO I=0,Log2N-1
+			Lstep = 2 * J2
+			DO J = 0, J2-1
+				DO Ip=J, N-1, Lstep
+					Iq=Ip+J2
+					temp = wp(I2)*x(:,Iq)
+					x(:,Iq) = x(:,Ip) - temp
+					x(:,Ip) = x(:,Ip) + temp
+				END DO
+				I2=I2+1
+			END DO
+			J2=Lstep
+		END DO
+	END SUBROUTINE FFT_16_6
 #else
 	SUBROUTINE FFT_16(X,dir)!x MUST be after bit reverse, wp -array of coefficients for forward or backward FT
 		USE ISO_C_BINDING
