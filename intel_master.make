@@ -10,6 +10,6 @@ LIB_FFTW=  -L$(HOME)/Soft/lib/lib -lfftw3_omp -lfftw3_mpi  -lfftw3
 FGMRES_PATH=/mnt/data/users/dm3/vol6/kruglyakov/Soft/src/fgmres
 LIB_BLAS=-L$(HOME)/Soft/lib/lib/ -lopenblas_serial_gnu 
 LIB_ADD=-lgfortran
-INCLUDE= $(HOME)/Soft/lib/include
+INCLUDE= -I$(HOME)/Soft/lib/include
 INSTALL_PATH=~/_scratch/bin/GIEM2G/master
 

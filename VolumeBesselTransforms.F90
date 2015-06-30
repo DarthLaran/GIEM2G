@@ -42,9 +42,9 @@ PRIVATE
 		REAL(dp),DIMENSION(3,0:N-1,2)::xy_exp2
 		REAL(dp),DIMENSION(3,0:N-1,2)::xy_erf
 		REAL(dp),DIMENSION(3,0:N-1,2)::xy2
-        	REAL(dp)::edt%explt(0:N-1)
-        	REAL(dp)::edt%explt2(0:N-1)
-        	REAL(dp)::edt%explt3(0:N-1)
+        	REAL(dp)::explt(0:N-1)
+        	REAL(dp)::explt2(0:N-1)
+        	REAL(dp)::explt3(0:N-1)
 	END TYPE
 INTERFACE
 	FUNCTION out_all(edt,I) RESULT(R)
@@ -120,7 +120,6 @@ END SUBROUTINE
 SUBROUTINE CALC_EXP_LT(s,edt)
         REAL(dp),INTENT(IN)::s
 	TYPE (EXP_DATA_TYPE),INTENT(INOUT)::edt
-        REAL(dp),INTENT(IN)::s
 	INTEGER::I
 	REAL(dp)::y2
 	DO I=0,N-1,2
