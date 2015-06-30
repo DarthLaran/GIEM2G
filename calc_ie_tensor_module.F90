@@ -14,7 +14,7 @@ MODULE Calc_IE_Tensor_Module
 	PUBLIC::CalcIntegralGreenTensor
 CONTAINS
 	SUBROUTINE CalcIntegralGreenTensor(matrix,bkg,anomaly,Wt_Threshold)
-		CLASS(IE_MATRIX),INTENT(INOUT)::matrix
+		TYPE(IntegralEquation),INTENT(INOUT)::matrix
 		TYPE (BKG_DATA_TYPE),TARGET,INTENT(INOUT)::bkg
 		TYPE (ANOMALY_TYPE),TARGET,INTENT(INOUT)::anomaly
 		REAL(REALPARM),INTENT(IN)::Wt_Threshold
@@ -26,7 +26,7 @@ CONTAINS
 		COMPLEX(REALPARM),POINTER::pGrecv_asym(:,:,:,:)
 		INTEGER::Ix,Iy,ly,Ic,IERROR
 		INTEGER::Nx,Ny,Ny_loc,Ny_offset,Nz,Nx2
-		REAL(REALPARM)::dx,dy
+		REAL(REALPARM)::dx,dy,rmin
 		INTEGER::Nsend_symm,Nrecv_symm
 		INTEGER::Nsend_asym,Nrecv_asym
 		INTEGER::recv_proc,send_proc,shift
@@ -55,10 +55,10 @@ CONTAINS
 		G_asym=>matrix%G_asym
 		G_symm=C_ZERO
 		G_asym=C_ZERO
-		CALL VBTransformInit(lms)
-!		CALL Prepare_Hankel(bkg,anomaly)
 		dx=anomaly%dx
 		dy=anomaly%dy
+		rmin=SQRT(dx*dx+dy*dy)/2
+		CALL VBTransformInit(rmin,lms)
 		IF (Ny_offset<Ny) THEN
 			Nsend_asym=Nz*Nz*2*Nx2
 			Nrecv_asym=Nz*Nz*2*(Nx-Nx2)
@@ -236,7 +236,7 @@ CONTAINS
 		x=lx*dx+dx/2d0
 		y=ly*dy+dy/2d0
 		r=SQRT(x*x+y*y)
-		CALL VBTransformWeightsAllInt42(x,y,dx,dy,WT0)
+		CALL VBTransformWeightsAllDoubleInt(x,y,dx,dy,WT0)
 		WT(:,IE_D0)=WT0(:,1)
 		WT(:,IE_DXX)=WT0(:,2)
 		WT(:,IE_DXY)=WT0(:,3)
@@ -275,8 +275,8 @@ CONTAINS
 		time1=time2
 		DO K=Nfirst,Nlast
 			Wm=ABS(WT(K,:)/W0(:))
-!			IF (MAXVAL(Wm)>Wt_Threshold) THEN
-				lm=lms(K)/r
+			IF (MAXVAL(Wm)>Wt_Threshold) THEN
+				lm=lms(K)!r
 				W(IE_DXX)=WT(K,IE_DXX)/lm
 				W(IE_DYY)=WT(K,IE_DYY)/lm
 				W(IE_DXY)=WT(K,IE_DXY)/lm
@@ -284,8 +284,7 @@ CONTAINS
 				W(IE_DY)=WT(K,IE_DY)*lm
 				W(IE_D0)=WT(K,IE_D0)*lm
 				CALL Calc_Double_Integral_U(anomaly,bkg,dz,lm,W,G1,calc_time(3:4))
-
-!			ENDIF
+			ENDIF
 		ENDDO
 		G_asym(:,:,A_EXZ)=(G1(EXZ,:,:)/PI/4.0_REALPARM)
 		G_asym(:,:,A_EYZ)=(G1(EYZ,:,:)/PI/4.0_REALPARM)

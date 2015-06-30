@@ -22,7 +22,7 @@ MODULE CONTINUATION_FUNCTION_MODULE
 		INTEGER::mult_num
 		INTEGER::dotprod_num
 	ENDTYPE
-	TYPE RC_MATRIX
+	TYPE RC_OPERATOR
 		INTEGER::Nx,Ny,Nz,Nr
 		INTEGER::Nx2,Ny_loc,Ny_offset
 		INTEGER::Nx2Ny2
@@ -44,8 +44,6 @@ MODULE CONTINUATION_FUNCTION_MODULE
 		LOGICAL::master
 		TYPE(TypeCounter)::counter
 		TYPE (RECEIVER_TYPE),POINTER::recvs(:)
-	ENDTYPE
-	TYPE,EXTENDS(RC_MATRIX):: RC_OPERATOR
 		INTEGER (C_INTPTR_T) ::localsize_in
 		INTEGER (C_INTPTR_T) ::localsize_out
 		TYPE(C_PTR)::p_in,p_out
@@ -60,7 +58,7 @@ MODULE CONTINUATION_FUNCTION_MODULE
 	  ENDTYPE
 CONTAINS
 	SUBROUTINE PrepareContinuationOperator(rc_op,anomaly,recvs,mcomm,fftw_threads_ok)
-		CLASS(RC_OPERATOR),INTENT(INOUT)::rc_op
+		TYPE(RC_OPERATOR),INTENT(INOUT)::rc_op
 		TYPE (ANOMALY_TYPE),INTENT(INOUT)::anomaly
 		TYPE (RECEIVER_TYPE),POINTER,INTENT(IN)::recvs(:)
 		INTEGER,INTENT(IN)::mcomm 
@@ -118,7 +116,7 @@ CONTAINS
 	ENDSUBROUTINE
 #define no_compile	
 	SUBROUTINE ReCalculation(rc_op,Eint,Ea,Ha)
-		CLASS(RC_OPERATOR),INTENT(INOUT)::rc_op
+		TYPE(RC_OPERATOR),INTENT(INOUT)::rc_op
 		COMPLEX(REALPARM),POINTER,INTENT(IN)::Eint(:,:,:,:)
 		COMPLEX(REALPARM),POINTER,INTENT(OUT)::Ea(:,:,:,:)
 		COMPLEX(REALPARM),POINTER,INTENT(OUT)::Ha(:,:,:,:)
@@ -186,20 +184,21 @@ CONTAINS
 	END SUBROUTINE
 
 	SUBROUTINE CalcSizesForRC_OP(rc_op) 
-		CLASS(RC_Operator),INTENT(INOUT)::rc_op
+		TYPE(RC_Operator),INTENT(INOUT)::rc_op
 		INTEGER(C_INTPTR_T)::tsize8(2)
-		INTEGER(C_INTPTR_T),PARAMETER::TWO=2
 		INTEGER(C_INTPTR_T)::Nz3,Nr3
 		INTEGER(C_INTPTR_T)::block
 		INTEGER(C_INTPTR_T):: CNy,CNy_offset !size and offset for electrical current in Y direction at this process 
+		INTEGER(FFTW_COMM_SIZE)::COMM
 		REAL(REALPARM)::size_g
 		REAL(REALPARM)::tensor_size
 		tsize8=(/rc_op%Ny*2,rc_op%Nx*2/)
 		
+		COMM=rc_op%matrix_comm
 		block=FFTW_MPI_DEFAULT_BLOCK!(0)
 !----------------------------------------------------------------------------------------------------------!
 		Nz3=rc_op%Nz*3
-		rc_op%localsize_in = fftw_mpi_local_size_many(TWO,tsize8,Nz3,block,rc_op%matrix_comm, &
+		rc_op%localsize_in = fftw_mpi_local_size_many(FFTW_TWO,tsize8,Nz3,block,COMM, &
 			& CNy, CNy_offset)
 		rc_op%Ny_loc=INT(CNy,KIND(rc_op%Ny_loc))
 		rc_op%Ny_offset=INT(CNy_offset,KIND(rc_op%Ny_offset))
@@ -208,7 +207,7 @@ CONTAINS
 		rc_op%Nx2Ny2=rc_op%Nx*rc_op%Ny*4
 
 		Nr3=rc_op%Nr*3
-		rc_op%localsize_out = fftw_mpi_local_size_many(TWO,tsize8,Nr3,block,rc_op%matrix_comm, &
+		rc_op%localsize_out = fftw_mpi_local_size_many(FFTW_TWO,tsize8,Nr3,block,COMM, &
 			& CNy, CNy_offset)
 
 
@@ -220,7 +219,7 @@ CONTAINS
 		 ENDIF
 	ENDSUBROUTINE
 	SUBROUTINE AllocateRCMatrix(matrix)
-		CLASS(RC_MATRIX),INTENT(INOUT)::matrix
+		TYPE(RC_OPERATOR),INTENT(INOUT)::matrix
 		INTEGER(C_INTPTR_T)::length
 		INTEGER::shape1(1),Nz,Nx2,Ny_loc,N1,N2,Nr
 		COMPLEX(REALPARM),POINTER::tmp(:)
@@ -247,7 +246,7 @@ CONTAINS
 	END SUBROUTINE
 
 	SUBROUTINE AllocateRC_OP(rc_op)
-		CLASS(rc_operator),INTENT(INOUT)::rc_op
+		TYPE(rc_operator),INTENT(INOUT)::rc_op
 		INTEGER::shape4(4),shape3(3)
 		CALL AllocateRCMatrix(rc_op)
 		rc_op%p_in=fftw_alloc_complex(rc_op%localsize_in)
@@ -262,13 +261,13 @@ CONTAINS
 		CALL c_f_pointer(rc_op%p_out,rc_op%field_out3, shape3)
 	ENDSUBROUTINE
 	SUBROUTINE CalcFFTWPlansRC_OP(rc_op)
-		CLASS(rc_operator),INTENT(INOUT)::rc_op
+		TYPE(rc_operator),INTENT(INOUT)::rc_op
 		INTEGER(C_INTPTR_T)::fftwsize(2)
 		INTEGER(C_INTPTR_T)::Nz3,Nr3
 		INTEGER(C_INTPTR_T)::block
-		INTEGER(C_INTPTR_T),PARAMETER::TWO=2
 		INTEGER::IERROR
 		INTEGER::omp_get_max_threads,nt
+		INTEGER(FFTW_COMM_SIZE)::COMM, FFTW_NT
 		REAL(8)::time1,time2
 		fftwsize=(/rc_op%Ny*2,rc_op%Nx*2/)
 		block=FFTW_MPI_DEFAULT_BLOCK
@@ -278,15 +277,17 @@ CONTAINS
 		time1=MPI_WTIME()
 		IF (rc_op%fftw_threads_ok) THEN
 			NT=OMP_GET_MAX_THREADS()
-			CALL FFTW_PLAN_WITH_NTHREADS(NT)
+			FFTW_NT=NT
+			CALL FFTW_PLAN_WITH_NTHREADS(FFTW_NT)
 		ENDIF
+		COMM=rc_op%matrix_comm
 !		 CALL fftw_set_timelimit(5d0)
 				 
-		rc_op%planFWD=fftw_mpi_plan_many_dft(TWO,fftwsize,Nz3,block,block,&
-		&rc_op%field_in4,rc_op%field_in4,rc_op%matrix_comm, FFTW_FORWARD ,FFTW_MEASURE)!FFTW_PATIENT);
+		rc_op%planFWD=fftw_mpi_plan_many_dft(FFTW_TWO,fftwsize,Nz3,block,block,&
+		&rc_op%field_in4,rc_op%field_in4,COMM, FFTW_FORWARD ,FFTW_MEASURE)!FFTW_PATIENT);
 
-		rc_op%planBWD=fftw_mpi_plan_many_dft(TWO,fftwsize,Nr3,block,block,&
-		&rc_op%field_out4,rc_op%field_out4,rc_op%matrix_comm, FFTW_BACKWARD ,FFTW_MEASURE)!FFTW_PATIENT);
+		rc_op%planBWD=fftw_mpi_plan_many_dft(FFTW_TWO,fftwsize,Nr3,block,block,&
+		&rc_op%field_out4,rc_op%field_out4,COMM, FFTW_BACKWARD ,FFTW_MEASURE)!FFTW_PATIENT);
 		time2=MPI_WTIME()
 		rc_op%counter%plans=time2-time1
 		IF (VERBOSE) THEN
@@ -296,16 +297,16 @@ CONTAINS
 		ENDIF
 	ENDSUBROUTINE
 	SUBROUTINE RC_OP_FFTW_FWD(rc_op)
-		CLASS(rc_operator),INTENT(INOUT)::rc_op
+		TYPE(rc_operator),INTENT(INOUT)::rc_op
 		CALL fftw_mpi_execute_dft(rc_op%planFWD,rc_op%field_in4,rc_op%field_in4)
 	ENDSUBROUTINE
 	SUBROUTINE RC_OP_FFTW_BWD(rc_op)
-		CLASS(rc_operator),INTENT(INOUT)::rc_op
+		TYPE(rc_operator),INTENT(INOUT)::rc_op
 		CALL fftw_mpi_execute_dft(rc_op%planBWD,rc_op%field_out4,rc_op%field_out4)
 		rc_op%field_out4=rc_op%field_out4/rc_op%Nx2Ny2
 	ENDSUBROUTINE
 	SUBROUTINE CalcFFTofRCTensor(rc_op)
-		CLASS(rc_operator),INTENT(INOUT)::rc_op
+		TYPE(rc_operator),INTENT(INOUT)::rc_op
 		INTEGER::Ir
 		INTEGER::IERROR
 		REAL(8)::time1,time2
@@ -344,7 +345,7 @@ CONTAINS
 	ENDSUBROUTINE
 
 	SUBROUTINE DeleteMatrix(matrix)
-		CLASS(RC_matrix),INTENT(INOUT)::matrix
+		TYPE(RC_OPERATOR),INTENT(INOUT)::matrix
 		CALL fftw_free(matrix%pG_E)
 		CALL fftw_free(matrix%pG_H)
 		matrix%G_E=>NULL()
@@ -355,7 +356,7 @@ CONTAINS
 		matrix%G_H4=>NULL()
 	ENDSUBROUTINE
 	SUBROUTINE DeleteRC_OP(rc_op)
-		CLASS(RC_OPERATOR),INTENT(INOUT)::rc_op
+		TYPE(RC_OPERATOR),INTENT(INOUT)::rc_op
 		CALL fftw_free(rc_op%p_in)
 		CALL fftw_free(rc_op%p_out)
 		rc_op%field_in4=>NULL()
@@ -404,7 +405,7 @@ CONTAINS
 	ENDSUBROUTINE
 
 	SUBROUTINE APPLY_RC_E_OP(rc_op)
-		CLASS(RC_OPERATOR),INTENT(INOUT)::rc_op
+		TYPE(RC_OPERATOR),INTENT(INOUT)::rc_op
 		INTEGER::Ixy
 		REAL(8)::time1,time2,time3,time4
 		COMPLEX(REALPARM),POINTER::G(:,:,:,:)
@@ -440,14 +441,14 @@ CONTAINS
 	ENDSUBROUTINE
 
 	SUBROUTINE APPLY_RC_H_OP(rc_op)
-		CLASS(RC_OPERATOR),INTENT(INOUT)::rc_op
+		TYPE(RC_OPERATOR),INTENT(INOUT)::rc_op
 		INTEGER::Ixy
 		REAL(8)::time1,time2,time3,time4
 		COMPLEX(REALPARM),POINTER::G(:,:,:,:)
 		!------ ONLY IN THIS SUBROUTINE !!!!
-        INTEGER, PARAMETER :: HX=1
-        INTEGER, PARAMETER :: HY=2
-        INTEGER, PARAMETER :: HZ=3
+                INTEGER, PARAMETER :: HX=1
+                INTEGER, PARAMETER :: HY=2
+                INTEGER, PARAMETER :: HZ=3
 		!------ ONLY IN THIS SUBROUTINE !!!!
 		time1=MPI_WTIME()
 		CALL RC_OP_FFTW_FWD(rc_op)
@@ -478,7 +479,7 @@ CONTAINS
 		rc_op%counter%mult_zgemv=rc_op%counter%mult_zgemv+time3-time2
 	ENDSUBROUTINE
 	SUBROUTINE RC_OP_ZGEMV(rc_op,G,Tc,c_in,c_out,I,ALPHA,BETA)
-			CLASS(RC_OPERATOR),INTENT(INOUT)::rc_op
+			TYPE(RC_OPERATOR),INTENT(INOUT)::rc_op
 			COMPLEX(REALPARM),POINTER,INTENT(IN)::G(:,:,:,:)
 			INTEGER,INTENT(IN)::c_in,c_out,I,TC
 			COMPLEX(REALPARM),INTENT(IN)::ALPHA,BETA
