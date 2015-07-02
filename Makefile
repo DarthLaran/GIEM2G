@@ -10,14 +10,14 @@ else
 	FILTER_WEIGHTS_O=IntegralCodes.o   VolumeBesselTransforms.o  
 	OPTS=$(FOPTS)
 endif
-MODEL_O=data_types_module.o mpi_saveload_module.o
+MODEL_O=data_types_module.o # mpi_saveload_module.o
 IMAGE_O= apq_module.o  ie_kernel_hankel_module.o  rc_kernel_hankel_module.o 
 IE_O=Integral_Equation_Module.o calc_ie_tensor_module.o ie_solver_module.o   
 RC_O=Continuation_Function_Module.o calc_rc_tensor_module.o
 SRC_O=sources_module.o
+API_O=giem2g_c_api.o
 
-
-ALL_O=$(MISC_O) $(FILTER_WEIGHTS_O) $(MODEL_O) $(IMAGE_O) $(IE_O) $(RC_O) $(SRC_O)
+ALL_O=$(MISC_O) $(FILTER_WEIGHTS_O) $(MODEL_O) $(IMAGE_O) $(IE_O) $(RC_O) $(SRC_O) $(API_O)
 
 LIB_ZFGMRES=-L./ZFGMRES -lzfgmres
 
@@ -27,14 +27,18 @@ $(MAKECMDGOALS): zfgmres giem2g
 endif
 
 zfgmres:
-		$(MAKE) -C ZFGMRES FC=$(F77)  FOPTS='$(OPTS)' AR=$(AR) FGMRES_PATH='$(FGMRES_PATH)'
+	$(MAKE) -C ZFGMRES FC=$(F77)  FOPTS='$(OPTS)' AR=$(AR) FGMRES_PATH='$(FGMRES_PATH)'
 
-giem2g:  $(ALL_O) giem2g.F90 $(MAKECMDGOALS).make Makefile	
-	$(FC_Link)   $(OPTS)   -o giem2g $(ALL_O) giem2g.F90 $(LIBS)  $(INCLUDE) 
+giem2g: giem2g_lib giem2g.F90
+	$(FC_Link)   $(OPTS)  giem2g.F90  -L./ -lgiem2g  $(LIBS)  $(INCLUDE) -o giem2g 
 	
 ifdef INSTALL_PATH
 	cp giem2g $(INSTALL_PATH)/giem2g
 endif
+
+giem2g_lib: $(ALL_O)  $(MAKECMDGOALS).make Makefile	
+	$(AR) rcs libgiem2g.a $(ALL_O)
+
 %.o:%.f90
 	$(FC) $(OPTS) -c $*.f90 -o $*.o $(INCLUDE)
 
@@ -43,3 +47,4 @@ endif
 clean:
 	rm $(ALL_O)   *.mod
 	$(MAKE) -C ZFGMRES clean
+	rm libgiem2g.a
