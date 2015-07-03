@@ -147,15 +147,12 @@ PROGRAM GIEMIEMG
 		ENDIF
 		CALL Set_Freq(bkg,freqs(Ifreq))
 
-		CALL CHECK_MEM(int_eq%me,int_eq%master_proc,int_eq%matrix_comm)
 
 		CALL CalcIntegralGreenTensor(int_eq,bkg,anomaly,IE_Threshold)
 
-		CALL CHECK_MEM(int_eq%me,int_eq%master_proc,int_eq%matrix_comm)
 
 		CALL CalcFFTofIETensor(int_eq)
 
-		CALL CHECK_MEM(int_eq%me,int_eq%master_proc,int_eq%matrix_comm)
 
 		CALL CalcRecalculationGreenTensor(rc_op,bkg,anomaly,RC_Threshold)
 		CALL CalcFFTofRCTensor(rc_op)
@@ -176,7 +173,6 @@ PROGRAM GIEMIEMG
 				IF (me==0) PRINT*, 'FY=', FY
 
 
-			CALL CHECK_MEM(int_eq%me,int_eq%master_proc,int_eq%matrix_comm)
 			CALL SolveEquation(int_eq,fgmres_ctl)
 			CALL ReCalculation(rc_op,int_eq%Esol,Ea,Ha)
 			IF (int_eq%real_space) THEN
@@ -217,7 +213,9 @@ PROGRAM GIEMIEMG
 		ENDDO
 #endif
 	ENDDO
-	 CALL DeleteIE_OP(int_eq)
-	 CALL DeleteRC_OP(RC_OP)
+	CALL CHECK_MEM(int_eq%me,int_eq%master_proc,int_eq%matrix_comm)
+	CALL DeleteIE_OP(int_eq)
+	CALL DeleteRC_OP(RC_OP)
+	CALL CHECK_MEM(int_eq%me,int_eq%master_proc,int_eq%matrix_comm)
 	CALL MPI_FINALIZE(IERROR)
 END PROGRAM
