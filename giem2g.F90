@@ -53,24 +53,30 @@ PROGRAM GIEMIEMG
 	CALL MPI_COMM_RANK(wcomm, me, IERROR)
 	CALL MPI_COMM_SIZE(wcomm,wsize,IERROR) 
 	
-	
-	 IF (PROVIDED>=MPI_THREAD_FUNNELED) THEN 
-		threads_ok=.TRUE.
-		NF= fftw_init_threads(); 
-		IF ((me==0).AND.(NF/=0)) THEN
-			PRINT*, 'FFTW THREADS ENABLE'
-		ENDIF			 
+	IF ( .NOT. FFTW_THREADS_DISABLE) THEN
+		IF (PROVIDED>=MPI_THREAD_FUNNELED) THEN 
+			threads_ok=.TRUE.
+			NF= fftw_init_threads(); 
+			IF ((me==0).AND.(NF/=0)) THEN
+				PRINT*, 'FFTW THREADS ENABLE'
+			ENDIF			 
 		ELSEIF(FFTW_THREADS_FORCE) THEN
-		threads_ok=.TRUE.
-		NF= fftw_init_threads(); 
-		IF ((me==0).AND.(NF/=0)) THEN
-			PRINT*, 'FFTW THREADS FORCED ENABLE'
-		ENDIF			 
+			threads_ok=.TRUE.
+			NF= fftw_init_threads(); 
+			IF ((me==0).AND.(NF/=0)) THEN
+				PRINT*, 'FFTW THREADS FORCED ENABLE'
+			ENDIF			 
 		ELSE
-		threads_ok=.FALSE.
-		IF (me==0) THEN
-			PRINT*, 'FFTW THREADS DISABLE'
-		ENDIF			 
+			threads_ok=.FALSE.
+			IF (me==0) THEN
+				PRINT*, 'FFTW THREADS DISABLE'
+			ENDIF			 
+		ENDIF
+	ELSE	
+			threads_ok=.FALSE.
+			IF (me==0) THEN
+				PRINT*, 'FFTW FORCED THREADS DISABLE'
+			ENDIF			 
 	ENDIF
 		IF (me==0)	PRINT*,'Number of processes:',wsize
 		NT=OMP_GET_MAX_THREADS()
@@ -104,12 +110,21 @@ PROGRAM GIEMIEMG
 	CALL PrepareIntegralEquation(int_eq,anomaly,wcomm,threads_ok)
 
 	real_comm=int_eq%fgmres_comm
+
+	CALL CHECK_MEM(int_eq%me,int_eq%master_proc,int_eq%matrix_comm)
 	CALL PrepareContinuationOperator(rc_op,anomaly,recvs,wcomm,threads_ok)
 
+	IF (me==0) PRINT*, 'stage 0'
+		CALL CHECK_MEM(int_eq%me,int_eq%master_proc,int_eq%matrix_comm)
 	CALL  SetSigb(int_eq,anomaly,bkg)
+	IF (me==0) PRINT*, 'stage 01'
+	CALL CHECK_MEM(int_eq%me,int_eq%master_proc,int_eq%matrix_comm)
 	CALL SetSigbRC(rc_op,anomaly,bkg)
 
+	IF (me==0) PRINT*, 'stage 1'
+		CALL CHECK_MEM(int_eq%me,int_eq%master_proc,int_eq%matrix_comm)
 	IF (int_eq%real_space) THEN
+	IF (me==0) PRINT*, 'stage 2'
 		CALL AllocateSiga(anomaly)
 		ALLOCATE(FX(1,1,1,6),FY(1,1,1,6))
 		ALLOCATE(Ea(Nr,EX:EZ,int_eq%Nx,int_eq%Ny_loc),Ha(Nr,HX:HZ,int_eq%Nx,int_eq%Ny_loc))
@@ -130,6 +145,7 @@ PROGRAM GIEMIEMG
 !----------------------------------------------------------------------------!
 
 
+		CALL CHECK_MEM(int_eq%me,int_eq%master_proc,int_eq%matrix_comm)
 
 	DO Ifreq=1,Nfreq
 		WRITE (fnum1,'(F11.5)') freqs(Ifreq)

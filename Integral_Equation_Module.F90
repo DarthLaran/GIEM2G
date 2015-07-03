@@ -5,6 +5,7 @@ MODULE INTEGRAL_EQUATION_MODULE
 
 	USE DATA_TYPES_MODULE
 
+	USE CHECK_MEMORY
 	IMPLICIT NONE
 	INTEGER,PARAMETER::COUNTER_ALL=1
 	INTEGER,PARAMETER::COUNTER_WT=2
@@ -157,7 +158,9 @@ CONTAINS
 		TYPE(IntegralEquation),INTENT(INOUT)::ie_op
 		CALL CalcSizesForIE_OP(ie_op)
 		CALL AllocateIE_OP(ie_op)
+			CALL CHECK_MEM(ie_op%me,ie_op%master_proc,ie_op%matrix_comm)
 		CALL CalcFFTWPlansIE_OP(ie_op)
+			CALL CHECK_MEM(ie_op%me,ie_op%master_proc,ie_op%matrix_comm)
 	ENDSUBROUTINE
 
 	SUBROUTINE CalcSizesForIE_OP(ie_op) 

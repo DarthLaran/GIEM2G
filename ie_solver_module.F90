@@ -112,6 +112,7 @@ MODULE IE_SOLVER_MODULE
 		Nz=int_eq%Nz
 		Ny_loc=int_eq%Ny_loc
 		IF (int_eq%real_space) THEN
+			CALL CHECK_MEM(int_eq%me,int_eq%master_proc,int_eq%fgmres_comm)
 			IF (ASSOCIATED(int_eq%sigb))	THEN
 				anom_shape=(/Nz,Nx,Ny_loc/)
 				tmp_shape=SHAPE(int_eq%sigb)
@@ -140,13 +141,17 @@ MODULE IE_SOLVER_MODULE
 				ALLOCATE(int_eq%gsig(Nz,Nx,Ny_loc))
 				ALLOCATE(int_eq%dsig(Nz,Nx,Ny_loc))
 			ENDIF
-			!$OMP PARALLEL	DEFAULT(SHARED) PRIVATE(Iz)
-			!$OMP DO SCHEDULE(GUIDED)
+			IF( int_eq%me==0)  PRINT*, 'before sigb setup'
+			CALL CHECK_MEM(int_eq%me,int_eq%master_proc,int_eq%fgmres_comm)
+			!!$OMP PARALLEL	DEFAULT(SHARED) PRIVATE(Iz)
+			!!$OMP DO SCHEDULE(GUIDED)
 			DO Iz=1,int_eq%Nz
 					int_eq%sigb(Iz,:,:)=bkg%sigma(anomaly%Lnumber(Iz))
 			ENDDO
-			!$OMP ENDDO
-			!$OMP END PARALLEL
+			!!$OMP ENDDO
+			!!$OMP END PARALLEL
+			IF( int_eq%me==0)  PRINT*, 'after sigb setup'
+			CALL CHECK_MEM(int_eq%me,int_eq%master_proc,int_eq%fgmres_comm)
 		ENDIF
 	ENDSUBROUTINE
 
@@ -245,6 +250,7 @@ MODULE IE_SOLVER_MODULE
 
 		work_fgmres(1:int_eq%Nloc)=int_eq%initial_guess
 		work_fgmres(int_eq%Nloc+1:2*int_eq%Nloc)=int_eq%solution
+		CALL CHECK_MEM(int_eq%me,int_eq%master_proc,comm_outer)
 		DO
 			CALL drive_zfgmres(int_eq%N,int_eq%Nloc,m,l_fgmres,work_fgmres,irc,icntl,cntl,info,rinfo)
 			revcom = irc(1)
