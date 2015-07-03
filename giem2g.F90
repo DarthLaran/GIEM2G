@@ -111,20 +111,12 @@ PROGRAM GIEMIEMG
 
 	real_comm=int_eq%fgmres_comm
 
-	CALL CHECK_MEM(int_eq%me,int_eq%master_proc,int_eq%matrix_comm)
 	CALL PrepareContinuationOperator(rc_op,anomaly,recvs,wcomm,threads_ok)
 
-	IF (me==0) PRINT*, 'stage 0'
-		CALL CHECK_MEM(int_eq%me,int_eq%master_proc,int_eq%matrix_comm)
 	CALL  SetSigb(int_eq,anomaly,bkg)
-	IF (me==0) PRINT*, 'stage 01'
-	CALL CHECK_MEM(int_eq%me,int_eq%master_proc,int_eq%matrix_comm)
 	CALL SetSigbRC(rc_op,anomaly,bkg)
 
-	IF (me==0) PRINT*, 'stage 1'
-		CALL CHECK_MEM(int_eq%me,int_eq%master_proc,int_eq%matrix_comm)
 	IF (int_eq%real_space) THEN
-	IF (me==0) PRINT*, 'stage 2'
 		CALL AllocateSiga(anomaly)
 		ALLOCATE(FX(1,1,1,6),FY(1,1,1,6))
 		ALLOCATE(Ea(Nr,EX:EZ,int_eq%Nx,int_eq%Ny_loc),Ha(Nr,HX:HZ,int_eq%Nx,int_eq%Ny_loc))
@@ -145,7 +137,6 @@ PROGRAM GIEMIEMG
 !----------------------------------------------------------------------------!
 
 
-		CALL CHECK_MEM(int_eq%me,int_eq%master_proc,int_eq%matrix_comm)
 
 	DO Ifreq=1,Nfreq
 		WRITE (fnum1,'(F11.5)') freqs(Ifreq)
