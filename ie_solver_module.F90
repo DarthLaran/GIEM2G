@@ -4,6 +4,7 @@ MODULE IE_SOLVER_MODULE
 	USE MPI_MODULE
 	USE DATA_TYPES_MODULE
 	USE INTEGRAL_EQUATION_MODULE
+	USE CHECK_MEMORY
 	IMPLICIT NONE
 	PRIVATE
 
@@ -456,6 +457,7 @@ MODULE IE_SOLVER_MODULE
 !		PRINT*,ie_op%me,'Tj',ie_op%field_out4(:,EZ,:,:)
 		ie_op%counter%mult_fftw_b=ie_op%counter%mult_fftw_b+time4-time3
 		ie_op%counter%mult_zgemv=ie_op%counter%mult_zgemv+time3-time2
+		CALL CHECK_MEM(ie_op%me,ie_op%master_proc,ie_op%matrix_comm)
 	ENDSUBROUTINE
 	SUBROUTINE IE_OP_ZGEMV_SYMM(ie_op,Tc,c_in,c_out,I,ALPHA,BETA)
 			TYPE(IntegralEquation),INTENT(INOUT)::ie_op

@@ -2,18 +2,16 @@ PROGRAM GIEMIEMG
 	USE CONST_MODULE
 	USE FFTW3
 	USE MPI_MODULE
-
 	USE DATA_TYPES_MODULE
-	USE MPI_MODULE
 	USE MPI_SAVELOAD_MODULE
 	USE SOURCES_MODULE
-	USE FFTW3
-   USE INTEGRAL_EQUATION_MODULE
+	USE INTEGRAL_EQUATION_MODULE
 	USE Calc_IE_Tensor_Module
 	USE IE_SOLVER_MODULE
 
 	USE CONTINUATION_FUNCTION_MODULE
 	USE Calc_RC_Tensor_Module
+	USE CHECK_MEMORY
 
 
 	IMPLICIT NONE
@@ -104,6 +102,7 @@ PROGRAM GIEMIEMG
 	IF (me==0) PRINT'(A80)','%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%'
 	IF (me==0) PRINT*, 'Nx=',anomaly%Nx, 'Ny=',anomaly%Ny,'Nz=',anomaly%Nz
 	CALL PrepareIntegralEquation(int_eq,anomaly,wcomm,threads_ok)
+
 	real_comm=int_eq%fgmres_comm
 	CALL PrepareContinuationOperator(rc_op,anomaly,recvs,wcomm,threads_ok)
 
@@ -130,6 +129,8 @@ PROGRAM GIEMIEMG
 
 !----------------------------------------------------------------------------!
 
+
+
 	DO Ifreq=1,Nfreq
 		WRITE (fnum1,'(F11.5)') freqs(Ifreq)
 		DO Istr=1,11
@@ -139,9 +140,16 @@ PROGRAM GIEMIEMG
 			PRINT'(A, F11.5, A)', 'Frequency:', freqs(Ifreq), 'Hz'
 		ENDIF
 		CALL Set_Freq(bkg,freqs(Ifreq))
+
+		CALL CHECK_MEM(int_eq%me,int_eq%master_proc,int_eq%matrix_comm)
+
 		CALL CalcIntegralGreenTensor(int_eq,bkg,anomaly,IE_Threshold)
+
+		CALL CHECK_MEM(int_eq%me,int_eq%master_proc,int_eq%matrix_comm)
+
 		CALL CalcFFTofIETensor(int_eq)
 
+		CALL CHECK_MEM(int_eq%me,int_eq%master_proc,int_eq%matrix_comm)
 
 		CALL CalcRecalculationGreenTensor(rc_op,bkg,anomaly,RC_Threshold)
 		CALL CalcFFTofRCTensor(rc_op)
@@ -160,8 +168,10 @@ PROGRAM GIEMIEMG
 
 			ENDIF
 				IF (me==0) PRINT*, 'FY=', FY
-			CALL SolveEquation(int_eq,fgmres_ctl)
 
+
+			CALL CHECK_MEM(int_eq%me,int_eq%master_proc,int_eq%matrix_comm)
+			CALL SolveEquation(int_eq,fgmres_ctl)
 			CALL ReCalculation(rc_op,int_eq%Esol,Ea,Ha)
 			IF (int_eq%real_space) THEN
 
