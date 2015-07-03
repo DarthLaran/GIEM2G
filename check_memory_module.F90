@@ -22,5 +22,5 @@ CONTAINS
 			PRINT *,'Max memory usage:', DATA_MAX*4.0/1024/1024, 'Gb'
 		ENDIF
 		
-	END 
+	END SUBROUTINE 
 END

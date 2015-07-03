@@ -53,24 +53,30 @@ PROGRAM GIEMIEMG
 	CALL MPI_COMM_RANK(wcomm, me, IERROR)
 	CALL MPI_COMM_SIZE(wcomm,wsize,IERROR) 
 	
-	
-	 IF (PROVIDED>=MPI_THREAD_FUNNELED) THEN 
-		threads_ok=.TRUE.
-		NF= fftw_init_threads(); 
-		IF ((me==0).AND.(NF/=0)) THEN
-			PRINT*, 'FFTW THREADS ENABLE'
-		ENDIF			 
+	IF ( .NOT. FFTW_THREADS_DISABLE) THEN
+		IF (PROVIDED>=MPI_THREAD_FUNNELED) THEN 
+			threads_ok=.TRUE.
+			NF= fftw_init_threads(); 
+			IF ((me==0).AND.(NF/=0)) THEN
+				PRINT*, 'FFTW THREADS ENABLE'
+			ENDIF			 
 		ELSEIF(FFTW_THREADS_FORCE) THEN
-		threads_ok=.TRUE.
-		NF= fftw_init_threads(); 
-		IF ((me==0).AND.(NF/=0)) THEN
-			PRINT*, 'FFTW THREADS FORCED ENABLE'
-		ENDIF			 
+			threads_ok=.TRUE.
+			NF= fftw_init_threads(); 
+			IF ((me==0).AND.(NF/=0)) THEN
+				PRINT*, 'FFTW THREADS FORCED ENABLE'
+			ENDIF			 
 		ELSE
-		threads_ok=.FALSE.
-		IF (me==0) THEN
-			PRINT*, 'FFTW THREADS DISABLE'
-		ENDIF			 
+			threads_ok=.FALSE.
+			IF (me==0) THEN
+				PRINT*, 'FFTW THREADS DISABLE'
+			ENDIF			 
+		ENDIF
+	ELSE	
+			threads_ok=.FALSE.
+			IF (me==0) THEN
+				PRINT*, 'FFTW FORCED THREADS DISABLE'
+			ENDIF			 
 	ENDIF
 		IF (me==0)	PRINT*,'Number of processes:',wsize
 		NT=OMP_GET_MAX_THREADS()
