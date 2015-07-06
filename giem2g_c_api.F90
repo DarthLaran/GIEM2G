@@ -67,7 +67,7 @@ MODULE GIEM2G_C_API
                         CALL C_F_POINTER(c_bkg,bkg)
                         CALL C_F_POINTER(c_anomaly,anomaly)
                         ALLOCATE(recvs(Nr))
-                        RES=C_LOC(recvs)
+                        RES=C_LOC(recvs(1))
                         CALL C_F_POINTER(c_z,zr,(/Nr/))
                         CALL C_F_POINTER(c_x,xshift,(/Nr/))
                         CALL C_F_POINTER(c_y,yshift,(/Nr/))
