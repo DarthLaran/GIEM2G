@@ -218,7 +218,7 @@ MODULE APQ_Module
 						COMPLEX(REALPARM),INTENT(INOUT)::eta(bkg%Nl),Arr(bkg%Nl,2)
 			COMPLEX(REALPARM),OPTIONAL,INTENT(INOUT)::A(bkg%Nl,bkg%Nl,2)
 			REAL(REALPARM),INTENT(IN)::lms
-			COMPLEX(REALPARM)::eta0,el(bkg%Nl),w(bkg%Nl,2)
+			COMPLEX(REALPARM)::eta0,el(bkg%Nl),w(bkg%Nl,2),tmp
 			INTEGER:: I,J
 			DO I=1,bkg%Nl
 				eta(I)=SQRT(lms*lms-bkg%k2(I))
@@ -232,16 +232,19 @@ MODULE APQ_Module
 			DO I=1,bkg%Nl
 				Arr(I,:)=C_ONE/eta(I)/(C_ONE-p(I,:)*q(I,:)*el(I))
 			ENDDO
-			DO I=1,bkg%Nl-1
-				w(I,:)=(C_ONE+p(I+1,:))/(C_ONE+p(I,:)*el(I))*EXP(bkg%depth(I)*(eta(I+1)-eta(I)))
-			ENDDO
 			IF (PRESENT(A))THEN
+				DO I=1,bkg%Nl-1
+					tmp=(bkg%k2(I)-bkg%k2(I+1))
+					tmp=bkg%depth(I)*tmp
+					tmp=tmp/(eta(I+1)+eta(I))
+					w(I,:)=(C_ONE+p(I+1,:))/(C_ONE+p(I,:)*el(I))*EXP(tmp)
+				ENDDO
 				DO I=1,bkg%Nl
 					A(I,I,:)=Arr(I,:)
 					DO J=I-1,1,-1
 						A(J,I,:)=A(J+1,I,:)*w(J,:)
 						A(I,J,1)=A(J,I,1)
-						A(I,J,2)=A(J,I,1)*bkg%sigma(I)/bkg%sigma(J)
+						A(I,J,2)=A(J,I,2)*bkg%sigma(I)/bkg%sigma(J)
 					ENDDO
 				ENDDO
 			ENDIF
@@ -253,10 +256,10 @@ MODULE APQ_Module
 			COMPLEX(REALPARM)::p(bkg%Nl,2)
 			COMPLEX(REALPARM)::eta0,w(2),a(2)
 			INTEGER:: I
-			eta0=lms!cbkg%depthange for displacement currents in future
+			eta0=lms! change for displacement currents in future
 
 			p(1,1)=(eta(1)-eta0)/(eta(1)+eta0)
-			p(1,2)=-1!cbkg%depthange for displacement currents in future
+			p(1,2)=-1! change for displacement currents in future
 			DO I=2,bkg%Nl
 				w(1)=el(I-1)*p(I-1,1)
 				w(2)=el(I-1)*p(I-1,2)
