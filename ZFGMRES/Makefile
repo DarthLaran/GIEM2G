@@ -9,7 +9,7 @@ all:  $(PATCH)
 	$(F77) $(FOPTS) -c zPackgmres.f -o zPackgmres.o 
 	$(F77) $(FOPTS) -c zPackfgmres.f -o zPackfgmres.o 
 	$(AR) rcs libzfgmres.a $(ZGMRES)
-	rm $(ZGMRES)
+	rm $(ZGMRES_F)
 clean :
 	/bin/rm -f *.o *.mod
 
