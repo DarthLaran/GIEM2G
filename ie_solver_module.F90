@@ -253,7 +253,7 @@ MODULE IE_SOLVER_MODULE
 			nbscal = irc(5)
 			v_in=>work_fgmres(colx:colx+int_eq%Nloc-1)
 			v_out=>work_fgmres(colz:colz+int_eq%Nloc-1)
-			IF ((info(1)==77).OR.(info(1)==0).OR.(info(1)==-4)) THEN
+			IF ((info(1)==77).OR.(info(1)==0).OR.(info(1)==-4).OR.(info(1)==79)) THEN
 				Nfgmres=Nfgmres+1
 				IF ((int_eq%master) .AND.(FGMRES_VERBOSE)) THEN
 				       PRINT info_fmt,'FGMRES interation', Nfgmres,' Arnoldi b.e.:' , rinfo
