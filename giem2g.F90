@@ -16,7 +16,6 @@ PROGRAM GIEMIEMG
 
 	IMPLICIT NONE
 #define debug		 
-#define no_compile
 	INTEGER(4)::PROVIDED,IERROR
 	INTEGER::shift_y,shift_x
 	INTEGER(4)::comm_old,Np
@@ -46,6 +45,7 @@ PROGRAM GIEMIEMG
 	CHARACTER(len=11)::fnum1,fnum2
 	CHARACTER(len=1024),POINTER::anom_list(:)
 	INTEGER::Istr,Na,Ia
+	REAL(8)::time2
 !-------------------MPI INITIALIZATION-------------------------------------!
 	CALL MPI_INIT_THREAD(MPI_THREAD_FUNNELED, PROVIDED, IERROR)
 	wcomm=MPI_COMM_WORLD
@@ -158,7 +158,6 @@ PROGRAM GIEMIEMG
 		CALL CalcRecalculationGreenTensor(rc_op,bkg,anomaly,RC_Threshold)
 		CALL CalcFFTofRCTensor(rc_op)
 
-#ifndef not_compile
 		DO Ia=1,Na
 			WRITE (fnum2,'(I5.5)') Ia
 			IF (me==0)	PRINT*, 'Anomaly ', Ia, ' from ', trim(anom_list(Ia))
@@ -168,14 +167,29 @@ PROGRAM GIEMIEMG
 				CALL PlaneWave(EY,bkg,(/recvs(1)%zrecv/),FY)
 !				anomaly%siga(:,1:int_eq%Nx/2,:)=sig1(It)
 !				anomaly%siga(:,int_eq%Nx/2+1:,:)=sig2(It)
-                CALL LoadAnomalySigma(anomaly,real_comm,trim(anom_list(Ia)))
+		                CALL LoadAnomalySigma(anomaly,real_comm,trim(anom_list(Ia)))
 
 			ENDIF
-				IF (me==0) PRINT*, 'FY=', FY
+
+			IF (me==0) PRINT*, 'FY=', FY
 
 
 			CALL SolveEquation(int_eq,fgmres_ctl)
+			CALL MPI_BARRIER(int_eq%matrix_comm,IERROR)
+			time2=MPI_WTIME()
+			IF (int_eq%real_space) THEN
+!				CALL SaveIESolutionSeparateBinary(int_eq%Esol,int_eq%me,'SOL_PY_F'//trim(fnum1)//'T_'//trim(fnum2))
+				CALL SaveIESolutionOneFIleBinary(int_eq%Esol,real_comm,'SOL_PY_F'//trim(fnum1)//'T_'//trim(fnum2))
+			ENDIF
+			CALL MPI_BARRIER(int_eq%matrix_comm,IERROR)
+			time2=MPI_WTIME()-time2;
+			IF (int_eq%master) THEN
+				PRINT*, "Save IE Solution in",time2, 's'
+			ENDIF
+
 			CALL ReCalculation(rc_op,int_eq%Esol,Ea,Ha)
+			CALL MPI_BARRIER(int_eq%matrix_comm,IERROR)
+			time2=MPI_WTIME()
 			IF (int_eq%real_space) THEN
 
 				Et(:,EX,:,:)=Ea(:,EX,:,:)+FY(1,1,1,EX)
@@ -186,8 +200,13 @@ PROGRAM GIEMIEMG
 				Ht(:,HY,:,:)=Ha(:,HY,:,:)+FY(1,1,1,HY)
 				Ht(:,HZ,:,:)=Ha(:,HZ,:,:)+FY(1,1,1,HZ)
 
-				!CALL SaveOutputOneFile(Ea,Et,Ha,Ht,anomaly,recvs,freqs(Ifreq),real_comm,'PY_F'//trim(fnum1)//'T_'//trim(fnum2))
-				CALL SaveOutputSeparate(Ea,Et,Ha,Ht,anomaly,recvs,freqs(Ifreq),rc_op%me,rc_op%Ny_offset,'PY_F'//trim(fnum1)//'T_'//trim(fnum2))
+				CALL SaveOutputOneFile(Ea,Et,Ha,Ht,anomaly,recvs,freqs(Ifreq),real_comm,'PY_F'//trim(fnum1)//'T_'//trim(fnum2))
+				!CALL SaveOutputSeparate(Ea,Et,Ha,Ht,anomaly,recvs,freqs(Ifreq),rc_op%me,rc_op%Ny_offset,'PY_F'//trim(fnum1)//'T_'//trim(fnum2))
+			ENDIF
+			CALL MPI_BARRIER(int_eq%matrix_comm,IERROR)
+			time2=MPI_WTIME()-time2;
+			IF (int_eq%master) THEN
+				PRINT*, "Save fields in",time2, 's'
 			ENDIF
 
 			IF (int_eq%real_space) THEN
@@ -196,8 +215,21 @@ PROGRAM GIEMIEMG
 			ENDIF
 
 			CALL SolveEquation(int_eq,fgmres_ctl)
+			CALL MPI_BARRIER(int_eq%matrix_comm,IERROR)
+			time2=MPI_WTIME()
+			IF (int_eq%real_space) THEN
+				!CALL SaveIESolutionSeparateBinary(int_eq%Esol,int_eq%me,'SOL_PX_F'//trim(fnum1)//'T_'//trim(fnum2))
+				CALL SaveIESolutionOneFIleBinary(int_eq%Esol,real_comm,'SOL_PX_F'//trim(fnum1)//'T_'//trim(fnum2))
+			ENDIF
+			CALL MPI_BARRIER(int_eq%matrix_comm,IERROR)
+			time2=MPI_WTIME()-time2;
+			IF (int_eq%master) THEN
+				PRINT*, "Save IE Solution in",time2, 's'
+			ENDIF
 			CALL ReCalculation(rc_op,int_eq%Esol,Ea,Ha)
 
+			CALL MPI_BARRIER(int_eq%matrix_comm,IERROR)
+			time2=MPI_WTIME()
 			IF (int_eq%real_space) THEN
 
 				Et(:,EX,:,:)=Ea(:,EX,:,:)+FX(1,1,1,EX)
@@ -207,12 +239,16 @@ PROGRAM GIEMIEMG
 				Ht(:,HX,:,:)=Ha(:,HX,:,:)+FX(1,1,1,HX)
 				Ht(:,HY,:,:)=Ha(:,HY,:,:)+FX(1,1,1,HY)
 				Ht(:,HZ,:,:)=Ha(:,HZ,:,:)+FX(1,1,1,HZ)
-				CALL SaveOutputSeparate(Ea,Et,Ha,Ht,anomaly,recvs,freqs(Ifreq),rc_op%me,rc_op%Ny_offset,'PX_F'//trim(fnum1)//'T_'//trim(fnum2))
+!				CALL SaveOutputSeparate(Ea,Et,Ha,Ht,anomaly,recvs,freqs(Ifreq),rc_op%me,rc_op%Ny_offset,'PX_F'//trim(fnum1)//'T_'//trim(fnum2))
 
-!				CALL SaveOutputOneFile(Ea,Et,Ha,Ht,anomaly,recvs,freqs(Ifreq),real_comm,'PX_F'//trim(fnum1)//'T_'//trim(fnum2))
+				CALL SaveOutputOneFile(Ea,Et,Ha,Ht,anomaly,recvs,freqs(Ifreq),real_comm,'PX_F'//trim(fnum1)//'T_'//trim(fnum2))
+			ENDIF
+			CALL MPI_BARRIER(int_eq%matrix_comm,IERROR)
+			time2=MPI_WTIME()-time2;
+			IF (int_eq%master) THEN
+				PRINT*, "Save fields in",time2, 's'
 			ENDIF
 		ENDDO
-#endif
 	ENDDO
 	CALL CHECK_MEM(int_eq%me,int_eq%master_proc,int_eq%matrix_comm)
 	CALL DeleteIE_OP(int_eq)
