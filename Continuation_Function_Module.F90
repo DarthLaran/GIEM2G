@@ -394,13 +394,13 @@ CONTAINS
 				ALLOCATE(rc_op%sigb(Nz,Nx,Ny_loc))
 				ALLOCATE(rc_op%dsig(Nz,Nx,Ny_loc))
 			ENDIF
-			!$OMP PARALLEL	DEFAULT(SHARED) PRIVATE(Iz)
-			!$OMP DO SCHEDULE(GUIDED)
+			!!$OMP PARALLEL	DEFAULT(SHARED) PRIVATE(Iz)
+			!!$OMP DO SCHEDULE(GUIDED)
 			DO Iz=1,rc_op%Nz
 					rc_op%sigb(Iz,:,:)=bkg%sigma(anomaly%Lnumber(Iz))
 			ENDDO
-			!$OMP ENDDO
-			!$OMP END PARALLEL
+			!!$OMP ENDDO
+			!!$OMP END PARALLEL
 		ENDIF
 	ENDSUBROUTINE
 

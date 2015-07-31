@@ -1,3 +1,7 @@
 MODULE MPI_MODULE
+#ifdef LEGACY_MPI
 	INCLUDE 'mpif.h'
+#else
+	USE MPI
+#endif
 END MODULE

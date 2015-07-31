@@ -337,7 +337,7 @@ CONTAINS
 			
 	END SUBROUTINE
 
-	SUBROUTINE SaveOutputOneFile(Ea,Et,Ha,Ht,anomaly,recvs,freq,comm,fname)
+	SUBROUTINE SaveOutputOneFile_Old(Ea,Et,Ha,Ht,anomaly,recvs,freq,comm,fname)
 		COMPLEX(REALPARM),POINTER,INTENT(IN)::Ea(:,:,:,:)
 		COMPLEX(REALPARM),POINTER,INTENT(IN)::Et(:,:,:,:)
 		COMPLEX(REALPARM),POINTER,INTENT(IN)::Ha(:,:,:,:)
@@ -394,6 +394,98 @@ CONTAINS
 		CALL MPI_BARRIER(comm,IERROR)
 	ENDSUBROUTINE
 
+	SUBROUTINE SaveOutputOneFile(Ea,Et,Ha,Ht,anomaly,recvs,freq,comm,fname)
+		COMPLEX(REALPARM),POINTER,INTENT(IN)::Ea(:,:,:,:)
+		COMPLEX(REALPARM),POINTER,INTENT(IN)::Et(:,:,:,:)
+		COMPLEX(REALPARM),POINTER,INTENT(IN)::Ha(:,:,:,:)
+		COMPLEX(REALPARM),POINTER,INTENT(IN)::Ht(:,:,:,:)
+		TYPE (RECEIVER_TYPE),POINTER,INTENT(IN)::recvs(:)
+		TYPE (ANOMALY_TYPE),INTENT(IN)::anomaly
+		REAL(REALPARM),INTENT(IN)::freq
+		INTEGER,INTENT(IN)::comm
+		CHARACTER(*),INTENT(IN)::fname
+		CHARACTER(LEN=*), PARAMETER  :: output_fmt = "(A1, 28ES20.10E3)"
+		CHARACTER(LEN=*), PARAMETER  :: title_fmt = "(A1, 28A20)"
+		INTEGER:: REC_STATUS(MPI_STATUS_SIZE)
+		INTEGER::Ir,Nr,me, IERROR
+		INTEGER::fsize,fshape(4),csize,fsize2
+		INTEGER::Ix,Iy,I,Ic
+		COMPLEX(REALPARM),POINTER::Ea1(:,:,:,:),Et1(:,:,:,:)
+		COMPLEX(REALPARM),POINTER::Ha1(:,:,:,:),Ht1(:,:,:,:)
+		REAL(REALPARM)::x,y
+		
+		CALL MPI_COMM_RANK(comm, me, IERROR)
+		CALL MPI_COMM_SIZE(comm, csize, IERROR)
+		Nr=SIZE(recvs)
+		fsize=SIZE(Ea)
+		IF (me==0) THEN
+			Ic=0
+			fshape=SHAPE(Ea)
+			ALLOCATE(Ea1(fshape(1),fshape(2),fshape(3),fshape(4)))
+			ALLOCATE(Et1(fshape(1),fshape(2),fshape(3),fshape(4)))
+			ALLOCATE(Ha1(fshape(1),fshape(2),fshape(3),fshape(4)))
+			ALLOCATE(Ht1(fshape(1),fshape(2),fshape(3),fshape(4)))
+			OPEN(UNIT = 77,STATUS='replace',FILE=fname//'.dat')
+			WRITE (UNIT =77,FMT=title_fmt) "%","x_recv","y_recv","z_recv","frequency",&
+							&"Re Ex^a","Im Ex^a", "Re Ey^a", "Im Ey^a",&
+							&"Re Ez^a","Im Ez^a", "Re Hx^a", "Im Hx^a",&
+							&"Re Hy^a","Im Hy^a", "Re Hz^a", "Im Hz^a",&
+							&"Re Ex^t","Im Ex^t", "Re Ey^t", "Im Ey^t",&
+							&"Re Ez^t","Im Ez^t", "Re Hx^t", "Im Hx^t",&
+							&"Re Hy^t","Im Hy^t", "Re Hz^t", "Im Hz^t"
+
+			DO Ir=1,Nr
+				DO Iy=1,anomaly%Ny_loc
+					y=Iy*anomaly%dy-anomaly%dy/2d0+recvs(Ir)%y_shift
+						DO Ix=1,anomaly%Nx
+							x=Ix*anomaly%dx-anomaly%dx/2d0+recvs(Ir)%x_shift
+							WRITE (UNIT =77,FMT=output_fmt) " ",x,y,recvs(Ir)%zrecv,freq,&
+											& Ea(Ir,EX,Ix,Iy),Ea(Ir,EY,Ix,Iy),&
+											& Ea(Ir,EZ,Ix,Iy),Ha(Ir,HX,Ix,Iy),&
+											& Ha(Ir,HY,Ix,Iy),Ha(Ir,HZ,Ix,Iy),&
+											& Et(Ir,EX,Ix,Iy),Et(Ir,EY,Ix,Iy),&
+											& Et(Ir,EZ,Ix,Iy),Ht(Ir,HX,Ix,Iy),&
+											& Ht(Ir,HY,Ix,Iy),Ht(Ir,HZ,Ix,Iy)
+							Ic=Ic+1
+						ENDDO
+				ENDDO
+			ENDDO
+		ENDIF
+
+		IF (me/=0) THEN
+			CALL MPI_SEND(Ea, fsize, MPI_DOUBLE_COMPLEX,0,me,comm, IERROR)
+			CALL MPI_SEND(Ha, fsize, MPI_DOUBLE_COMPLEX, 0, me+csize,comm, IERROR)
+			CALL MPI_SEND(Et, fsize, MPI_DOUBLE_COMPLEX, 0, me+2*csize,comm, IERROR)
+			CALL MPI_SEND(Ht, fsize, MPI_DOUBLE_COMPLEX, 0, me+3*csize,comm, IERROR)
+			CALL MPI_BARRIER(comm,IERROR)
+			RETURN
+		ENDIF
+		DO I=1,csize-1
+			CALL MPI_RECV(Ea1, fsize, MPI_DOUBLE_COMPLEX, I, I,comm,REC_STATUS, IERROR)
+			CALL MPI_RECV(Ha1, fsize, MPI_DOUBLE_COMPLEX, I, I+csize,comm, REC_STATUS,IERROR)
+			CALL MPI_RECV(Et1, fsize, MPI_DOUBLE_COMPLEX, I, I+2*csize,comm, REC_STATUS,IERROR)
+			CALL MPI_RECV(Ht1, fsize, MPI_DOUBLE_COMPLEX, I, I+3*csize,comm, REC_STATUS,IERROR)
+			DO Ir=1,Nr
+				DO Iy=1,anomaly%Ny_loc
+					y=(Iy+I*anomaly%Ny_loc)*anomaly%dy-anomaly%dy/2d0+recvs(Ir)%y_shift
+					DO Ix=1,anomaly%Nx
+						x=Ix*anomaly%dx-anomaly%dx/2d0+recvs(Ir)%x_shift
+						WRITE (UNIT =77,FMT=output_fmt) " ",x,y,recvs(Ir)%zrecv,freq,&
+										& Ea1(Ir,EX,Ix,Iy),Ea1(Ir,EY,Ix,Iy),&
+										& Ea1(Ir,EZ,Ix,Iy),Ha1(Ir,HX,Ix,Iy),&
+										& Ha1(Ir,HY,Ix,Iy),Ha1(Ir,HZ,Ix,Iy),&
+										& Et1(Ir,EX,Ix,Iy),Et1(Ir,EY,Ix,Iy),&
+										& Et1(Ir,EZ,Ix,Iy),Ht1(Ir,HX,Ix,Iy),&
+										& Ht1(Ir,HY,Ix,Iy),Ht1(Ir,HZ,Ix,Iy)
+						Ic=Ic+1
+					ENDDO
+				ENDDO
+			ENDDO
+		ENDDO
+		CLOSE(77)
+		DEALLOCATE(Ea1,Ha1,Et1,Ht1)
+		CALL MPI_BARRIER(comm,IERROR)
+	ENDSUBROUTINE
 	SUBROUTINE SaveOutputSeparate(Ea,Et,Ha,Ht,anomaly,recvs,freq,tag,offset,fname)
 		COMPLEX(REALPARM),INTENT(IN)::Ea(1:,EX:,1:,1:)
 		COMPLEX(REALPARM),INTENT(IN)::Et(1:,EX:,1:,1:)
@@ -440,6 +532,104 @@ CONTAINS
 				ENDDO
 			ENDDO
 		ENDDO
+		CLOSE(277)
+	ENDSUBROUTINE
+	SUBROUTINE SaveIESolutionSeparate(Eint,anomaly,freq,tag,offset,fname)
+		COMPLEX(REALPARM),INTENT(IN)::Eint(1:,EX:,1:,1:)
+		INTEGER,INTENT(IN)::offset
+		TYPE (ANOMALY_TYPE),INTENT(IN)::anomaly
+		REAL(REALPARM),INTENT(IN)::freq
+		INTEGER,INTENT(IN)::tag
+		CHARACTER(*),INTENT(IN)::fname
+		CHARACTER(LEN=*), PARAMETER  :: output_fmt = "(A1, 10ES20.10E3)"
+		CHARACTER(LEN=*), PARAMETER  :: title_fmt = "(A1, 10A20)"
+		CHARACTER(LEN=6):: ftag
+		INTEGER::Ir,Nx,Nz,me, IERROR
+		INTEGER::fsize
+		INTEGER::Ix,Iy,Iz,Nyloc,s(4)
+		REAL(REALPARM)::x,y,z
+		s=SHAPE(Eint)
+		Nyloc=s(4)
+		WRITE (ftag,'(I5.5)') tag
+		OPEN(UNIT = 277,STATUS='replace',FILE=fname//trim(ftag)//'.dat')
+		WRITE (UNIT =277,FMT=title_fmt) "%","x_c","y_c","z_c","frequency",&
+						&"Re Ex","Im Ex", "Re Ey", "Im Ey",&
+						&"Re Ez","Im Ez"
+		Nx=anomaly%Nx
+		DO Iy=1,Nyloc
+			y=(Iy+offset)*anomaly%dy-anomaly%dy/2d0
+			DO Ix=1,Nx
+				x=Ix*anomaly%dx-anomaly%dx/2d0
+				DO Iz=1,anomaly%Nz
+				z=(anomaly%z(Iz)+anomaly%z(Iz-1))/2;
+				WRITE (UNIT =277,FMT=output_fmt) " ",x,y,z,freq,&
+								& Eint(Iz,EX,Ix,Iy),Eint(Iz,EY,Ix,Iy),&
+								& Eint(Iz,EZ,Ix,Iy)
+				ENDDO
+			ENDDO
+		ENDDO
+		CLOSE(277)
+	ENDSUBROUTINE
+	SUBROUTINE SaveIESolutionSeparateBinary(Eint,tag,fname)
+		COMPLEX(REALPARM),INTENT(IN)::Eint(1:,EX:,1:,1:)
+		INTEGER,INTENT(IN)::tag
+		CHARACTER(*),INTENT(IN)::fname
+		CHARACTER(LEN=6):: ftag
+		INTEGER::Ir,Nx,Nz,me, IERROR
+		INTEGER::fsize
+		INTEGER::Ix,Iy,Iz,Nyloc,s(4)
+		REAL(REALPARM)::x,y,z
+		WRITE (ftag,'(I5.5)') tag
+		OPEN(UNIT = 277,STATUS='replace',FILE=fname//trim(ftag)//'.bin',form='binary',access="stream")
+		WRITE (UNIT =277) Eint
+		CLOSE(277)
+	ENDSUBROUTINE
+	SUBROUTINE SaveIESolutionOneFileBinary(Eint,comm,fname)
+		COMPLEX(REALPARM),INTENT(IN)::Eint(1:,EX:,1:,1:)
+		INTEGER,INTENT(IN)::comm
+		CHARACTER(*),INTENT(IN)::fname
+		INTEGER::Ir,Nr,me, IERROR
+		INTEGER::fsize,fshape(4),csize
+		INTEGER:: REC_STATUS(MPI_STATUS_SIZE)
+		INTEGER::Ix,Iy,I
+		COMPLEX(REALPARM),POINTER::Eint1(:,:,:,:)
+		REAL(REALPARM)::x,y
+		
+		CALL MPI_COMM_RANK(comm, me, IERROR)
+		CALL MPI_COMM_SIZE(comm, csize, IERROR)
+		fsize=SIZE(Eint)
+		IF (me==0) THEN
+			fshape=SHAPE(Eint)
+			ALLOCATE(Eint1(fshape(1),fshape(2),fshape(3),fshape(4)))
+			OPEN(UNIT = 77,STATUS='replace',FILE=fname//'.bin',form='binary',access="stream")
+			WRITE (UNIT =77) Eint
+		ENDIF
+
+		IF (me/=0) THEN
+			CALL MPI_SEND(Eint, fsize, MPI_DOUBLE_COMPLEX,0,me,comm, IERROR)
+			CALL MPI_BARRIER(comm,IERROR)
+			RETURN
+		ENDIF
+		DO I=1,csize-1
+			CALL MPI_RECV(Eint1, fsize, MPI_DOUBLE_COMPLEX, I, I,comm, REC_STATUS,IERROR)
+			WRITE (UNIT =77) Eint1
+		ENDDO
+		CLOSE(77)
+		DEALLOCATE(Eint1)
+		CALL MPI_BARRIER(comm,IERROR)
+	ENDSUBROUTINE
+	SUBROUTINE LoadIESolutionSeparateBinary(Eint,tag,fname)
+		COMPLEX(REALPARM),INTENT(INOUT)::Eint(1:,EX:,1:,1:)
+		INTEGER,INTENT(IN)::tag
+		CHARACTER(*),INTENT(IN)::fname
+		CHARACTER(LEN=6):: ftag
+		INTEGER::Ir,Nx,Nz,me, IERROR
+		INTEGER::fsize
+		INTEGER::Ix,Iy,Iz,Nyloc,s(4)
+		REAL(REALPARM)::x,y,z
+		WRITE (ftag,'(I5.5)') tag
+		OPEN(UNIT = 277,STATUS='old',FILE=fname//trim(ftag)//'.bin',form='binary',access="stream")
+		READ (UNIT =277) Eint
 		CLOSE(277)
 	ENDSUBROUTINE
 	SUBROUTINE ConvertNaIn(E1,E2) !Convert EM field array  E1 from "naive" format E1(x,y,z,c) to internal format E2(z,c,x,y)
