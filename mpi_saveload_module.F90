@@ -406,18 +406,20 @@ CONTAINS
 		CHARACTER(*),INTENT(IN)::fname
 		CHARACTER(LEN=*), PARAMETER  :: output_fmt = "(A1, 28ES20.10E3)"
 		CHARACTER(LEN=*), PARAMETER  :: title_fmt = "(A1, 28A20)"
+		INTEGER:: REC_STATUS(MPI_STATUS_SIZE)
 		INTEGER::Ir,Nr,me, IERROR
-		INTEGER::fsize,fshape(4),csize
-		INTEGER::Ix,Iy,I
+		INTEGER::fsize,fshape(4),csize,fsize2
+		INTEGER::Ix,Iy,I,Ic
 		COMPLEX(REALPARM),POINTER::Ea1(:,:,:,:),Et1(:,:,:,:)
 		COMPLEX(REALPARM),POINTER::Ha1(:,:,:,:),Ht1(:,:,:,:)
 		REAL(REALPARM)::x,y
 		
 		CALL MPI_COMM_RANK(comm, me, IERROR)
-		CALL MPI_COMM_RANK(comm, csize, IERROR)
+		CALL MPI_COMM_SIZE(comm, csize, IERROR)
 		Nr=SIZE(recvs)
-		fsize=Nr*3*anomaly%Nx*anomaly%Ny_loc
+		fsize=SIZE(Ea)
 		IF (me==0) THEN
+			Ic=0
 			fshape=SHAPE(Ea)
 			ALLOCATE(Ea1(fshape(1),fshape(2),fshape(3),fshape(4)))
 			ALLOCATE(Et1(fshape(1),fshape(2),fshape(3),fshape(4)))
@@ -433,7 +435,7 @@ CONTAINS
 							&"Re Hy^t","Im Hy^t", "Re Hz^t", "Im Hz^t"
 
 			DO Ir=1,Nr
-				DO Iy=1,anomaly%Ny
+				DO Iy=1,anomaly%Ny_loc
 					y=Iy*anomaly%dy-anomaly%dy/2d0+recvs(Ir)%y_shift
 						DO Ix=1,anomaly%Nx
 							x=Ix*anomaly%dx-anomaly%dx/2d0+recvs(Ir)%x_shift
@@ -444,6 +446,7 @@ CONTAINS
 											& Et(Ir,EX,Ix,Iy),Et(Ir,EY,Ix,Iy),&
 											& Et(Ir,EZ,Ix,Iy),Ht(Ir,HX,Ix,Iy),&
 											& Ht(Ir,HY,Ix,Iy),Ht(Ir,HZ,Ix,Iy)
+							Ic=Ic+1
 						ENDDO
 				ENDDO
 			ENDDO
@@ -458,10 +461,10 @@ CONTAINS
 			RETURN
 		ENDIF
 		DO I=1,csize-1
-			CALL MPI_RECV(Ea1, fsize, MPI_DOUBLE_COMPLEX, I, I,comm, IERROR)
-			CALL MPI_RECV(Ha1, fsize, MPI_DOUBLE_COMPLEX, I, I+csize,comm, IERROR)
-			CALL MPI_RECV(Et1, fsize, MPI_DOUBLE_COMPLEX, I, I+2*csize,comm, IERROR)
-			CALL MPI_RECV(Ht1, fsize, MPI_DOUBLE_COMPLEX, I, I+3*csize,comm, IERROR)
+			CALL MPI_RECV(Ea1, fsize, MPI_DOUBLE_COMPLEX, I, I,comm,REC_STATUS, IERROR)
+			CALL MPI_RECV(Ha1, fsize, MPI_DOUBLE_COMPLEX, I, I+csize,comm, REC_STATUS,IERROR)
+			CALL MPI_RECV(Et1, fsize, MPI_DOUBLE_COMPLEX, I, I+2*csize,comm, REC_STATUS,IERROR)
+			CALL MPI_RECV(Ht1, fsize, MPI_DOUBLE_COMPLEX, I, I+3*csize,comm, REC_STATUS,IERROR)
 			DO Ir=1,Nr
 				DO Iy=1,anomaly%Ny_loc
 					y=(Iy+I*anomaly%Ny_loc)*anomaly%dy-anomaly%dy/2d0+recvs(Ir)%y_shift
@@ -474,11 +477,13 @@ CONTAINS
 										& Et1(Ir,EX,Ix,Iy),Et1(Ir,EY,Ix,Iy),&
 										& Et1(Ir,EZ,Ix,Iy),Ht1(Ir,HX,Ix,Iy),&
 										& Ht1(Ir,HY,Ix,Iy),Ht1(Ir,HZ,Ix,Iy)
+						Ic=Ic+1
 					ENDDO
 				ENDDO
 			ENDDO
 		ENDDO
 		CLOSE(77)
+		DEALLOCATE(Ea1,Ha1,Et1,Ht1)
 		CALL MPI_BARRIER(comm,IERROR)
 	ENDSUBROUTINE
 	SUBROUTINE SaveOutputSeparate(Ea,Et,Ha,Ht,anomaly,recvs,freq,tag,offset,fname)
@@ -575,7 +580,7 @@ CONTAINS
 		INTEGER::Ix,Iy,Iz,Nyloc,s(4)
 		REAL(REALPARM)::x,y,z
 		WRITE (ftag,'(I5.5)') tag
-		OPEN(UNIT = 277,STATUS='replace',FILE=fname//trim(ftag)//'.bin',form='unformatted')
+		OPEN(UNIT = 277,STATUS='replace',FILE=fname//trim(ftag)//'.bin',form='binary',access="stream")
 		WRITE (UNIT =277) Eint
 		CLOSE(277)
 	ENDSUBROUTINE
@@ -585,17 +590,18 @@ CONTAINS
 		CHARACTER(*),INTENT(IN)::fname
 		INTEGER::Ir,Nr,me, IERROR
 		INTEGER::fsize,fshape(4),csize
+		INTEGER:: REC_STATUS(MPI_STATUS_SIZE)
 		INTEGER::Ix,Iy,I
 		COMPLEX(REALPARM),POINTER::Eint1(:,:,:,:)
 		REAL(REALPARM)::x,y
 		
 		CALL MPI_COMM_RANK(comm, me, IERROR)
-		CALL MPI_COMM_RANK(comm, csize, IERROR)
+		CALL MPI_COMM_SIZE(comm, csize, IERROR)
 		fsize=SIZE(Eint)
 		IF (me==0) THEN
 			fshape=SHAPE(Eint)
 			ALLOCATE(Eint1(fshape(1),fshape(2),fshape(3),fshape(4)))
-			OPEN(UNIT = 77,STATUS='replace',FILE=fname//'.bin',form='unformatted')
+			OPEN(UNIT = 77,STATUS='replace',FILE=fname//'.bin',form='binary',access="stream")
 			WRITE (UNIT =77) Eint
 		ENDIF
 
@@ -605,10 +611,11 @@ CONTAINS
 			RETURN
 		ENDIF
 		DO I=1,csize-1
-			CALL MPI_RECV(Eint1, fsize, MPI_DOUBLE_COMPLEX, I, I,comm, IERROR)
+			CALL MPI_RECV(Eint1, fsize, MPI_DOUBLE_COMPLEX, I, I,comm, REC_STATUS,IERROR)
 			WRITE (UNIT =77) Eint1
 		ENDDO
 		CLOSE(77)
+		DEALLOCATE(Eint1)
 		CALL MPI_BARRIER(comm,IERROR)
 	ENDSUBROUTINE
 	SUBROUTINE LoadIESolutionSeparateBinary(Eint,tag,fname)
@@ -621,7 +628,7 @@ CONTAINS
 		INTEGER::Ix,Iy,Iz,Nyloc,s(4)
 		REAL(REALPARM)::x,y,z
 		WRITE (ftag,'(I5.5)') tag
-		OPEN(UNIT = 277,STATUS='old',FILE=fname//trim(ftag)//'.bin',form='unformatted')
+		OPEN(UNIT = 277,STATUS='old',FILE=fname//trim(ftag)//'.bin',form='binary',access="stream")
 		READ (UNIT =277) Eint
 		CLOSE(277)
 	ENDSUBROUTINE
