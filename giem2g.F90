@@ -165,10 +165,9 @@ PROGRAM GIEMIEMG
 			IF (int_eq%real_space) THEN
 				CALL PlaneWaveIntegral(EY,bkg,anomaly,int_eq%E_n)
 				CALL PlaneWave(EY,bkg,(/recvs(1)%zrecv/),FY)
-!				anomaly%siga(:,1:int_eq%Nx/2,:)=sig1(It)
-!				anomaly%siga(:,int_eq%Nx/2+1:,:)=sig2(It)
-		                CALL LoadAnomalySigma(anomaly,real_comm,trim(anom_list(Ia)))
-
+				IF ((Na/=1).OR.(Ifreq==1))THEN
+			                CALL LoadAnomalySigma(anomaly,real_comm,trim(anom_list(Ia)))
+				ENDIF
 			ENDIF
 
 			IF (me==0) PRINT*, 'FY=', FY
