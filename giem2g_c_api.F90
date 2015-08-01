@@ -9,6 +9,7 @@ MODULE GIEM2G_C_API
 
 	USE CONTINUATION_FUNCTION_MODULE
 	USE Calc_RC_Tensor_Module
+	USE MPI_MODULE
 	IMPLICIT NONE
 
 
@@ -80,7 +81,7 @@ MODULE GIEM2G_C_API
         	END FUNCTION 
                 FUNCTION GIEM2G_CREATE_IE_OPERATOR(c_anomaly,wcomm,threads_ok) RESULT(RES)
                         TYPE(C_PTR),INTENT(IN)::c_anomaly
-                        INTEGER,INTENT(IN)::wcomm ! THIS IS COMMUNICATOR!!! 
+			INTEGER(MPI_CTL_KIND),INTENT(IN)::wcomm
                         LOGICAL,INTENT(IN)::threads_ok
                 	TYPE(IntegralEquation),POINTER:: int_eq
                 	TYPE(ANOMALY_TYPE),POINTER::anomaly
@@ -97,7 +98,7 @@ MODULE GIEM2G_C_API
                         TYPE(C_PTR),INTENT(IN)::c_anomaly
                         TYPE(C_PTR),INTENT(IN)::c_recvs
                         INTEGER(C_INT),INTENT(IN)::Nr
-                        INTEGER,INTENT(IN)::wcomm ! THIS IS COMMUNICATOR!!! 
+			INTEGER(MPI_CTL_KIND),INTENT(IN)::wcomm
                         LOGICAL,INTENT(IN)::threads_ok
 			TYPE(C_PTR)::RES
                 	TYPE (RECEIVER_TYPE),POINTER::recvs(:)

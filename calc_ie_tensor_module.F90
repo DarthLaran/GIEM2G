@@ -25,7 +25,9 @@ CONTAINS
 		COMPLEX(REALPARM),POINTER::pGsend_asym(:,:,:,:)
 		COMPLEX(REALPARM),POINTER::pGrecv_asym(:,:,:,:)
 		INTEGER::Ix,Iy,ly,Ic
-                INTEGER::IERROR
+		
+		INTEGER(MPI_CTL_KIND)::IERROR
+		INTEGER::Ix,Iy,ly,Ic
 		INTEGER::Nx,Ny,Ny_loc,Ny_offset,Nz,Nx2
 		REAL(REALPARM)::dx,dy,rmin
 		INTEGER::Nsend_symm,Nrecv_symm
@@ -34,8 +36,8 @@ CONTAINS
 		INTEGER::xfirst,xlast
 		INTEGER::recv_start,send_start
 !------------------------- workaround for bug in some realizations of MPI_WAITALL
-                INTEGER,TARGET::all_requests(4*matrix%Ny_loc)
-		INTEGER,POINTER::requests(:,:)
+                INTEGER(MPI_CTL_KIND),TARGET::all_requests(4*matrix%Ny_loc)
+		INTEGER(MPI_CTL_KIND),POINTER::requests(:,:)
 !---------------------------------------------------------------------------
 		REAL(8)::time(4),time_all!,Wt_Threshold
 		REAL(8)::time_max(4),time_min(4)

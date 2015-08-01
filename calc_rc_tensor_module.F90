@@ -20,7 +20,8 @@ CONTAINS
 		REAL(REALPARM),INTENT(IN)::Wt_Threshold
 		COMPLEX(REALPARM),POINTER::G_E(:,:,:,:,:)
 		COMPLEX(REALPARM),POINTER::G_H(:,:,:,:,:)
-		INTEGER::Ix,Iy,ly,Ic,IERROR
+		INTEGER::Ix,Iy,ly,Ic
+		INTEGER(MPI_CTL_KIND)::IERROR
 		INTEGER::Nx,Ny,Ny_loc,Ny_offset,Nz,Nx2
 		REAL(REALPARM)::dx,dy,rmin
 		INTEGER::xfirst,xlast

@@ -38,9 +38,9 @@ MODULE CONTINUATION_FUNCTION_MODULE
 
 		TYPE(C_PTR)::pG_E
 		TYPE(C_PTR)::pG_H
-		INTEGER:: matrix_comm
-		INTEGER::me
-		INTEGER::master_proc
+		INTEGER(MPI_CTL_KIND):: matrix_comm
+		INTEGER(MPI_CTL_KIND)::me
+		INTEGER(MPI_CTL_KIND)::master_proc
 		LOGICAL::master
 		TYPE(TypeCounter)::counter
 		TYPE (RECEIVER_TYPE),POINTER::recvs(:)
@@ -61,10 +61,10 @@ CONTAINS
 		TYPE(RC_OPERATOR),INTENT(INOUT)::rc_op
 		TYPE (ANOMALY_TYPE),INTENT(INOUT)::anomaly
 		TYPE (RECEIVER_TYPE),POINTER,INTENT(IN)::recvs(:)
-		INTEGER,INTENT(IN)::mcomm 
+		INTEGER(MPI_CTL_KIND),INTENT(IN)::mcomm 
 		LOGICAL,OPTIONAL,INTENT(IN)::fftw_threads_ok
 		INTEGER::Nx,Ny,Nz
-		INTEGER::comm_size,IERROR,me
+		INTEGER(MPI_CTL_KIND)::comm_size,IERROR,me
 		Nx=anomaly%Nx
 		Ny=anomaly%Ny
 		Nz=anomaly%Nz
@@ -120,7 +120,8 @@ CONTAINS
 		COMPLEX(REALPARM),POINTER,INTENT(IN)::Eint(:,:,:,:)
 		COMPLEX(REALPARM),POINTER,INTENT(OUT)::Ea(:,:,:,:)
 		COMPLEX(REALPARM),POINTER,INTENT(OUT)::Ha(:,:,:,:)
-		INTEGER::IERROR,Nx
+		INTEGER(MPI_CTL_KIND)::IERROR
+		INTEGER::Nx
 		CHARACTER(LEN=*), PARAMETER  :: info_fmt = "(A, ES10.2E3)"
 		REAL(8)::time1,time2
 		CALL MPI_BARRIER(rc_op%matrix_comm,IERROR)
@@ -265,7 +266,7 @@ CONTAINS
 		INTEGER(C_INTPTR_T)::fftwsize(2)
 		INTEGER(C_INTPTR_T)::Nz3,Nr3
 		INTEGER(C_INTPTR_T)::block
-		INTEGER::IERROR
+		INTEGER(MPI_CTL_KIND)::IERROR
 		INTEGER::omp_get_max_threads,nt
 		INTEGER(FFTW_COMM_SIZE)::COMM, FFTW_NT
 		REAL(8)::time1,time2
@@ -308,7 +309,8 @@ CONTAINS
 	SUBROUTINE CalcFFTofRCTensor(rc_op)
 		TYPE(rc_operator),INTENT(INOUT)::rc_op
 		INTEGER::Ir
-		INTEGER::IERROR
+		
+		INTEGER(MPI_CTL_KIND)::IERROR
 		REAL(8)::time1,time2
 		CALL MPI_BARRIER(rc_op%matrix_comm,IERROR)
 		time1=MPI_WTIME()
