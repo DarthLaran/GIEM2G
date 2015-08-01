@@ -24,7 +24,6 @@ CONTAINS
 		COMPLEX(REALPARM),POINTER::pGrecv_symm(:,:,:)
 		COMPLEX(REALPARM),POINTER::pGsend_asym(:,:,:,:)
 		COMPLEX(REALPARM),POINTER::pGrecv_asym(:,:,:,:)
-		
 		INTEGER(MPI_CTL_KIND)::IERROR
 		INTEGER::Ix,Iy,ly,Ic
 		INTEGER::Nx,Ny,Ny_loc,Ny_offset,Nz,Nx2
@@ -34,12 +33,16 @@ CONTAINS
 		INTEGER::recv_proc,send_proc,shift
 		INTEGER::xfirst,xlast
 		INTEGER::recv_start,send_start
-		INTEGER::requests(matrix%Ny_loc,4)
+!------------------------- workaround for bug in some realizations of MPI_WAITALL
+                INTEGER(MPI_CTL_KIND),TARGET::all_requests(4*matrix%Ny_loc)
+		INTEGER(MPI_CTL_KIND),POINTER::requests(:,:)
+!---------------------------------------------------------------------------
 		REAL(8)::time(4),time_all!,Wt_Threshold
 		REAL(8)::time_max(4),time_min(4)
 		REAL(8)::time1,time2,time3,time4
 		CALL MPI_BARRIER(matrix%matrix_comm,IERROR)
 		time_all=MPI_WTIME()
+                requests(1:matrix%Ny_loc,1:4)=>all_requests
 		IF (VERBOSE) THEN
 			IF (matrix%master) THEN
 				PRINT'(A80)','***********************************************************************************'
@@ -124,7 +127,8 @@ CONTAINS
 			CALL MPI_ISEND(pGsend_asym,Nsend_asym,MPI_DOUBLE_COMPLEX,recv_proc,shift-Iy,&
 				&matrix%matrix_comm,requests(Iy+1-Ny_offset,4),IERROR)
 		ENDDO
-		CALL MPI_WAITALL(Ny_loc*4, requests, MPI_STATUSES_IGNORE, IERROR)  
+                
+		CALL MPI_WAITALL(Ny_loc*4, all_requests,  MPI_STATUSES_IGNORE, IERROR)  
 		IF (Ny_offset>=Ny) THEN
 			DO Iy=Ny_offset,Ny_offset+Ny_loc-1
 				IF (Iy==Ny) THEN
