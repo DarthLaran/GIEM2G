@@ -1,27 +1,28 @@
-188,189c188,189
+188,189c188,190
 <        integer n, nloc, lwork, icntl(*)
 <        double precision   cntl(*)
 ---
->        integer,intent(in):: n, nloc, lwork
+>        integer(8),intent(in):: n
+>        integer,intent(in)::  nloc, lwork
 >        double precision,intent(in)::   cntl(3)
-193,194c193,195
+193,194c194,196
 <        integer  info(*)
 <        double precision    rinfo
 ---
 >        integer,intent(inout)::  info(3), icntl(7)
 > 
 >        double precision,intent(inout)::    rinfo
-197,198c198,199
+197,198c199,200
 <        integer  m, irc(*)
 <        double complex work(*)
 ---
 >        integer,intent(inout)::  m, irc(7)
 >        double complex,intent(inout):: work(lwork)
-460c461
+460c462
 < *
 ---
 > 
-706a708,710
+706a709,711
 > *------- by Mikhail Kruglyakov--------
 >         info(1)=42
 > *--------------------------------------       
@@ -30,7 +31,7 @@
 >                rinfo=be
 >                info(1)=79
 > *-------------------------------------------------------------              
-1211a1220,1223
+1211a1217,1220
 > *-------------- by Mikhail Kruglyakov ------------------------
 >                rinfo=bea
 >                info(1)=77

@@ -172,7 +172,7 @@ MODULE IE_SOLVER_MODULE
 		INTEGER(MPI_CTL_KIND):: IERROR,comm_inner,comm_outer
 		INTEGER::   MATVEC, PRECONDLEFT,PRECONDRIGHT,DOTPROD
 		parameter (matvec=1, precondLeft=2, precondRight=3, dotProd=4)
-
+		INTEGER(8)::N_unknowns
 		integer nout
 		INTEGER::Nfgmres,Ngmres
 		real(8)::  cntl(3), rinfo
@@ -244,8 +244,9 @@ MODULE IE_SOLVER_MODULE
 
 		work_fgmres(1:int_eq%Nloc)=int_eq%initial_guess
 		work_fgmres(int_eq%Nloc+1:2*int_eq%Nloc)=int_eq%solution
+		N_unknowns=int_eq%N
 		DO
-			CALL drive_zfgmres(int_eq%N,int_eq%Nloc,m,l_fgmres,work_fgmres,irc,icntl,cntl,info,rinfo)
+			CALL drive_zfgmres(N_unknowns,int_eq%Nloc,m,l_fgmres,work_fgmres,irc,icntl,cntl,info,rinfo)
 			revcom = irc(1)
 			colx   = irc(2)
 			coly   = irc(3)
@@ -275,7 +276,7 @@ MODULE IE_SOLVER_MODULE
 				work_gmres(int_eq%Nloc+1:2*int_eq%Nloc)=v_in
 				Ngmres=0
 				DO
-					CALL drive_zgmres(int_eq%N,int_eq%Nloc,maxit_precond,l_gmres,&
+					CALL drive_zgmres(N_unknowns,int_eq%Nloc,maxit_precond,l_gmres,&
 						& work_gmres(1:),irc2,icntl2,cntl2,info2,rinfo2) 
 					revcom2 = irc2(1)
 					colx2	= irc2(2) 
