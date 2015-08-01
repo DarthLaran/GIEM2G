@@ -245,6 +245,7 @@ MODULE IE_SOLVER_MODULE
 		work_fgmres(1:int_eq%Nloc)=int_eq%initial_guess
 		work_fgmres(int_eq%Nloc+1:2*int_eq%Nloc)=int_eq%solution
 		N_unknowns=int_eq%N
+		IF (int_eq%master) PRINT*, 'Number of unknowns:', N_unknowns
 		DO
 			CALL drive_zfgmres(N_unknowns,int_eq%Nloc,m,l_fgmres,work_fgmres,irc,icntl,cntl,info,rinfo)
 			revcom = irc(1)

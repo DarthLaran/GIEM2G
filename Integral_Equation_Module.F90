@@ -53,7 +53,8 @@ MODULE INTEGRAL_EQUATION_MODULE
 		TYPE(C_PTR)::planFwd,planBwd
 		LOGICAL::fftw_threads_ok
 
-		INTEGER::N,Nloc
+		INTEGER::Nloc
+		INTEGER(8)::N
 		REAL(REALPARM),POINTER ::siga(:,:,:)
 		REAL(REALPARM),POINTER ::sigb(:,:,:)
 		REAL(REALPARM),POINTER ::dsig(:,:,:)
