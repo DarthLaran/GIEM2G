@@ -6,10 +6,10 @@ MODULE MPI_SAVELOAD_MODULE
 CONTAINS
 	SUBROUTINE LoadBackground(bkg,comm,background)
 		TYPE(BKG_DATA_TYPE),INTENT(INOUT)::bkg
-		INTEGER,INTENT(IN)::comm
+		INTEGER(MPI_CTL_KIND),INTENT(IN)::comm
 		CHARACTER(*),INTENT(IN)::background
-		INTEGER::N,me,I
-		INTEGER::IERROR
+		INTEGER(MPI_CTL_KIND)::me,IERROR
+		INTEGER::N,I
 		CALL MPI_COMM_RANK(comm, me, IERROR)
 		IF (me==0) THEN
 			OPEN(077,file=background)
@@ -46,10 +46,10 @@ CONTAINS
 	SUBROUTINE LoadAnomalyShape(anomaly,bkg,comm,anomaly_shape,loadz)
 		TYPE (ANOMALY_TYPE),INTENT(INOUT)::anomaly
         TYPE (BKG_DATA_TYPE),TARGET,INTENT(IN)::bkg
-		INTEGER,INTENT(IN)::comm
+		INTEGER(MPI_CTL_KIND),INTENT(IN)::comm
 		CHARACTER(*),INTENT(IN)::anomaly_shape
 		LOGICAL,OPTIONAL,INTENT(IN)::loadz
-		INTEGER::IERROR,me
+		INTEGER(MPI_CTL_KIND)::IERROR,me
 		INTEGER::Nx,NY,Nz
 		REAL(REALPARM)::dx,dy
 		LOGICAL::lz
@@ -91,12 +91,12 @@ CONTAINS
 		IF (me==0) CLOSE(078)
 	ENDSUBROUTINE
         SUBROUTINE LoadAnomalySigmaList(fname,comm,anom_list,Na)
-		INTEGER,INTENT(IN)::comm
+		INTEGER(MPI_CTL_KIND),INTENT(IN)::comm
 		CHARACTER(*),INTENT(IN)::fname
         CHARACTER(*),POINTER,INTENT(INOUT)::anom_list(:)
         CHARACTER(len=1024)::tmp
         INTEGER,INTENT(OUT)::Na
-		INTEGER::IERROR,me
+		INTEGER(MPI_CTL_KIND)::IERROR,me
 		INTEGER::I,l,io,Nl
 		CALL MPI_COMM_RANK(comm, me, IERROR)
 		
@@ -120,12 +120,12 @@ CONTAINS
 
 	SUBROUTINE LoadAnomalySigma(anomaly,comm,anomaly_sig)
 		TYPE (ANOMALY_TYPE),INTENT(INOUT)::anomaly
-		INTEGER,INTENT(IN)::comm
+		INTEGER(MPI_CTL_KIND),INTENT(IN)::comm
 		CHARACTER(*),INTENT(IN)::anomaly_sig
 		REAL(REALPARM),ALLOCATABLE::siga1(:,:,:)
-		INTEGER::IERROR,me,csize
+		INTEGER(MPI_CTL_KIND)::IERROR,me,csize
 		INTEGER::Nc,io,I
-		INTEGER:: REC_STATUS(MPI_STATUS_SIZE)
+		INTEGER(MPI_CTL_KIND):: REC_STATUS(MPI_STATUS_SIZE)
 		REAL(8)::time1,time2
 		time1=MPI_WTIME()
 		CALL MPI_COMM_RANK(comm, me, IERROR)
@@ -153,9 +153,10 @@ CONTAINS
 	ENDSUBROUTINE
 	SUBROUTINE LoadFrequencies(freq,comm,frequencies)
 		REAL(REALPARM),INTENT(INOUT),POINTER::freq(:)
-		INTEGER,INTENT(IN)::comm
+		INTEGER(MPI_CTL_KIND),INTENT(IN)::comm
 		CHARACTER(*),INTENT(IN)::frequencies
-		INTEGER:: Nfreq,me,IERROR
+		INTEGER(MPI_CTL_KIND)::me,IERROR
+		INTEGER:: Nfreq
 		IF (ASSOCIATED(freq)) THEN
 			DEALLOCATE(freq)
 			freq=>NULL()
@@ -177,9 +178,10 @@ CONTAINS
 
 	SUBROUTINE LoadRecievers(recvs,comm,recievers)
 		TYPE (RECEIVER_TYPE),POINTER,INTENT(INOUT)::recvs(:)
-		INTEGER,INTENT(IN)::comm
+		INTEGER(MPI_CTL_KIND),INTENT(IN)::comm
 		CHARACTER(*),INTENT(IN)::recievers
-		INTEGER:: Nr,me,IERROR,I
+		INTEGER(MPI_CTL_KIND):: me,IERROR
+		INTEGER:: Nr,I
 		REAL(REALPARM),ALLOCATABLE::zr(:),xshift(:),yshift(:)
 		IF (ASSOCIATED(recvs)) THEN
 			DEALLOCATE(recvs)
@@ -187,7 +189,7 @@ CONTAINS
 		ENDIF
 		CALL MPI_COMM_RANK(comm, me, IERROR)
 		IF (me==0) THEN
-			OPEN(078,file=recievers)
+			OPEN(078,file=recievers,form='FORMATTED')
 			READ(078,*) Nr
 			ALLOCATE(zr(Nr),xshift(Nr),yshift(Nr))
 			DO I=1,Nr
@@ -212,11 +214,11 @@ CONTAINS
 	ENDSUBROUTINE
 	SUBROUTINE LoadFGMRES_Ctl(fgmres_ctl,comm,fname)
 		TYPE (FGMRES_CTL_TYPE),INTENT(OUT)::fgmres_ctl
-		INTEGER,INTENT(IN)::comm
+		INTEGER(MPI_CTL_KIND),INTENT(IN)::comm
 		CHARACTER(*),INTENT(IN)::fname
 		INTEGER :: buf_length,maxit,maxit_precond
 		REAL(REALPARM)::misfit
-		INTEGER:: Nr,me,IERROR,I
+		INTEGER(MPI_CTL_KIND):: me,IERROR
 		CALL MPI_COMM_RANK(comm, me, IERROR)
 		IF (me==0) THEN
 			OPEN(078,file=fname)
@@ -234,10 +236,10 @@ CONTAINS
 	ENDSUBROUTINE
 	SUBROUTINE LoadThreshold(IE_Threshold,RC_Threshold,comm,fname)
 		REAL(REALPARM),INTENT(OUT)::IE_Threshold,RC_Threshold
-		INTEGER,INTENT(IN)::comm
+		INTEGER(MPI_CTL_KIND),INTENT(IN)::comm
 		CHARACTER(*),INTENT(IN)::fname
 		REAL(REALPARM)::tmp(2)
-		INTEGER:: Nr,me,IERROR,I
+		INTEGER(MPI_CTL_KIND):: me,IERROR
 		CALL MPI_COMM_RANK(comm, me, IERROR)
 		IF (me==0) THEN
 			OPEN(078,file=fname)
@@ -294,12 +296,14 @@ CONTAINS
 		COMPLEX(REALPARM),INTENT(INOUT)::E(:,:,:,:)
 		CHARACTER(len=*), INTENT(IN)::fname
 		LOGICAL,INTENT(IN)::convert
-		INTEGER,INTENT(IN)::t,comm
+		INTEGER,INTENT(IN)::t
+		INTEGER(MPI_CTL_KIND),INTENT(IN)::comm
 		COMPLEX(REALPARM),ALLOCATABLE::Etmp1(:,:,:,:),Etmp2(:,:,:,:)
 		CHARACTER(len=6)::fnum
 		CHARACTER(len=4)::ftype
-		INTEGER::Np,I,IERROR
-		INTEGER::SH(4),me,csize,Ny
+		INTEGER::Np,I
+		INTEGER::SH(4),Ny
+		INTEGER(MPI_CTL_KIND)::me,csize,IERROR
 		CALL MPI_COMM_RANK(comm, me, IERROR)
 		CALL MPI_COMM_SIZE(comm, csize, IERROR)
 
@@ -337,6 +341,7 @@ CONTAINS
 			
 	END SUBROUTINE
 
+#ifdef old_output
 	SUBROUTINE SaveOutputOneFile_Old(Ea,Et,Ha,Ht,anomaly,recvs,freq,comm,fname)
 		COMPLEX(REALPARM),POINTER,INTENT(IN)::Ea(:,:,:,:)
 		COMPLEX(REALPARM),POINTER,INTENT(IN)::Et(:,:,:,:)
@@ -393,7 +398,7 @@ CONTAINS
 		CLOSE(77)
 		CALL MPI_BARRIER(comm,IERROR)
 	ENDSUBROUTINE
-
+#endif
 	SUBROUTINE SaveOutputOneFile(Ea,Et,Ha,Ht,anomaly,recvs,freq,comm,fname)
 		COMPLEX(REALPARM),POINTER,INTENT(IN)::Ea(:,:,:,:)
 		COMPLEX(REALPARM),POINTER,INTENT(IN)::Et(:,:,:,:)
@@ -402,13 +407,14 @@ CONTAINS
 		TYPE (RECEIVER_TYPE),POINTER,INTENT(IN)::recvs(:)
 		TYPE (ANOMALY_TYPE),INTENT(IN)::anomaly
 		REAL(REALPARM),INTENT(IN)::freq
-		INTEGER,INTENT(IN)::comm
+		INTEGER(MPI_CTL_KIND),INTENT(IN)::comm
 		CHARACTER(*),INTENT(IN)::fname
 		CHARACTER(LEN=*), PARAMETER  :: output_fmt = "(A1, 28ES20.10E3)"
 		CHARACTER(LEN=*), PARAMETER  :: title_fmt = "(A1, 28A20)"
-		INTEGER:: REC_STATUS(MPI_STATUS_SIZE)
-		INTEGER::Ir,Nr,me, IERROR
-		INTEGER::fsize,fshape(4),csize,fsize2
+		INTEGER(MPI_CTL_KIND):: REC_STATUS(MPI_STATUS_SIZE)
+		INTEGER(MPI_CTL_KIND)::me, IERROR,csize
+		INTEGER::Ir,Nr
+		INTEGER::fsize,fshape(4),fsize2
 		INTEGER::Ix,Iy,I,Ic
 		COMPLEX(REALPARM),POINTER::Ea1(:,:,:,:),Et1(:,:,:,:)
 		COMPLEX(REALPARM),POINTER::Ha1(:,:,:,:),Ht1(:,:,:,:)
@@ -586,11 +592,11 @@ CONTAINS
 	ENDSUBROUTINE
 	SUBROUTINE SaveIESolutionOneFileBinary(Eint,comm,fname)
 		COMPLEX(REALPARM),INTENT(IN)::Eint(1:,EX:,1:,1:)
-		INTEGER,INTENT(IN)::comm
+		INTEGER(MPI_CTL_KIND),INTENT(IN)::comm
 		CHARACTER(*),INTENT(IN)::fname
-		INTEGER::Ir,Nr,me, IERROR
-		INTEGER::fsize,fshape(4),csize
-		INTEGER:: REC_STATUS(MPI_STATUS_SIZE)
+		INTEGER(MPI_CTL_KIND)::me, IERROR,csize
+		INTEGER::fsize,fshape(4)
+		INTEGER(MPI_CTL_KIND):: REC_STATUS(MPI_STATUS_SIZE)
 		INTEGER::Ix,Iy,I
 		COMPLEX(REALPARM),POINTER::Eint1(:,:,:,:)
 		REAL(REALPARM)::x,y

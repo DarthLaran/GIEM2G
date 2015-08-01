@@ -40,9 +40,9 @@ MODULE INTEGRAL_EQUATION_MODULE
 
 		TYPE(C_PTR)::pG_asym
 		TYPE(C_PTR)::pG_symm
-		INTEGER::matrix_comm
-		INTEGER::me
-		INTEGER::master_proc
+		INTEGER(MPI_CTL_KIND)::matrix_comm
+		INTEGER(MPI_CTL_KIND)::me
+		INTEGER(MPI_CTL_KIND)::master_proc
 		LOGICAL::master
 		TYPE(TypeCounter)::counter
 
@@ -69,8 +69,8 @@ MODULE INTEGRAL_EQUATION_MODULE
 		COMPLEX(REALPARM),POINTER::solution(:)
 		COMPLEX(REALPARM),POINTER::initial_guess(:)
 		COMPLEX(REALPARM),POINTER::rhs(:)
-		INTEGER::fgmres_comm
-		INTEGER::fgmres_me
+		INTEGER(MPI_CTL_KIND)::fgmres_comm
+		INTEGER(MPI_CTL_KIND)::fgmres_me
 		LOGICAL::real_space
 	  ENDTYPE
 	PUBLIC::  IntegralEquation,TypeCounter
@@ -79,10 +79,12 @@ CONTAINS
 	SUBROUTINE PrepareIntegralEquation(int_eq,anomaly,mcomm,fftw_threads_ok)
 		TYPE(IntegralEquation),INTENT(INOUT)::int_eq
 		TYPE (ANOMALY_TYPE),INTENT(INOUT)::anomaly
-		INTEGER,INTENT(IN)::mcomm 
+		INTEGER(MPI_CTL_KIND),INTENT(IN)::mcomm 
 		LOGICAL,OPTIONAL,INTENT(IN)::fftw_threads_ok
 		INTEGER::Nx,Ny,Nz
-		INTEGER::comm_size,IERROR,me
+		INTEGER(MPI_CTL_KIND)::comm_size,IERROR,me
+		INTEGER(MPI_CTL_KIND),PARAMETER::MPI_TWO=2
+		INTEGER(MPI_CTL_KIND),PARAMETER::MPI_ONE=1
 		Nx=anomaly%Nx
 		Ny=anomaly%Ny
 		Nz=anomaly%Nz
@@ -116,10 +118,10 @@ CONTAINS
 		int_eq%Nloc=Nx*3*Nz*int_eq%Ny_loc
 		IF (int_eq%Ny_offset >= Ny) THEN	  
 			int_eq%real_space=.FALSE.
-			CALL MPI_COMM_SPLIT(int_eq%matrix_comm, TWO, int_eq%me, int_eq%fgmres_comm, IERROR)
+			CALL MPI_COMM_SPLIT(int_eq%matrix_comm, MPI_TWO, int_eq%me, int_eq%fgmres_comm, IERROR)
 		ELSE
 			int_eq%real_space=.TRUE.
-			CALL MPI_COMM_SPLIT(int_eq%matrix_comm, ONE, int_eq%me, int_eq%fgmres_comm, IERROR)
+			CALL MPI_COMM_SPLIT(int_eq%matrix_comm, MPI_ONE, int_eq%me, int_eq%fgmres_comm, IERROR)
 			CALL MPI_COMM_RANK(int_eq%fgmres_comm, int_eq%fgmres_me, IERROR)
 		ENDIF
 		CALL MPI_COMM_RANK(int_eq%fgmres_comm, int_eq%fgmres_me, IERROR)
@@ -237,7 +239,7 @@ CONTAINS
 		INTEGER(C_INTPTR_T)::fftwsize(2)
 		INTEGER(C_INTPTR_T)::Nz3
 		INTEGER(C_INTPTR_T)::block
-		INTEGER::IERROR
+		INTEGER(MPI_CTL_KIND)::IERROR
 		INTEGER::omp_get_max_threads,nt
 		INTEGER(FFTW_COMM_SIZE)::COMM, FFTW_NT
 		REAL(8)::time1,time2
@@ -279,7 +281,7 @@ CONTAINS
 		TYPE(IntegralEquation),INTENT(INOUT)::ie_op
 		INTEGER::Iz,Is,Ia
 		INTEGER::Is1,Ia1
-		INTEGER::IERROR
+		INTEGER(MPI_CTL_KIND)::IERROR
 		   REAL(8)::time1,time2
 		   CALL MPI_BARRIER(ie_op%matrix_comm,IERROR)
 		   time1=MPI_WTIME()

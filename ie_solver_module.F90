@@ -22,7 +22,7 @@ MODULE IE_SOLVER_MODULE
 		INTEGER::anom_shape(3)
 		INTEGER::tmp_shape(3)
 		INTEGER::Iz,Nz,Nx,Ny_loc
-		INTEGER::IERROR
+		INTEGER(MPI_CTL_KIND)::IERROR
 		REAL(8)::time1,time2
 		CHARACTER(LEN=*), PARAMETER  :: info_fmt = "(A, ES10.2E3)"
 		CALL MPI_BARRIER(int_eq%matrix_comm,IERROR)
@@ -169,7 +169,7 @@ MODULE IE_SOLVER_MODULE
 		INTEGER :: irc(7), icntl(7), info(3)
 		INTEGER:: irc2(5), icntl2(8), info2(3)
 		LOGICAL :: NextMult
-		INTEGER:: IERROR,comm_inner,comm_outer
+		INTEGER(MPI_CTL_KIND):: IERROR,comm_inner,comm_outer
 		INTEGER::   MATVEC, PRECONDLEFT,PRECONDRIGHT,DOTPROD
 		parameter (matvec=1, precondLeft=2, precondRight=3, dotProd=4)
 
@@ -244,6 +244,7 @@ MODULE IE_SOLVER_MODULE
 
 		work_fgmres(1:int_eq%Nloc)=int_eq%initial_guess
 		work_fgmres(int_eq%Nloc+1:2*int_eq%Nloc)=int_eq%solution
+		N64=int_eq%N
 		DO
 			CALL drive_zfgmres(int_eq%N,int_eq%Nloc,m,l_fgmres,work_fgmres,irc,icntl,cntl,info,rinfo)
 			revcom = irc(1)

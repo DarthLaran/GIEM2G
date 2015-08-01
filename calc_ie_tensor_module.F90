@@ -24,7 +24,9 @@ CONTAINS
 		COMPLEX(REALPARM),POINTER::pGrecv_symm(:,:,:)
 		COMPLEX(REALPARM),POINTER::pGsend_asym(:,:,:,:)
 		COMPLEX(REALPARM),POINTER::pGrecv_asym(:,:,:,:)
-		INTEGER::Ix,Iy,ly,Ic,IERROR
+		
+		INTEGER(MPI_CTL_KIND)::IERROR
+		INTEGER::Ix,Iy,ly,Ic
 		INTEGER::Nx,Ny,Ny_loc,Ny_offset,Nz,Nx2
 		REAL(REALPARM)::dx,dy,rmin
 		INTEGER::Nsend_symm,Nrecv_symm

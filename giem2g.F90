@@ -21,7 +21,7 @@ PROGRAM GIEMIEMG
 	INTEGER(4)::comm_old,Np
 	INTEGER(4)::buff_off(4),I
 	INTEGER(8):: loc_shift,Nf
-	INTEGER(4):: STATUS(MPI_STATUS_SIZE)
+	INTEGER(MPI_CTL_KIND):: STATUS(MPI_STATUS_SIZE)
 	INTEGER::Iz,Ifreq,Ix
 	REAL(REALPARM):: zrecv(3),dz
 	REAL(REALPARM),POINTER::freqs(:)
@@ -37,7 +37,7 @@ PROGRAM GIEMIEMG
 	INTEGER::N,Nfreq,Nr
 	INTEGER::NT,OMP_GET_MAX_THREADS
 	LOGICAL::threads_ok
-	INTEGER::wcomm,wsize,me,real_comm
+	INTEGER(MPI_CTL_KIND)::wcomm,wsize,me,real_comm
 	TYPE (BKG_DATA_TYPE)::bkg
 	TYPE (ANOMALY_TYPE)::anomaly
 	TYPE (FGMRES_CTL_TYPE)::fgmres_ctl
@@ -91,7 +91,7 @@ PROGRAM GIEMIEMG
 	CALL LoadRecievers(recvs,wcomm,'recievers.dat')
 	CALL LoadFGMRES_Ctl(fgmres_ctl,wcomm,'fgmres_ctl.dat')
 	CALL LoadThreshold(IE_Threshold,RC_Threshold,wcomm,'threshold.dat')
-    CALL LoadAnomalySigmaList('anomaly_list.dat',wcomm,anom_list,Na)
+	CALL LoadAnomalySigmaList('anomaly_list.dat',wcomm,anom_list,Na)
         
 		Nr=SIZE(recvs)	
 		Nfreq=SIZE(freqs)
