@@ -365,10 +365,8 @@ CONTAINS
 			ie_op%G_asym_fftw(:,2,Ia,:,:)=ie_op%field_in4(:,3,:,:)
 		ELSE
 			ie_op%field_in4(:,1:2,:,:)=ie_op%G_symm_fftw(:,1:2,Is,:,:)
-			ie_op%field_in4(:,3,:,:)=ie_op%G_asym_fftw(:,2,Ia,:,:)
 			CALL IE_OP_FFTW_FWD(ie_op) !Nz+1 Nz
 			ie_op%G_symm_fftw(:,1:2,Is,:,:)=ie_op%field_in4(:,1:2,:,:)
-			ie_op%G_asym_fftw(:,2,Ia,:,:)=ie_op%field_in4(:,3,:,:)
 		ENDIF
 		time2=MPI_WTIME()
 		IF (VERBOSE) THEN
