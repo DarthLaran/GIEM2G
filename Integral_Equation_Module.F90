@@ -115,7 +115,8 @@ CONTAINS
 			int_eq%fftw_threads_ok=.FALSE.
 		ENDIF
 		CALL PrepareOperatorIE_OP(int_eq)
-		int_eq%N=Nx*Ny*Nz*3
+		int_eq%N=INT(Nx,KIND=8)*INT(Ny,KIND=8)*INT(Nz,KIND=8)*INT(3,KIND=8)
+		IF (int_eq%master) PRINT*, 'Number of unknowns', int_eq%N
 		int_eq%Nloc=Nx*3*Nz*int_eq%Ny_loc
 		IF (int_eq%Ny_offset >= Ny) THEN	  
 			int_eq%real_space=.FALSE.
