@@ -32,6 +32,7 @@ MODULE Data_Types_Module
 		INTEGER::fgmres_maxit
 		INTEGER::gmres_buf
 		INTEGER::fgmres_buf
+		INTEGER::ort_type
 	END TYPE
 
 	INTERFACE GetLayer

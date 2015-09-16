@@ -216,16 +216,17 @@ CONTAINS
 		TYPE (FGMRES_CTL_TYPE),INTENT(OUT)::fgmres_ctl
 		INTEGER(MPI_CTL_KIND),INTENT(IN)::comm
 		CHARACTER(*),INTENT(IN)::fname
-		INTEGER :: buf_length,maxit,maxit_precond
+		INTEGER :: buf_length,maxit,maxit_precond,ort_type
 		REAL(REALPARM)::misfit
 		INTEGER(MPI_CTL_KIND):: me,IERROR
 		CALL MPI_COMM_RANK(comm, me, IERROR)
 		IF (me==0) THEN
 			OPEN(078,file=fname)
-			READ(078,*) buf_length,maxit,maxit_precond,misfit
+			READ(078,*) buf_length,maxit,maxit_precond,misfit, ort_type
 			CLOSE(078)
 		ENDIF
 		CALL MPI_BCAST(buf_length,1,MPI_INTEGER, 0, comm, IERROR)
+		CALL MPI_BCAST(ort_type,1,MPI_INTEGER, 0, comm, IERROR)
 		CALL MPI_BCAST(maxit,1,MPI_INTEGER, 0, comm, IERROR)
 		CALL MPI_BCAST(maxit_precond,1,MPI_INTEGER, 0, comm, IERROR)
 		CALL MPI_BCAST(misfit,1,MPI_DOUBLE_PRECISION, 0, comm, IERROR)
@@ -233,6 +234,7 @@ CONTAINS
 		fgmres_ctl%fgmres_maxit=maxit
 		fgmres_ctl%fgmres_buf=buf_length
 		fgmres_ctl%gmres_buf=maxit_precond
+		fgmres_ctl%ort_type=ort_type
 	ENDSUBROUTINE
 	SUBROUTINE LoadThreshold(IE_Threshold,RC_Threshold,comm,fname)
 		REAL(REALPARM),INTENT(OUT)::IE_Threshold,RC_Threshold
@@ -586,7 +588,8 @@ CONTAINS
 		INTEGER::Ix,Iy,Iz,Nyloc,s(4)
 		REAL(REALPARM)::x,y,z
 		WRITE (ftag,'(I5.5)') tag
-		OPEN(UNIT = 277,STATUS='replace',FILE=fname//trim(ftag)//'.bin',form='binary',access="stream")
+!		OPEN(UNIT = 277,STATUS='replace',FILE=fname//trim(ftag)//'.bin',form='binary',access="stream")
+		OPEN(UNIT = 277,STATUS='replace',FILE=fname//trim(ftag)//'.bin',form='unformatted',access="stream")
 		WRITE (UNIT =277) Eint
 		CLOSE(277)
 	ENDSUBROUTINE
@@ -607,7 +610,8 @@ CONTAINS
 		IF (me==0) THEN
 			fshape=SHAPE(Eint)
 			ALLOCATE(Eint1(fshape(1),fshape(2),fshape(3),fshape(4)))
-			OPEN(UNIT = 77,STATUS='replace',FILE=fname//'.bin',form='binary',access="stream")
+!			OPEN(UNIT = 77,STATUS='replace',FILE=fname//'.bin',form='binary',access="stream")
+			OPEN(UNIT = 77,STATUS='replace',FILE=fname//'.bin',form='unformatted',access="stream")
 			WRITE (UNIT =77) Eint
 		ENDIF
 
@@ -634,7 +638,8 @@ CONTAINS
 		INTEGER::Ix,Iy,Iz,Nyloc,s(4)
 		REAL(REALPARM)::x,y,z
 		WRITE (ftag,'(I5.5)') tag
-		OPEN(UNIT = 277,STATUS='old',FILE=fname//trim(ftag)//'.bin',form='binary',access="stream")
+!		OPEN(UNIT = 277,STATUS='old',FILE=fname//trim(ftag)//'.bin',form='binary',access="stream")
+		OPEN(UNIT = 277,STATUS='old',FILE=fname//trim(ftag)//'.bin',form='unformatted',access="stream")
 		READ (UNIT =277) Eint
 		CLOSE(277)
 	ENDSUBROUTINE

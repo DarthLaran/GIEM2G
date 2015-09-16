@@ -236,9 +236,9 @@ MODULE IE_SOLVER_MODULE
 		ENDIF
 
 		icntl(5)=1
-		icntl(4)=3
+		icntl(4)=fgmres_ctl%ort_type
 		icntl2(4) = 0
-		icntl2(5) =3
+		icntl2(5) =fgmres_ctl%ort_type
 		icntl2(6)=1
 		icntl2(7) = maxit_precond
 
