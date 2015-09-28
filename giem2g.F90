@@ -107,8 +107,33 @@ PROGRAM GIEMIEMG
 	CALL PrepareRecvs(recvs,anomaly,bkg)
 	IF (me==0) PRINT'(A80)','%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%'
 	IF (me==0) PRINT*, 'Nx=',anomaly%Nx, 'Ny=',anomaly%Ny,'Nz=',anomaly%Nz
-	CALL PrepareIntegralEquation(int_eq,anomaly,wcomm,threads_ok)
+	CALL PrepareIntegralEquation(int_eq,anomaly,wcomm,threads_ok,6)
+	IF (me==0) PRINT*, 'Number of blocks in async FFT', int_eq%DFD%Nb
+ 
+#ifdef test2
+		int_eq%DFD%field_out=0d0
+		int_eq%DFD%field_load_in=(1d0,-246d0)
+                IF (me==0) THEN
+        		int_eq%DFD%field_load_in(1,1,1)=(-119d0,0d0)
+        		int_eq%DFD%field_load_in(1,1,2:)=(239d0,0d0)
+                       	int_eq%DFD%field_load_in(1,2:,:)=(11d0,0d0)
+                ELSE
+        		int_eq%DFD%field_load_in(1,1,:)=(2340d0,0d0)
+                       	int_eq%DFD%field_load_in(1,2:,:)=(19d0,0d0)
+                ENDIF
+		CALL CalcDistributedFourier(int_eq%DFD,FFT_FWD)
+                IF (me==0)	PRINT'(I7, 8F13.5)' ,me, int_eq%DFD%field_load_out(1,1,1),int_eq%DFD%field_load_out(1,2,1),int_eq%DFD%field_load_out(2,1,1),int_eq%DFD%field_load_out(2,2,1)
+                int_eq%DFD%field_load_in=int_eq%DFD%field_load_out
+		CALL CalcDistributedFourier(int_eq%DFD,FFT_BWD)
+                IF (me==0)	PRINT'(I7, 8F13.5)',me, int_eq%DFD%field_load_out(1,1,1),int_eq%DFD%field_load_out(1,2,1),int_eq%DFD%field_load_out(2,1,1),int_eq%DFD%field_load_out(2,2,1)
 
+
+
+!		CALL MPI_BARRIER(wcomm,IERROR)
+!		CALL MPI_FINALIZE(IERROR)
+!		STOP
+#endif
+>>>>>>> 40c9c44... Hmm, it works.
 	real_comm=int_eq%fgmres_comm
 
 	CALL PrepareContinuationOperator(rc_op,anomaly,recvs,wcomm,threads_ok)

@@ -121,6 +121,35 @@ CONTAINS
 		IF (int_eq%Ny_offset >= Ny) THEN	  
 			int_eq%real_space=.FALSE.
 			CALL MPI_COMM_SPLIT(int_eq%matrix_comm, MPI_TWO, int_eq%me, int_eq%fgmres_comm, IERROR)
+		
+!		PRINT*,'!!  222  !!'
+!		CALL MPI_COMM_DUP(mcomm,tt,IERROR)
+!		PRINT*,'?? dddd  ??'
+
+		IF (ie_op%fftw_threads_ok) THEN
+			NT=OMP_GET_MAX_THREADS()
+			CALL FFTW_PLAN_WITH_NTHREADS(NT)
+			IF (ie_op%master) PRINT* ,'MULTITHREADED FFTW'
+		ENDIF
+		CALL TestBlocksNumber(ie_op%DFD,Nx2,Ny2,Nc,comm,Nb,Nopt)
+!		Nopt=Nb
+		CALL PrepareDistributedFourierData(ie_op%DFD,Nx2,Ny2,Nc,comm,Nopt)
+		IF (VERBOSE) THEN
+			IF (ie_op%master) THEN
+!				PRINT'(A)' ,'Block distributed FFT plan calculations:'
+!				PRINT'(A ES10.2E3 )' ,'Forward along X', ie_op%DFD%plans_time(1,FFT_FWD)
+!				PRINT'(A ES10.2E3 )' ,'Forward along Y', ie_op%DFD%plans_time(2,FFT_FWD)
+!				PRINT'(A ES10.2E3 )' ,'Backward along X', ie_op%DFD%plans_time(1,FFT_BWD)
+!				PRINT'(A ES10.2E3 )' ,'Backward along Y', ie_op%DFD%plans_time(2,FFT_BWD)
+			ENDIF
+		ENDIF
+		CALL PrepareOperatorIE_OP(ie_op)
+		ie_op%N=Nx64*Ny64*Nc64
+		ie_op%Nloc=Nx*3*Nz*ie_op%Ny_loc
+		IF (ie_op%Ny_offset >= Ny) THEN	  
+			ie_op%real_space=.FALSE.
+			CALL MPI_COMM_SPLIT(ie_op%matrix_comm, MPI_TWO, ie_op%me, ie_op%fgmres_comm, IERROR)
+>>>>>>> 40c9c44... Hmm, it works.
 		ELSE
 			int_eq%real_space=.TRUE.
 			CALL MPI_COMM_SPLIT(int_eq%matrix_comm, MPI_ONE, int_eq%me, int_eq%fgmres_comm, IERROR)
