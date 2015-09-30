@@ -14,8 +14,8 @@ MODULE DISTRIBUTED_FFT_MODULE
 	INTEGER, PARAMETER, PUBLIC :: FFT_FWD=1!FFTW_FORWARD
 	INTEGER, PARAMETER, PUBLIC :: FFT_BWD=2!FFTW_BACKWARD
 
-!	INTEGER(KIND=KIND(FFTW_PATIENT)), PARAMETER  :: FFT_CTL=IOR(FFTW_PATIENT,FFTW_DESTROY_INPUT )
-	INTEGER(KIND=KIND(FFTW_PATIENT)), PARAMETER  :: FFT_CTL=IOR(FFTW_EXHAUSTIVE,FFTW_DESTROY_INPUT )
+	INTEGER(KIND=KIND(FFTW_PATIENT)), PARAMETER  :: FFT_CTL=IOR(FFTW_PATIENT,FFTW_DESTROY_INPUT )
+!	INTEGER(KIND=KIND(FFTW_PATIENT)), PARAMETER  :: FFT_CTL=IOR(FFTW_EXHAUSTIVE,FFTW_DESTROY_INPUT )
 !	INTEGER(KIND=KIND(FFTW_PATIENT)), PARAMETER  :: FFT_CTL=IOR(FFTW_ESTIMATE,FFTW_DESTROY_INPUT )
 
 	LOGICAL, PARAMETER, PUBLIC :: NEW_DFD_ALLOC=.TRUE.
@@ -191,13 +191,15 @@ MODULE DISTRIBUTED_FFT_MODULE
 	SUBROUTINE CreateAll2AllPlan(DFD)
 		TYPE (DistributedFourierData),INTENT(INOUT)::DFD
 		REAL(REALPARM),POINTER::r_in(:),r_out(:)
-		INTEGER::N,Np
-		
+		INTEGER::M
+		INTEGER(C_INTPTR_T)::N,Np
+		INTEGER(C_INTPTR_T),PARAMETER::ONE=1
 		N=2*DFD%block(1)%chunk_len
 		Np=DFD%Np
-		CALL c_f_pointer(DFD%p_out,r_in,(/N*Np/))
-		CALL c_f_pointer(DFD%p_in,r_out,(/N*Np/))
-		DFD%FFTW_TRANSPOSE%plan = fftw_mpi_plan_many_transpose(Np, Np, N, 1, 1, r_in, r_out, DFD%block(1)%comm,&
+		M=N*Np
+		CALL c_f_pointer(DFD%p_out,r_in,(/M/))
+		CALL c_f_pointer(DFD%p_in,r_out,(/M/))
+		DFD%FFTW_TRANSPOSE%plan = fftw_mpi_plan_many_transpose(Np, Np, N, ONE, ONE, r_in, r_out, DFD%block(1)%comm,&
 		& FFT_CTL);
 		DFD%FFTW_TRANSPOSE%p_in=>r_in
 		DFD%FFTW_TRANSPOSE%p_out=>r_out
@@ -653,7 +655,7 @@ MODULE DISTRIBUTED_FFT_MODULE
 		Iopt=1
 		kernel_min=HUGE(kernel_time)	
 		kernel_time=0d0	
-		DO Nb=3,Nbmax
+		DO Nb=1,Nbmax
 			CALL PrepareDistributedFourierData(DFD,Nx,Ny,Nc,comm,Nb,NEW_DFD_ALLOC)
 			DFD%field_out=1d0
 			DFD%field_load_in=(1d0,-246d0)
