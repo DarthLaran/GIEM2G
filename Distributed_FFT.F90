@@ -132,33 +132,11 @@ MODULE DISTRIBUTED_FFT_MODULE
 			block=>DFD%block(Ib)
 			CALL MPI_COMM_DUP(comm,block%comm, IERROR)
 		ENDDO
+		IF (Nb==1) THEN
+			CALL CreateAll2AllPlan(DFD)
+		ENDIF
 		CALL CHECK_MEM(dfd%me,0,comm)
 
-			block%field_in=>DFD%field_in
-			block%field_out=>DFD%field_out
-
-			block%field_fft_x_in(1:Nx,1:Ny_loc,1:block%Nm)=>DFD%field_in(block%Ix0:)
-
-			block%field_fft_x_out(1:Nx,1:Ny_loc,1:block%Nm)=>DFD%field_out(block%Ix0:)
-
-
-			block%field_fft_y_in(1:block%K,1:Ny_loc,1:Np)=>DFD%field_out(block%Iy0:)
-
-			block%field_fft_y_out(1:block%K,1:Ny_loc,1:Np)=>DFD%field_in(block%Iy0:)
-
-			block%timer=>DFD%timer
-			block%plans_time=0d0
-			
-			CALL CreateBlockPlans(block)
-			DFD%plans_time=DFD%plans_time+block%plans_time
-			IF (Ib/=Nb) THEN
-				block%sK=block%K+DFD%block(Ib+1)%K
-				block%dK=DFD%block(Ib+1)%K-block%K
-			ELSE
-				block%sK=2*block%K
-				block%dK=0
-			ENDIF
-		ENDDO
 		IF (DFD%me==0) THEN
 			PRINT'(A)' ,'Block distributed FFT plan calculations at 0 process:'
 			PRINT'(A ES10.2E3 )' ,'Forward along X', DFD%plans_time(1,FFT_FWD)
@@ -167,24 +145,6 @@ MODULE DISTRIBUTED_FFT_MODULE
 			PRINT'(A ES10.2E3 )' ,'Backward along Y', DFD%plans_time(2,FFT_BWD)
 		ENDIF
 		DFD%comm=comm
-		DFD%Nb=Nb
-		DFD%timer(FFT_FWD)%N=0
-		DFD%timer(FFT_FWD)%fftx=0d0
-		DFD%timer(FFT_FWD)%ffty=0d0
-		DFD%timer(FFT_FWD)%x2y_transpose=0d0
-		DFD%timer(FFT_FWD)%y2x_transpose=0d0
-		DFD%timer(FFT_FWD)%kernel_total=0d0
-
-		DFD%timer(FFT_BWD)%N=0
-		DFD%timer(FFT_BWD)%fftx=0d0
-		DFD%timer(FFT_BWD)%ffty=0d0
-		DFD%timer(FFT_BWD)%x2y_transpose=0d0
-		DFD%timer(FFT_BWD)%y2x_transpose=0d0
-		
-		DFD%timer(FFT_BWD)%kernel_total=0d0
-		IF (Nb==1) THEN
-			CALL CreateAll2AllPlan(DFD)
-		ENDIF
 	ENDSUBROUTINE
 
 
@@ -242,6 +202,7 @@ MODULE DISTRIBUTED_FFT_MODULE
 		DFD%FFTW_TRANSPOSE%p_in=>r_in
 		DFD%FFTW_TRANSPOSE%p_out=>r_out
 	ENDSUBROUTINE
+
 	SUBROUTINE CalcDistributedFourier(DFD,FFT_DIR)
 		TYPE (DistributedFourierData),INTENT(INOUT)::DFD
 		INTEGER,INTENT(IN)::FFT_DIR
@@ -256,8 +217,6 @@ MODULE DISTRIBUTED_FFT_MODULE
 	END SUBROUTINE
 
 	
-
-
 	SUBROUTINE ProcessDistributedFourierKernel(DFD,FFT_DIR)
 		TYPE (DistributedFourierData),INTENT(INOUT)::DFD
 		INTEGER,INTENT(IN)::FFT_DIR
