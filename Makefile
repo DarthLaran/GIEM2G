@@ -1,7 +1,7 @@
 ifneq ($(MAKECMDGOALS), clean)
 include $(MAKECMDGOALS).make	
 endif
-MISC_O=const_module.o mpi_module.o fftw3_mod.o check_memory_module.o
+MISC_O=const_module.o mpi_module.o fftw3_mod.o check_memory_module.o Distributed_FFT.o
 #FILTER_WEIGHTS_O=IntegralCodes.o VolumeBesselTransforms.o 
 ifdef FFT_QUAD_OURA
 	FILTER_WEIGHTS_O=IntegralCodes.o FFT_Quadruple.o  VolumeBesselTransforms.o 
@@ -29,15 +29,16 @@ endif
 zfgmres:
 	$(MAKE) -C ZFGMRES FC=$(F77)  FOPTS='$(OPTS)' AR=$(AR) FGMRES_PATH='$(FGMRES_PATH)'
 
-giem2g: giem2g_lib giem2g.F90
+giem2g: giem2g_lib giem2g.F90 
 	$(FC_Link)   $(OPTS)  giem2g.F90  -L./ -lgiem2g  $(LIBS)  $(INCLUDE) -o giem2g 
 	
 ifdef INSTALL_PATH
-	cp giem2g $(INSTALL_PATH)/giem2g
+	cp giem2g $(INSTALL_PATH)
 endif
 
 giem2g_lib: $(ALL_O)  $(MAKECMDGOALS).make Makefile	
 	$(AR) rcs libgiem2g.a $(ALL_O)
+
 
 %.o:%.f90
 	$(FC) $(OPTS) -c $*.f90 -o $*.o $(INCLUDE)
