@@ -4,6 +4,7 @@ MODULE INTEGRAL_EQUATION_MODULE
 	USE MPI_MODULE
 
 	USE DATA_TYPES_MODULE
+	USE DISTRIBUTED_FFT_MODULE
 
 	IMPLICIT NONE
 	INTEGER,PARAMETER::COUNTER_ALL=1
@@ -11,6 +12,7 @@ MODULE INTEGRAL_EQUATION_MODULE
 	INTEGER,PARAMETER::COUNTER_LIN=3
 	INTEGER,PARAMETER::COUNTER_SQR=4
 	INTEGER,PARAMETER::COUNTER_OTHER=5
+	INTEGER(8),PARAMETER::THREE_64=3
 	TYPE TypeCounter
 		REAL(8)::plans
 		REAL(8)::tensor_calc(5)
@@ -45,16 +47,13 @@ MODULE INTEGRAL_EQUATION_MODULE
 		INTEGER(MPI_CTL_KIND)::master_proc
 		LOGICAL::master
 		TYPE(TypeCounter)::counter
-
-		INTEGER (C_INTPTR_T) ::localsize
-		TYPE(C_PTR)::p_in,p_out
+		TYPE(DistributedFourierData)::DFD
 		COMPLEX(REALPARM),POINTER::field_in4(:,:,:,:),field_out4(:,:,:,:)
 		COMPLEX(REALPARM),POINTER::field_in3(:,:,:),field_out3(:,:,:)
-		TYPE(C_PTR)::planFwd,planBwd
 		LOGICAL::fftw_threads_ok
 
-		INTEGER::Nloc
 		INTEGER(8)::N
+		INTEGER::Nloc
 		REAL(REALPARM),POINTER ::siga(:,:,:)
 		REAL(REALPARM),POINTER ::sigb(:,:,:)
 		REAL(REALPARM),POINTER ::dsig(:,:,:)
@@ -77,50 +76,61 @@ MODULE INTEGRAL_EQUATION_MODULE
 	PUBLIC::  IntegralEquation,TypeCounter
 	PUBLIC::PrepareIntegralEquation
 CONTAINS
-	SUBROUTINE PrepareIntegralEquation(int_eq,anomaly,mcomm,fftw_threads_ok)
-		TYPE(IntegralEquation),INTENT(INOUT)::int_eq
+	SUBROUTINE PrepareIntegralEquation(ie_op,anomaly,mcomm,fftw_threads_ok,Nb1)
+		TYPE(IntegralEquation),INTENT(INOUT)::ie_op
 		TYPE (ANOMALY_TYPE),INTENT(INOUT)::anomaly
 		INTEGER(MPI_CTL_KIND),INTENT(IN)::mcomm 
 		LOGICAL,OPTIONAL,INTENT(IN)::fftw_threads_ok
-		INTEGER::Nx,Ny,Nz
-		INTEGER(MPI_CTL_KIND)::comm_size,IERROR,me
+		INTEGER,OPTIONAL,INTENT(IN)::Nb1
+		INTEGER::Nx,Ny,Nz,Nb,Nopt
+		INTEGER::Nx2,Ny2,Nc
+		INTEGER(8)::Nx64,Ny64,Nc64
+		INTEGER(MPI_CTL_KIND)::comm_size,IERROR,me,comm
 		INTEGER(MPI_CTL_KIND),PARAMETER::MPI_TWO=2
 		INTEGER(MPI_CTL_KIND),PARAMETER::MPI_ONE=1
+		INTEGER::NT,OMP_GET_MAX_THREADS
 		Nx=anomaly%Nx
 		Ny=anomaly%Ny
 		Nz=anomaly%Nz
-		int_eq%Nx=Nx
-		int_eq%Ny=Ny
-		int_eq%Nz=Nz
-		int_eq%matrix_comm=mcomm
-		CALL MPI_COMM_RANK(mcomm, me, IERROR)
-		CALL MPI_COMM_SIZE(mcomm,comm_size,IERROR) 
-		int_eq%me=me
-		if (me==0) THEN
-			int_eq%master=.TRUE.
+		Nx64=Nx
+		Ny64=Ny
+		Nc64=3*Nz
+		Nc=3*Nz
+		Nx2=2*Nx
+		Ny2=2*Ny
+		IF (PRESENT(Nb1)) THEN
+			Nb=Nb1
 		ELSE
-			int_eq%master=.FALSE.
+			Nb=3
 		ENDIF
-		int_eq%master_proc=0
+!		CALL MPI_DUP_COMM(mcomm,comm,IERROR)
+		comm=mcomm
+		ie_op%Nx=Nx
+		ie_op%Ny=Ny
+		ie_op%Nz=Nz
+		ie_op%matrix_comm=comm
+		CALL MPI_COMM_RANK(comm, me, IERROR)
+		CALL MPI_COMM_SIZE(comm,comm_size,IERROR) 
+		ie_op%me=me
+		if (me==0) THEN
+			ie_op%master=.TRUE.
+		ELSE
+			ie_op%master=.FALSE.
+		ENDIF
+		
+		ie_op%master_proc=0
 		IF (mod(2*Ny,comm_size)/=0) THEN
-			IF (int_eq%master) THEN
+			IF (ie_op%master) THEN
 				PRINT*,'Wrong number of processes. GIEM2G forced to halt!'
 			ENDIF
 			CALL MPI_FINALIZE(IERROR)
 			STOP
 		ENDIF
 		IF (PRESENT(fftw_threads_ok)) THEN
-			int_eq%fftw_threads_ok=fftw_threads_ok
+			ie_op%fftw_threads_ok=fftw_threads_ok
 		ELSE
-			int_eq%fftw_threads_ok=.FALSE.
+			ie_op%fftw_threads_ok=.FALSE.
 		ENDIF
-		CALL PrepareOperatorIE_OP(int_eq)
-		int_eq%N=INT(Nx,KIND=8)*INT(Ny,KIND=8)*INT(Nz,KIND=8)*INT(3,KIND=8)
-		IF (int_eq%master) PRINT*, 'Number of unknowns', int_eq%N
-		int_eq%Nloc=Nx*3*Nz*int_eq%Ny_loc
-		IF (int_eq%Ny_offset >= Ny) THEN	  
-			int_eq%real_space=.FALSE.
-			CALL MPI_COMM_SPLIT(int_eq%matrix_comm, MPI_TWO, int_eq%me, int_eq%fgmres_comm, IERROR)
 		
 !		PRINT*,'!!  222  !!'
 !		CALL MPI_COMM_DUP(mcomm,tt,IERROR)
@@ -131,8 +141,11 @@ CONTAINS
 			CALL FFTW_PLAN_WITH_NTHREADS(NT)
 			IF (ie_op%master) PRINT* ,'MULTITHREADED FFTW'
 		ENDIF
+#ifdef LEGACY_MPI
+		Nopt=1
+#else
 		CALL TestBlocksNumber(ie_op%DFD,Nx2,Ny2,Nc,comm,Nb,Nopt)
-!		Nopt=Nb
+#endif
 		CALL PrepareDistributedFourierData(ie_op%DFD,Nx2,Ny2,Nc,comm,Nopt)
 		IF (VERBOSE) THEN
 			IF (ie_op%master) THEN
@@ -149,48 +162,47 @@ CONTAINS
 		IF (ie_op%Ny_offset >= Ny) THEN	  
 			ie_op%real_space=.FALSE.
 			CALL MPI_COMM_SPLIT(ie_op%matrix_comm, MPI_TWO, ie_op%me, ie_op%fgmres_comm, IERROR)
->>>>>>> 40c9c44... Hmm, it works.
 		ELSE
-			int_eq%real_space=.TRUE.
-			CALL MPI_COMM_SPLIT(int_eq%matrix_comm, MPI_ONE, int_eq%me, int_eq%fgmres_comm, IERROR)
-			CALL MPI_COMM_RANK(int_eq%fgmres_comm, int_eq%fgmres_me, IERROR)
+			ie_op%real_space=.TRUE.
+			CALL MPI_COMM_SPLIT(ie_op%matrix_comm, MPI_ONE, ie_op%me, ie_op%fgmres_comm, IERROR)
+			CALL MPI_COMM_RANK(ie_op%fgmres_comm, ie_op%fgmres_me, IERROR)
 		ENDIF
-		CALL MPI_COMM_RANK(int_eq%fgmres_comm, int_eq%fgmres_me, IERROR)
-		IF ((int_eq%master).AND.(int_eq%Ny_offset/=0)) THEN
+		CALL MPI_COMM_RANK(ie_op%fgmres_comm, ie_op%fgmres_me, IERROR)
+		IF ((ie_op%master).AND.(ie_op%Ny_offset/=0)) THEN
 			PRINT*,  'Main process has no zero offset.&
 				   & Now it is problem. It will be solved... sometime'
 				CALL MPI_FINALIZE(IERROR)
 				STOP
 		ENDIF
-		IF (int_eq%real_space) THEN
-			ALLOCATE(int_eq%solution(int_eq%Nloc))
-			ALLOCATE(int_eq%initial_guess(int_eq%Nloc))
-			ALLOCATE(int_eq%rhs(int_eq%Nloc))
-			int_eq%Esol(1:Nz,1:3,1:Nx,1:int_eq%Ny_loc)=>int_eq%solution
-			int_eq%E_n(1:Nz,1:3,1:Nx,1:int_eq%Ny_loc)=>int_eq%rhs
+		IF (ie_op%real_space) THEN
+			ALLOCATE(ie_op%solution(ie_op%Nloc))
+			ALLOCATE(ie_op%initial_guess(ie_op%Nloc))
+			ALLOCATE(ie_op%rhs(ie_op%Nloc))
+			ie_op%Esol(1:Nz,1:3,1:Nx,1:ie_op%Ny_loc)=>ie_op%solution
+			ie_op%E_n(1:Nz,1:3,1:Nx,1:ie_op%Ny_loc)=>ie_op%rhs
 		ELSE
 			
-			int_eq%Esol=>NULL()
-			int_eq%E_n=>NULL()
-			int_eq%solution=>NULL()
-			int_eq%initial_guess=>NULL()
-			int_eq%rhs=>NULL()
+			ie_op%Esol=>NULL()
+			ie_op%E_n=>NULL()
+			ie_op%solution=>NULL()
+			ie_op%initial_guess=>NULL()
+			ie_op%rhs=>NULL()
 		ENDIF
-		int_eq%siga=>NULL()
-		int_eq%sigb=>NULL()
-		int_eq%asiga=>NULL()
-		int_eq%sqsigb=>NULL()
-		int_eq%gsig=>NULL()
-		int_eq%dsig=>NULL()
-		anomaly%Ny_loc=int_eq%Ny_loc
-		int_eq%dz=anomaly%z(1:Nz)-anomaly%z(0:Nz-1)
+		ie_op%siga=>NULL()
+		ie_op%sigb=>NULL()
+		ie_op%asiga=>NULL()
+		ie_op%sqsigb=>NULL()
+		ie_op%gsig=>NULL()
+		ie_op%dsig=>NULL()
+		anomaly%Ny_loc=ie_op%Ny_loc
+		ie_op%dz=anomaly%z(1:Nz)-anomaly%z(0:Nz-1)
 	ENDSUBROUTINE
 !--------------------------------------------------------------------------------------------------------------------!	
 	SUBROUTINE PrepareOperatorIE_OP(ie_op)
 		TYPE(IntegralEquation),INTENT(INOUT)::ie_op
 		CALL CalcSizesForIE_OP(ie_op)
 		CALL AllocateIE_OP(ie_op)
-		CALL CalcFFTWPlansIE_OP(ie_op)
+!		CALL CalcFFTWPlansIE_OP(ie_op)
 	ENDSUBROUTINE
 
 	SUBROUTINE CalcSizesForIE_OP(ie_op) 
@@ -203,14 +215,8 @@ CONTAINS
 		REAL(REALPARM)::size_symm,size_asym
 		REAL(REALPARM)::tensor_size
 
-		tsize8=(/ie_op%Ny*2,ie_op%Nx*2/)
-		block=FFTW_MPI_DEFAULT_BLOCK!(0)
-		Nz3=ie_op%Nz*3
-		comm=ie_op%matrix_comm
-		ie_op%localsize = fftw_mpi_local_size_many(FFTW_TWO,tsize8,Nz3,block,comm, &
-			& CNy, CNy_offset)
-		ie_op%Ny_loc=INT(CNy,KIND(ie_op%Ny_loc))
-		ie_op%Ny_offset=INT(CNy_offset,KIND(ie_op%Ny_offset))
+		ie_op%Ny_loc=ie_op%DFD%Ny_loc
+		ie_op%Ny_offset=ie_op%me*ie_op%Ny_loc
 		ie_op%Nx2=ie_op%Nx*2
 		ie_op%Nx2Ny_loc=ie_op%Nx2*ie_op%Ny_loc
 		ie_op%Nx2Ny2=ie_op%Nx*ie_op%Ny*4
@@ -254,16 +260,18 @@ CONTAINS
 	END SUBROUTINE
 	SUBROUTINE AllocateIE_OP(ie_op)
 		TYPE(IntegralEquation),INTENT(INOUT)::ie_op
-		INTEGER::shape4(4),shape3(3)
+		INTEGER::Nx2,Nz,Ny_loc,Nx2Ny_loc
 		CALL AllocateIEMatrix(ie_op)
-		ie_op%p_in=fftw_alloc_complex(ie_op%localsize)
-		ie_op%p_out=fftw_alloc_complex(ie_op%localsize)
-		shape4=(/ie_op%Nz,3,ie_op%Nx2,ie_op%Ny_loc/)
-		shape3=(/ie_op%Nz,3,ie_op%Nx2Ny_loc/)
-		CALL c_f_pointer(ie_op%p_in,ie_op%field_in4, shape4)
-		CALL c_f_pointer(ie_op%p_in,ie_op%field_in3, shape3)
-		CALL c_f_pointer(ie_op%p_out,ie_op%field_out4, shape4)
-		CALL c_f_pointer(ie_op%p_out,ie_op%field_out3, shape3)
+		Nz=ie_op%Nz
+		Nx2=ie_op%Nx2
+		Ny_loc=ie_op%Ny_loc
+		Nx2Ny_loc=ie_op%Nx2Ny_loc
+		ie_op%field_in4(1:Nz,1:3,1:Nx2,1:Ny_loc)=>ie_op%DFD%field_out
+		ie_op%field_out4(1:Nz,1:3,1:Nx2,1:Ny_loc)=>ie_op%DFD%field_in
+
+		ie_op%field_in3(1:Nz,1:3,1:Nx2Ny_loc)=>ie_op%DFD%field_in
+		ie_op%field_out3(1:Nz,1:3,1:Nx2Ny_loc)=>ie_op%DFD%field_out
+
 	ENDSUBROUTINE
 	SUBROUTINE CalcFFTWPlansIE_OP(ie_op)
 		TYPE(IntegralEquation),INTENT(INOUT)::ie_op
@@ -272,11 +280,9 @@ CONTAINS
 		INTEGER(C_INTPTR_T)::block
 		INTEGER(MPI_CTL_KIND)::IERROR
 		INTEGER::omp_get_max_threads,nt
+!		INTEGER::nt
 		INTEGER(FFTW_COMM_SIZE)::COMM, FFTW_NT
 		REAL(8)::time1,time2
-		fftwsize=(/ie_op%Ny*2,ie_op%Nx*2/)
-		block=FFTW_MPI_DEFAULT_BLOCK
-		Nz3=3*ie_op%Nz
 		CALL MPI_BARRIER(ie_op%matrix_comm,IERROR)
 		time1=MPI_WTIME()
 		IF (ie_op%fftw_threads_ok) THEN
@@ -284,14 +290,8 @@ CONTAINS
 			FFTW_NT=NT
 			CALL FFTW_PLAN_WITH_NTHREADS(FFTW_NT)
 		ENDIF
-		COMM=ie_op%matrix_comm
-!		 CALL fftw_set_timelimit(5d0)
-				 
-		ie_op%planFWD=fftw_mpi_plan_many_dft(FFTW_TWO,fftwsize,Nz3,block,block,&
-		&ie_op%field_in4,ie_op%field_in4,COMM, FFTW_FORWARD ,FFTW_MEASURE)!FFTW_PATIENT);
-		ie_op%planBWD=fftw_mpi_plan_many_dft(FFTW_TWO,fftwsize,Nz3,block,block,&
-		&ie_op%field_out4,ie_op%field_out4,COMM, FFTW_BACKWARD ,FFTW_MEASURE)!FFTW_PATIENT);
 		time2=MPI_WTIME()
+		!CALL CreateAllPlans(ie_op%DFD)
 		ie_op%counter%plans=time2-time1
 		IF (VERBOSE) THEN
 			IF (ie_op%master) THEN
@@ -301,12 +301,11 @@ CONTAINS
 	ENDSUBROUTINE
 	SUBROUTINE IE_OP_FFTW_FWD(ie_op)
 		TYPE(IntegralEquation),INTENT(INOUT)::ie_op
-		CALL fftw_mpi_execute_dft(ie_op%planFWD,ie_op%field_in4,ie_op%field_in4)
+		CALL	CalcDistributedFourier(ie_op%DFD,FFT_FWD)
 	ENDSUBROUTINE
 	SUBROUTINE IE_OP_FFTW_BWD(ie_op)
 		TYPE(IntegralEquation),INTENT(INOUT)::ie_op
-		CALL fftw_mpi_execute_dft(ie_op%planBWD,ie_op%field_out4,ie_op%field_out4)
-		ie_op%field_out4=ie_op%field_out4/ie_op%Nx2Ny2
+		CALL	CalcDistributedFourier(ie_op%DFD,FFT_BWD)
 	ENDSUBROUTINE
 	SUBROUTINE CalcFFTofIETensor(ie_op)
 		TYPE(IntegralEquation),INTENT(INOUT)::ie_op
@@ -323,33 +322,32 @@ CONTAINS
 			ie_op%field_in4(:,1:2,:,:)=ie_op%G_symm_fftw(:,:,Is,:,:)
 			ie_op%field_in4(:,3,:,:)=ie_op%G_asym_fftw(:,1,Ia,:,:)
 			CALL IE_OP_FFTW_FWD(ie_op)
-			ie_op%G_symm_fftw(:,:,Is,:,:)=ie_op%field_in4(:,1:2,:,:)
-			ie_op%G_asym_fftw(:,1,Ia,:,:)=ie_op%field_in4(:,3,:,:)
+			ie_op%G_symm_fftw(:,:,Is,:,:)=ie_op%field_out4(:,1:2,:,:)
+			ie_op%G_asym_fftw(:,1,Ia,:,:)=ie_op%field_out4(:,3,:,:)
 			Is=Is+1
-
 			ie_op%field_in4(:,1,:,:)=ie_op%G_symm_fftw(:,1,Is,:,:)
 			ie_op%field_in4(:,2,:,:)=ie_op%G_asym_fftw(:,2,Ia,:,:)
 			ie_op%field_in4(:,3,:,:)=ie_op%G_asym_fftw(:,1,Ia+1,:,:)
 			CALL IE_OP_FFTW_FWD(ie_op)
-			ie_op%G_symm_fftw(:,1,Is,:,:)=ie_op%field_in4(:,1,:,:)
-			ie_op%G_asym_fftw(:,2,Ia,:,:)=ie_op%field_in4(:,2,:,:)
-			ie_op%G_asym_fftw(:,1,Ia+1,:,:)=ie_op%field_in4(:,3,:,:)
+			ie_op%G_symm_fftw(:,1,Is,:,:)=ie_op%field_out4(:,1,:,:)
+			ie_op%G_asym_fftw(:,2,Ia,:,:)=ie_op%field_out4(:,2,:,:)
+			ie_op%G_asym_fftw(:,1,Ia+1,:,:)=ie_op%field_out4(:,3,:,:)
 			Ia=Ia+1
 
 			ie_op%field_in4(:,1,:,:)=ie_op%G_symm_fftw(:,2,Is,:,:)
 			ie_op%field_in4(:,2,:,:)=ie_op%G_asym_fftw(:,2,Ia,:,:)
 			ie_op%field_in4(:,3,:,:)=ie_op%G_asym_fftw(:,1,Ia+1,:,:)
 			CALL IE_OP_FFTW_FWD(ie_op)
-			ie_op%G_symm_fftw(:,2,Is,:,:)=ie_op%field_in4(:,1,:,:)
-			ie_op%G_asym_fftw(:,2,Ia,:,:)=ie_op%field_in4(:,2,:,:)
-			ie_op%G_asym_fftw(:,1,Ia+1,:,:)=ie_op%field_in4(:,3,:,:)
+			ie_op%G_symm_fftw(:,2,Is,:,:)=ie_op%field_out4(:,1,:,:)
+			ie_op%G_asym_fftw(:,2,Ia,:,:)=ie_op%field_out4(:,2,:,:)
+			ie_op%G_asym_fftw(:,1,Ia+1,:,:)=ie_op%field_out4(:,3,:,:)
 			Ia=Ia+1
 			Is=Is+1
 			ie_op%field_in4(:,1:2,:,:)=ie_op%G_symm_fftw(:,:,Is,:,:)
 			ie_op%field_in4(:,3,:,:)=ie_op%G_asym_fftw(:,2,Ia,:,:)
 			CALL IE_OP_FFTW_FWD(ie_op)
-			ie_op%G_symm_fftw(:,:,Is,:,:)=ie_op%field_in4(:,1:2,:,:)
-			ie_op%G_asym_fftw(:,2,Ia,:,:)=ie_op%field_in4(:,3,:,:)
+			ie_op%G_symm_fftw(:,:,Is,:,:)=ie_op%field_out4(:,1:2,:,:)
+			ie_op%G_asym_fftw(:,2,Ia,:,:)=ie_op%field_out4(:,3,:,:)
 			Is=Is+1
 			Ia=Ia+1
 		ENDDO
@@ -357,45 +355,44 @@ CONTAINS
 			ie_op%field_in4(:,1:2,:,:)=ie_op%G_symm_fftw(:,:,Is,:,:)
 			ie_op%field_in4(:,3,:,:)=ie_op%G_asym_fftw(:,1,Ia,:,:)
 			CALL IE_OP_FFTW_FWD(ie_op)	!Nz-1 Nz-1
-			ie_op%G_symm_fftw(:,:,Is,:,:)=ie_op%field_in4(:,1:2,:,:)
-			ie_op%G_asym_fftw(:,1,Ia,:,:)=ie_op%field_in4(:,3,:,:)
+			ie_op%G_symm_fftw(:,:,Is,:,:)=ie_op%field_out4(:,1:2,:,:)
+			ie_op%G_asym_fftw(:,1,Ia,:,:)=ie_op%field_out4(:,3,:,:)
 			Is=Is+1
 
 			ie_op%field_in4(:,1,:,:)=ie_op%G_symm_fftw(:,1,Is,:,:)
 			ie_op%field_in4(:,2,:,:)=ie_op%G_asym_fftw(:,2,Ia,:,:)
 			ie_op%field_in4(:,3,:,:)=ie_op%G_asym_fftw(:,1,Ia+1,:,:)
 			CALL IE_OP_FFTW_FWD(ie_op) !Nz Nz
-			ie_op%G_symm_fftw(:,1,Is,:,:)=ie_op%field_in4(:,1,:,:)
-			ie_op%G_asym_fftw(:,2,Ia,:,:)=ie_op%field_in4(:,2,:,:)
-			ie_op%G_asym_fftw(:,1,Ia+1,:,:)=ie_op%field_in4(:,3,:,:)
+			ie_op%G_symm_fftw(:,1,Is,:,:)=ie_op%field_out4(:,1,:,:)
+			ie_op%G_asym_fftw(:,2,Ia,:,:)=ie_op%field_out4(:,2,:,:)
+			ie_op%G_asym_fftw(:,1,Ia+1,:,:)=ie_op%field_out4(:,3,:,:)
 			Ia=Ia+1
 
 			ie_op%field_in4(:,1,:,:)=ie_op%G_symm_fftw(:,2,Is,:,:)
 			ie_op%field_in4(:,2,:,:)=ie_op%G_asym_fftw(:,2,Ia,:,:)
 			CALL IE_OP_FFTW_FWD(ie_op) !Nz Nz
-			ie_op%G_symm_fftw(:,2,Is,:,:)=ie_op%field_in4(:,1,:,:)
-			ie_op%G_asym_fftw(:,2,Ia,:,:)=ie_op%field_in4(:,2,:,:)
+			ie_op%G_symm_fftw(:,2,Is,:,:)=ie_op%field_out4(:,1,:,:)
+			ie_op%G_asym_fftw(:,2,Ia,:,:)=ie_op%field_out4(:,2,:,:)
 			Is=Is+1
 			ie_op%field_in4(:,1:2,:,:)=ie_op%G_symm_fftw(:,1:2,Is,:,:)
 			CALL IE_OP_FFTW_FWD(ie_op) !Nz+1 
-			ie_op%G_symm_fftw(:,1:2,Is,:,:)=ie_op%field_in4(:,1:2,:,:)
+			ie_op%G_symm_fftw(:,1:2,Is,:,:)=ie_op%field_out4(:,1:2,:,:)
 		ELSEIF (Ia==ie_op%Nz) THEN
 			ie_op%field_in4(:,1:2,:,:)=ie_op%G_symm_fftw(:,:,Is,:,:)
 			ie_op%field_in4(:,3,:,:)=ie_op%G_asym_fftw(:,1,Ia,:,:)
 			CALL IE_OP_FFTW_FWD(ie_op)	!Nz Nz
-			ie_op%G_symm_fftw(:,:,Is,:,:)=ie_op%field_in4(:,1:2,:,:)
-			ie_op%G_asym_fftw(:,1,Ia,:,:)=ie_op%field_in4(:,3,:,:)
+			ie_op%G_symm_fftw(:,:,Is,:,:)=ie_op%field_out4(:,1:2,:,:)
+			ie_op%G_asym_fftw(:,1,Ia,:,:)=ie_op%field_out4(:,3,:,:)
 			Is=Is+1
-
 			ie_op%field_in4(:,1:2,:,:)=ie_op%G_symm_fftw(:,1:2,Is,:,:)
 			ie_op%field_in4(:,3,:,:)=ie_op%G_asym_fftw(:,2,Ia,:,:)
 			CALL IE_OP_FFTW_FWD(ie_op) !Nz+1 Nz
-			ie_op%G_symm_fftw(:,1:2,Is,:,:)=ie_op%field_in4(:,1:2,:,:)
-			ie_op%G_asym_fftw(:,2,Ia,:,:)=ie_op%field_in4(:,3,:,:)
+			ie_op%G_symm_fftw(:,1:2,Is,:,:)=ie_op%field_out4(:,1:2,:,:)
+			ie_op%G_asym_fftw(:,2,Ia,:,:)=ie_op%field_out4(:,3,:,:)
 		ELSE
 			ie_op%field_in4(:,1:2,:,:)=ie_op%G_symm_fftw(:,1:2,Is,:,:)
-			CALL IE_OP_FFTW_FWD(ie_op) !Nz+1 Nz
-			ie_op%G_symm_fftw(:,1:2,Is,:,:)=ie_op%field_in4(:,1:2,:,:)
+			CALL IE_OP_FFTW_FWD(ie_op) 
+			ie_op%G_symm_fftw(:,1:2,Is,:,:)=ie_op%field_out4(:,1:2,:,:)
 		ENDIF
 		time2=MPI_WTIME()
 		IF (VERBOSE) THEN
@@ -404,6 +401,7 @@ CONTAINS
 			ENDIF
 		ENDIF
 		ie_op%counter%tensor_fft=time2-time1
+		CALL PrintTimings(ie_op%dfd)
 	ENDSUBROUTINE
 
 	SUBROUTINE DeleteMatrix(matrix)
@@ -420,15 +418,12 @@ CONTAINS
 	ENDSUBROUTINE
 	SUBROUTINE DeleteIE_OP(ie_op)
 		TYPE(IntegralEquation),INTENT(INOUT)::ie_op
-		CALL fftw_free(ie_op%p_in)
-		CALL fftw_free(ie_op%p_out)
 		ie_op%field_in4=>NULL()
 		ie_op%field_in3=>NULL()
 		ie_op%field_out4=>NULL()
 		ie_op%field_out3=>NULL()
-		CALL fftw_destroy_plan(ie_op%planFwd)
-		CALL fftw_destroy_plan(ie_op%planBwd)
 		CALL DeleteMatrix(ie_op)
+		CALL DeleteDistributedFourierData(ie_op%DFD)
 	ENDSUBROUTINE
 
 ENDMODULE

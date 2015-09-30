@@ -14,18 +14,25 @@ MODULE DISTRIBUTED_FFT_MODULE
 	INTEGER, PARAMETER, PUBLIC :: FFT_FWD=1!FFTW_FORWARD
 	INTEGER, PARAMETER, PUBLIC :: FFT_BWD=2!FFTW_BACKWARD
 
-	INTEGER(KIND=KIND(FFTW_PATIENT)), PARAMETER  :: FFT_CTL=IOR(FFTW_PATIENT,FFTW_DESTROY_INPUT )
-!	INTEGER(KIND=KIND(FFTW_PATIENT)), PARAMETER  :: FFT_CTL=IOR(FFTW_EXHAUSTIVE,FFTW_DESTROY_INPUT )
+!	INTEGER(KIND=KIND(FFTW_PATIENT)), PARAMETER  :: FFT_CTL=IOR(FFTW_PATIENT,FFTW_DESTROY_INPUT )
+	INTEGER(KIND=KIND(FFTW_PATIENT)), PARAMETER  :: FFT_CTL=IOR(FFTW_EXHAUSTIVE,FFTW_DESTROY_INPUT )
 !	INTEGER(KIND=KIND(FFTW_PATIENT)), PARAMETER  :: FFT_CTL=IOR(FFTW_ESTIMATE,FFTW_DESTROY_INPUT )
 
 	LOGICAL, PARAMETER, PUBLIC :: NEW_DFD_ALLOC=.TRUE.
 	LOGICAL, PARAMETER, PUBLIC :: OLD_DFD_ALLOC=.FALSE.
-        TYPE PlanXY_TYPE
+    TYPE PlanXY_TYPE
                 TYPE(C_PTR)::planX,planY
-        ENDTYPE
+    ENDTYPE
+
 	TYPE FFTW_DATA_TYPE
 		TYPE(C_PTR)::plan_fwd,plan_bwd
 	ENDTYPE
+
+	TYPE FFTW_TRANSPOSE_DATA
+		TYPE(C_PTR)::plan
+		REAL(REALPARM),POINTER::p_in(:),p_out(:)
+	ENDTYPE
+
 	TYPE BLOCK_TYPE
 		INTEGER::Nm !(Nx,Ny_loc,Nm)
                 INTEGER::Lxm
@@ -34,8 +41,8 @@ MODULE DISTRIBUTED_FFT_MODULE
 		INTEGER::len_x		
 
 		INTEGER::K  !(K,Ny_loc,Np)
-                INTEGER::Lkp
-                INTEGER::size_y
+        INTEGER::Lkp
+        INTEGER::size_y
 		INTEGER::len_y	
 		INTEGER::Iy0
 		INTEGER::chunk_len !K*Ny_loc)
@@ -53,7 +60,7 @@ MODULE DISTRIBUTED_FFT_MODULE
 		COMPLEX(REALPARM),POINTER:: field_out(:) 
 
 		INTEGER(MPI_CTL_KIND)::comm
-                TYPE(PlanXY_TYPE)::plan(FFT_FWD:FFT_BWD)
+        TYPE(PlanXY_TYPE)::plan(FFT_FWD:FFT_BWD)
 		REAL(DOUBLEPARM)::plans_time(2,FFT_FWD:FFT_BWD)
 		TYPE(FFT_COUNTER),POINTER::timer(:)
 	ENDTYPE
@@ -78,6 +85,9 @@ MODULE DISTRIBUTED_FFT_MODULE
 		TYPE (FFT_COUNTER)::timer(FFT_FWD:FFT_BWD)
 		REAL(DOUBLEPARM)::plans_time(2,FFT_FWD:FFT_BWD)
 		INTEGER(MPI_CTL_KIND)::comm,me
+        
+		TYPE(FFTW_TRANSPOSE_DATA)::FFTW_TRANSPOSE
+
 	ENDTYPE
 
 
@@ -123,6 +133,32 @@ MODULE DISTRIBUTED_FFT_MODULE
 			CALL MPI_COMM_DUP(comm,block%comm, IERROR)
 		ENDDO
 		CALL CHECK_MEM(dfd%me,0,comm)
+
+			block%field_in=>DFD%field_in
+			block%field_out=>DFD%field_out
+
+			block%field_fft_x_in(1:Nx,1:Ny_loc,1:block%Nm)=>DFD%field_in(block%Ix0:)
+
+			block%field_fft_x_out(1:Nx,1:Ny_loc,1:block%Nm)=>DFD%field_out(block%Ix0:)
+
+
+			block%field_fft_y_in(1:block%K,1:Ny_loc,1:Np)=>DFD%field_out(block%Iy0:)
+
+			block%field_fft_y_out(1:block%K,1:Ny_loc,1:Np)=>DFD%field_in(block%Iy0:)
+
+			block%timer=>DFD%timer
+			block%plans_time=0d0
+			
+			CALL CreateBlockPlans(block)
+			DFD%plans_time=DFD%plans_time+block%plans_time
+			IF (Ib/=Nb) THEN
+				block%sK=block%K+DFD%block(Ib+1)%K
+				block%dK=DFD%block(Ib+1)%K-block%K
+			ELSE
+				block%sK=2*block%K
+				block%dK=0
+			ENDIF
+		ENDDO
 		IF (DFD%me==0) THEN
 			PRINT'(A)' ,'Block distributed FFT plan calculations at 0 process:'
 			PRINT'(A ES10.2E3 )' ,'Forward along X', DFD%plans_time(1,FFT_FWD)
@@ -131,6 +167,24 @@ MODULE DISTRIBUTED_FFT_MODULE
 			PRINT'(A ES10.2E3 )' ,'Backward along Y', DFD%plans_time(2,FFT_BWD)
 		ENDIF
 		DFD%comm=comm
+		DFD%Nb=Nb
+		DFD%timer(FFT_FWD)%N=0
+		DFD%timer(FFT_FWD)%fftx=0d0
+		DFD%timer(FFT_FWD)%ffty=0d0
+		DFD%timer(FFT_FWD)%x2y_transpose=0d0
+		DFD%timer(FFT_FWD)%y2x_transpose=0d0
+		DFD%timer(FFT_FWD)%kernel_total=0d0
+
+		DFD%timer(FFT_BWD)%N=0
+		DFD%timer(FFT_BWD)%fftx=0d0
+		DFD%timer(FFT_BWD)%ffty=0d0
+		DFD%timer(FFT_BWD)%x2y_transpose=0d0
+		DFD%timer(FFT_BWD)%y2x_transpose=0d0
+		
+		DFD%timer(FFT_BWD)%kernel_total=0d0
+		IF (Nb==1) THEN
+			CALL CreateAll2AllPlan(DFD)
+		ENDIF
 	ENDSUBROUTINE
 
 
@@ -174,17 +228,31 @@ MODULE DISTRIBUTED_FFT_MODULE
 		block%plans_time(2,FFT_BWD)=time1-time2
 	ENDSUBROUTINE
 	
+	SUBROUTINE CreateAll2AllPlan(DFD)
+		TYPE (DistributedFourierData),INTENT(INOUT)::DFD
+		REAL(REALPARM),POINTER::r_in(:),r_out(:)
+		INTEGER::N,Np
+		
+		N=2*DFD%block(1)%chunk_len
+		Np=DFD%Np
+		CALL c_f_pointer(DFD%p_out,r_in,(/N*Np/))
+		CALL c_f_pointer(DFD%p_in,r_out,(/N*Np/))
+		DFD%FFTW_TRANSPOSE%plan = fftw_mpi_plan_many_transpose(Np, Np, N, 1, 1, r_in, r_out, DFD%block(1)%comm,&
+		& FFT_CTL);
+		DFD%FFTW_TRANSPOSE%p_in=>r_in
+		DFD%FFTW_TRANSPOSE%p_out=>r_out
+	ENDSUBROUTINE
 	SUBROUTINE CalcDistributedFourier(DFD,FFT_DIR)
 		TYPE (DistributedFourierData),INTENT(INOUT)::DFD
 		INTEGER,INTENT(IN)::FFT_DIR
                 CALL InitialTranspose(DFD)
-                CALL ProcessDistributedFourierKernel(DFD,FFT_DIR)
+	            CALL ProcessDistributedFourierKernel(DFD,FFT_DIR)
                 CALL FinalTranspose(DFD)
                 IF (FFT_DIR/=FFT_BWD) THEN
                         DFD%field_load_out=DFD%field_load_in
                 ELSE
                         DFD%field_load_out=DFD%field_load_in/DFD%Nx/DFD%Ny
-		ENDIF
+				ENDIF
 	END SUBROUTINE
 
 	
@@ -202,10 +270,18 @@ MODULE DISTRIBUTED_FFT_MODULE
 		LOGICAL::recv1(1:DFD%Nb),recv2(1:DFD%Nb+1)
 		COMPLEX(REALPARM),POINTER::p_send(:,:,:),p_recv(:,:,:)
 		REAL(DOUBLEPARM)::time1,time2
+#ifdef LEGACY_MPI
+		CALL ProcessDistributedFourierKernelSync(DFD,FFT_DIR)
+#else
+		IF (DFD%Nb==1) THEN
+			CALL ProcessDistributedFourierKernelSync(DFD,FFT_DIR)
+			RETURN
+		ENDIF
 		time1=MPI_WTIME()
 		recv1=.FALSE.
 		recv2=.FALSE.
 		recv2(DFD%Nb+1)=.TRUE.
+		indices=1
 		DFD%timer(FFT_DIR)%N=DFD%timer(FFT_DIR)%N+1
 		DO Ib=1,DFD%Nb
 			block=>DFD%block(Ib)
@@ -218,13 +294,14 @@ MODULE DISTRIBUTED_FFT_MODULE
 			CALL MPI_IALLTOALL(p_send,chunk , MPI_DOUBLE_COMPLEX,&
 						p_recv, chunk, MPI_DOUBLE_COMPLEX,&
 						comm, x2y_requests(Ib), IERROR)
+
 		ENDDO
 
 		CALL	MPI_WAITSOME(DFD%Nb, x2y_requests, Nrecv,indices,MPI_STATUSES_IGNORE,IERROR)
 		DO WHILE (Nrecv/=MPI_UNDEFINED)
 			DO Jb=1,Nrecv 
 				Ib=indices(Jb)
-        			block=>DFD%block(Ib)
+       			block=>DFD%block(Ib)
 				CALL DistributedFourierY(block,FFT_DIR)
 				p_send=>block%field_fft_y_out
 				p_recv=>block%field_fft_y_in
@@ -235,6 +312,7 @@ MODULE DISTRIBUTED_FFT_MODULE
 						comm, y2x_requests(Ib), IERROR)
 			ENDDO
 			CALL	MPI_WAITSOME(DFD%Nb, x2y_requests, Nrecv,indices,MPI_STATUSES_IGNORE,IERROR)
+
 		ENDDO
 		CALL	MPI_WAITSOME(DFD%Nb, y2x_requests, Nrecv,indices,MPI_STATUSES_IGNORE,IERROR)
 		DO WHILE (Nrecv/=MPI_UNDEFINED)
@@ -254,10 +332,57 @@ MODULE DISTRIBUTED_FFT_MODULE
 		ENDDO
 		time2=MPI_WTIME()
 		DFD%timer(FFT_DIR)%kernel_total=DFD%timer(FFT_DIR)%kernel_total+time2-time1
+#endif
 	END SUBROUTINE
  
 !----------------------------------------------------------------------------------------------------------------------------------!
 
+	SUBROUTINE ProcessDistributedFourierKernelSync(DFD,FFT_DIR)
+		TYPE (DistributedFourierData),INTENT(INOUT)::DFD
+		INTEGER,INTENT(IN)::FFT_DIR
+		INTEGER (MPI_CTL_KIND)::IERROR,comm
+		INTEGER::Nrecv,Ib,Jb,chunk
+		TYPE(BLOCK_TYPE),POINTER::block
+		REAL(REALPARM),POINTER::p_send(:),p_recv(:)
+		REAL(DOUBLEPARM)::time1,time2
+		TYPE(C_PTR)::cp
+		time1=MPI_WTIME()
+		DFD%timer(FFT_DIR)%N=DFD%timer(FFT_DIR)%N+1
+		block=>DFD%block(1)
+		p_send=>DFD%FFTW_TRANSPOSE%p_in
+		p_recv=>DFD%FFTW_TRANSPOSE%p_out
+		CALL DistributedFourierX(block,FFT_DIR)
+		CALL BlockTransposeXToY(block)
+!		p_send=>block%field_fft_y_out
+!		p_recv=>block%field_fft_y_in
+		chunk=block%chunk_len
+		comm=block%comm
+
+!		CALL MPI_ALLTOALL(p_send,chunk , MPI_DOUBLE_COMPLEX,&
+!					p_recv, chunk, MPI_DOUBLE_COMPLEX,&
+!					comm,  IERROR)
+!		CALL MPI_ALLTOALL(p_send,2*chunk, MPI_DOUBLE,&
+!				p_recv, 2*chunk, MPI_DOUBLE,&
+!				comm, IERROR)
+		CALL fftw_mpi_execute_r2r(DFD%FFTW_TRANSPOSE%plan,p_send,p_recv)
+
+		CALL DistributedFourierY(block,FFT_DIR)
+!		p_send=>block%field_fft_y_out
+!		p_recv=>block%field_fft_y_in
+!		CALL MPI_ALLTOALL(p_send,chunk , MPI_DOUBLE_COMPLEX,&
+!				p_recv, chunk, MPI_DOUBLE_COMPLEX,&
+!				comm, IERROR)
+
+!		CALL MPI_ALLTOALL(p_send,2*chunk, MPI_DOUBLE,&
+!				p_recv, 2*chunk, MPI_DOUBLE,&
+!				comm, IERROR)
+		CALL fftw_mpi_execute_r2r(DFD%FFTW_TRANSPOSE%plan,p_send,p_recv)
+		CALL BlockTransposeYToX(block)
+		time2=MPI_WTIME()
+		DFD%timer(FFT_DIR)%kernel_total=DFD%timer(FFT_DIR)%kernel_total+time2-time1
+	END SUBROUTINE
+
+	
 
 	SUBROUTINE DistributedFourierY(block,FFT_DIR)
 		TYPE(BLOCK_TYPE),POINTER,INTENT(INOUT)::block
@@ -325,7 +450,7 @@ MODULE DISTRIBUTED_FFT_MODULE
 		Ny=DFD%Ny_loc
 		Nc=DFD%Nc
 		!$OMP PARALLEL DEFAULT(SHARED), PRIVATE(Ic,Iy,Ix,l)
-		!$OMP DO SCHEDULE(GUIDED) COLLAPSE(2)
+		!$OMP DO SCHEDULE(GUIDED)! COLLAPSE(2)
 		DO Iy=1,Ny
 			DO Ix=1,Nx
 				DO Ic=1,Nc

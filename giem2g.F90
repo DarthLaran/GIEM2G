@@ -133,7 +133,6 @@ PROGRAM GIEMIEMG
 !		CALL MPI_FINALIZE(IERROR)
 !		STOP
 #endif
->>>>>>> 40c9c44... Hmm, it works.
 	real_comm=int_eq%fgmres_comm
 
 	CALL PrepareContinuationOperator(rc_op,anomaly,recvs,wcomm,threads_ok)
