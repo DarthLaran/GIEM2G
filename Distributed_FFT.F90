@@ -14,7 +14,8 @@ MODULE DISTRIBUTED_FFT_MODULE
 	INTEGER, PARAMETER, PUBLIC :: FFT_FWD=1!FFTW_FORWARD
 	INTEGER, PARAMETER, PUBLIC :: FFT_BWD=2!FFTW_BACKWARD
 
-	INTEGER(KIND=KIND(FFTW_PATIENT)), PARAMETER  :: FFT_CTL=IOR(FFTW_PATIENT,FFTW_DESTROY_INPUT )
+!	INTEGER(KIND=KIND(FFTW_PATIENT)), PARAMETER  :: FFT_CTL=IOR(FFTW_PATIENT,FFTW_DESTROY_INPUT )
+	INTEGER(KIND=KIND(FFTW_PATIENT)), PARAMETER  :: FFT_CTL=IOR(FFTW_MEASURE,FFTW_DESTROY_INPUT )
 !	INTEGER(KIND=KIND(FFTW_PATIENT)), PARAMETER  :: FFT_CTL=IOR(FFTW_EXHAUSTIVE,FFTW_DESTROY_INPUT )
 !	INTEGER(KIND=KIND(FFTW_PATIENT)), PARAMETER  :: FFT_CTL=IOR(FFTW_ESTIMATE,FFTW_DESTROY_INPUT )
 
@@ -139,10 +140,10 @@ MODULE DISTRIBUTED_FFT_MODULE
 
 		IF (DFD%me==0) THEN
 			PRINT'(A)' ,'Block distributed FFT plan calculations at 0 process:'
-			PRINT'(A ES10.2E3 )' ,'Forward along X', DFD%plans_time(1,FFT_FWD)
-			PRINT'(A ES10.2E3 )' ,'Forward along Y', DFD%plans_time(2,FFT_FWD)
-			PRINT'(A ES10.2E3 )' ,'Backward along X', DFD%plans_time(1,FFT_BWD)
-			PRINT'(A ES10.2E3 )' ,'Backward along Y', DFD%plans_time(2,FFT_BWD)
+			PRINT'(A, ES10.2E3 )' ,'Forward along X', DFD%plans_time(1,FFT_FWD)
+			PRINT'(A, ES10.2E3 )' ,'Forward along Y', DFD%plans_time(2,FFT_FWD)
+			PRINT'(A, ES10.2E3 )' ,'Backward along X', DFD%plans_time(1,FFT_BWD)
+			PRINT'(A, ES10.2E3 )' ,'Backward along Y', DFD%plans_time(2,FFT_BWD)
 		ENDIF
 		DFD%comm=comm
 	ENDSUBROUTINE
@@ -578,15 +579,15 @@ MODULE DISTRIBUTED_FFT_MODULE
 		max_overhead(2)=(max_times(8)-max_times(1)-max_times(2)-max_times(4)-max_times(6))/max_times(8)
 		IF (DFD%me==0) THEN
 			PRINT'(A80)','==================================================================================='
-			PRINT'(A I6 A)',"Block distributed FFT with ", DFD%Nb, " blocks"
+			PRINT'(A, I6, A)',"Block distributed FFT with ", DFD%Nb, " blocks"
 
 
 			IF (Nfwd/=0) THEN 
 				PRINT'(A80)','***********************************************************************************'
-				PRINT'(A I6)',"Number of forward Fourier transforms:", Nfwd
+				PRINT'(A, I6)',"Number of forward Fourier transforms:", Nfwd
 				PRINT info_fmt,"Forward total",max_times(7)*Nfwd," s ",variation(7), " % "
 				PRINT info_fmt,"Average kernel forward transform   ",max_times(7), " s ",variation(7), " % "
-				PRINT '(A36 F9.3 A3)',"Approximate overhead for forward ",max_overhead(1)*100, " % "
+				PRINT '(A36, F9.3, A3)',"Approximate overhead for forward ",max_overhead(1)*100, " % "
 
 				PRINT info_fmt,"Average forward transform along X  ",max_times(3), " s ",variation(3), " % "
 				PRINT info_fmt,"Average forward transform along Y  ",max_times(5), " s ",variation(5), " % "
@@ -597,11 +598,11 @@ MODULE DISTRIBUTED_FFT_MODULE
  
 			IF (Nbwd/=0) THEN 
 				PRINT'(A80)','***********************************************************************************'
-				PRINT'(A I6)',"Number of backward Fourier transforms:", Nbwd
+				PRINT'(A, I6)',"Number of backward Fourier transforms:", Nbwd
 
 				PRINT info_fmt,"Backward total",max_times(8)*Nbwd," s ",variation(8), " % "
 				PRINT info_fmt,"Average kernel backward transform  ",min_times(8), " s ",variation(8), " % "
-				PRINT '(A36 F9.3 A3)',"Approximate overhead for backward ",max_overhead(2)*100, " % "
+				PRINT '(A36, F9.3, A3)',"Approximate overhead for backward ",max_overhead(2)*100, " % "
 
 				PRINT info_fmt,"Average backward transform along X ",min_times(4), " s ",variation(4), " % " 
 				PRINT info_fmt,"Average backward transform along Y ",min_times(6), " s ",variation(6), " % "
