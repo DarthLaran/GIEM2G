@@ -4,7 +4,8 @@ MODULE RC_Kernel_Image_Module
 	USE APQ_Module
 
 	USE IntegralCodes
-	USE MPI_MODULE
+!	USE MPI_MODULE
+	USE Timer_Module 
 	IMPLICIT NONE	
 	PRIVATE
 	
@@ -56,7 +57,7 @@ MODULE RC_Kernel_Image_Module
 		REAL(KIND = RealParm) ::lm2,time1,time2
 		INTEGER::N,Nz
 		INTEGER:: Iz,l
-		time1=MPI_WTIME()
+		time1=GetTime()
 		lm2=lms*lms
 		CALL Calc_APQ(bkg,lms,Arr,p,q,eta,A)
 		DO Iz=1,anomaly%Nz
@@ -85,7 +86,7 @@ MODULE RC_Kernel_Image_Module
 !			CALL Calc_G_match(bkg,anomaly,A,p,eta,recv,N,Fb,G)
 			
 		ENDIF
-		time2=MPI_WTIME()
+		time2=GetTime()
 		calc_time(2)=calc_time(2)+time2-time1
 		DO Iz=1,anomaly%Nz
 !--------------------------------- G_E ----------------------------------------------!
@@ -117,7 +118,7 @@ MODULE RC_Kernel_Image_Module
 			G_H(RHZY,Iz)=G_H(RHZY,Iz)+G(G1,Iz)*WT(RC_DX)
 
 		END DO
-		time1=MPI_WTIME()
+		time1=GetTime()
 		calc_time(1)=calc_time(1)+time1-time2
 	END SUBROUTINE
 

@@ -8,6 +8,7 @@ MODULE DISTRIBUTED_FFT_MODULE
 	USE CONST_MODULE
 	USE FFTW3
 	USE MPI_MODULE
+	USE Timer_Module 
 	USE CHECK_MEMORY
 	IMPLICIT NONE
 	PRIVATE
@@ -159,16 +160,16 @@ MODULE DISTRIBUTED_FFT_MODULE
 		pNx(1)=x_shape(1)
 		dx=x_shape(1)
 		M=x_shape(2)*x_shape(3)
-		time1=MPI_WTIME()
+		time1=GetTime()
 		block%plan(FFT_FWD)%planX=fftw_plan_many_dft(ONE,pNx, M,block%field_fft_x_in,pNx,ONE,dx,&
 								block%field_fft_x_out,pNx,ONE,dx,&
 								&FFTW_FORWARD, FFT_CTL)
-		time2=MPI_WTIME()
+		time2=GetTime()
 		block%plans_time(1,FFT_FWD)=time2-time1
 		block%plan(FFT_BWD)%planX=fftw_plan_many_dft(ONE,pNx, M,block%field_fft_x_in,pNx,ONE,dx,&
 								block%field_fft_x_out,pNx,ONE,dx,&
 								&FFTW_BACKWARD, FFT_CTL)
-		time1=MPI_WTIME()
+		time1=GetTime()
 		block%plans_time(1,FFT_BWD)=time1-time2
 
 
@@ -179,13 +180,13 @@ MODULE DISTRIBUTED_FFT_MODULE
 								block%field_fft_y_out,pNy,M,ONE,&
 								&FFTW_FORWARD, FFT_CTL)
 
-		time2=MPI_WTIME()
+		time2=GetTime()
 		block%plans_time(2,FFT_FWD)=time2-time1
 
 		block%plan(FFT_BWD)%planY=fftw_plan_many_dft(ONE,pNy, M,block%field_fft_y_in,pNy,M,ONE,&
 								block%field_fft_y_out,pNy,M,ONE,&
 								&FFTW_BACKWARD, FFT_CTL)
-		time1=MPI_WTIME()
+		time1=GetTime()
 		block%plans_time(2,FFT_BWD)=time1-time2
 	ENDSUBROUTINE
 	
@@ -239,7 +240,7 @@ MODULE DISTRIBUTED_FFT_MODULE
 			CALL ProcessDistributedFourierKernelSync(DFD,FFT_DIR)
 			RETURN
 		ENDIF
-		time1=MPI_WTIME()
+		time1=GetTime()
 		recv1=.FALSE.
 		recv2=.FALSE.
 		recv2(DFD%Nb+1)=.TRUE.
@@ -292,7 +293,7 @@ MODULE DISTRIBUTED_FFT_MODULE
 			ENDDO
 			CALL	MPI_WAITSOME(DFD%Nb, y2x_requests, Nrecv,indices,MPI_STATUSES_IGNORE,IERROR)
 		ENDDO
-		time2=MPI_WTIME()
+		time2=GetTime()
 		DFD%timer(FFT_DIR)%kernel_total=DFD%timer(FFT_DIR)%kernel_total+time2-time1
 #endif
 	END SUBROUTINE
@@ -308,7 +309,7 @@ MODULE DISTRIBUTED_FFT_MODULE
 		REAL(REALPARM),POINTER::p_send(:),p_recv(:)
 		REAL(DOUBLEPARM)::time1,time2
 		TYPE(C_PTR)::cp
-		time1=MPI_WTIME()
+		time1=GetTime()
 		DFD%timer(FFT_DIR)%N=DFD%timer(FFT_DIR)%N+1
 		block=>DFD%block(1)
 		p_send=>DFD%FFTW_TRANSPOSE%p_in
@@ -340,7 +341,7 @@ MODULE DISTRIBUTED_FFT_MODULE
 !				comm, IERROR)
 		CALL fftw_mpi_execute_r2r(DFD%FFTW_TRANSPOSE%plan,p_send,p_recv)
 		CALL BlockTransposeYToX(block)
-		time2=MPI_WTIME()
+		time2=GetTime()
 		DFD%timer(FFT_DIR)%kernel_total=DFD%timer(FFT_DIR)%kernel_total+time2-time1
 	END SUBROUTINE
 
@@ -352,12 +353,12 @@ MODULE DISTRIBUTED_FFT_MODULE
 		COMPLEX(REALPARM),POINTER::pin(:,:,:),pout(:,:,:)
 		TYPE(C_PTR)::plan
 		REAL(DOUBLEPARM)::time1,time2
-		time1=MPI_Wtime()
+		time1=GetTime()
 		pin=>block%field_fft_y_in
 		pout=>block%field_fft_y_out
 		plan=block%plan(FFT_DIR)%planY
 		CALL fftw_execute_dft(plan,pin,pout)
-		time2=MPI_Wtime()
+		time2=GetTime()
 		block%timer(FFT_DIR)%ffty=block%timer(FFT_DIR)%ffty+time2-time1
 !		pout=pin
 	END SUBROUTINE
@@ -368,12 +369,12 @@ MODULE DISTRIBUTED_FFT_MODULE
 		COMPLEX(REALPARM),POINTER::pin(:,:,:),pout(:,:,:)
 		TYPE(C_PTR)::plan
 		REAL(DOUBLEPARM)::time1,time2
-		time1=MPI_Wtime()
+		time1=GetTime()
 		pin=>block%field_fft_x_in
 		pout=>block%field_fft_x_out
 		plan=block%plan(FFT_DIR)%planX
 		CALL fftw_execute_dft(plan,pin,pout)
-		time2=MPI_Wtime()
+		time2=GetTime()
 		block%timer(FFT_DIR)%fftx=block%timer(FFT_DIR)%fftx+time2-time1
 	END SUBROUTINE
 
@@ -434,7 +435,7 @@ MODULE DISTRIBUTED_FFT_MODULE
 		INTEGER::M
 		COMPLEX(REALPARM),POINTER::p_in(:),p_out(:,:,:)
 		REAL(DOUBLEPARM)::time1,time2
-		time1=MPI_Wtime()
+		time1=GetTime()
 		x_shape=SHAPE(block%field_fft_x_in)
 		y_shape=SHAPE(block%field_fft_y_in)
 		K=block%K
@@ -462,7 +463,7 @@ MODULE DISTRIBUTED_FFT_MODULE
 		ENDDO
 		!$OMP ENDDO
 		!$OMP END PARALLEL
-		time2=MPI_Wtime()
+		time2=GetTime()
 		block%timer(FFT_FWD)%x2y_transpose=time2-time1+block%timer(FFT_FWD)%x2y_transpose
 	END SUBROUTINE
 
@@ -475,7 +476,7 @@ MODULE DISTRIBUTED_FFT_MODULE
 		INTEGER::sK,dK,sI,dI,sL,dL,I2	
 		COMPLEX(REALPARM),POINTER::p_in(:),p_out(:,:,:)
 		REAL(DOUBLEPARM)::time1,time2
-		time1=MPI_Wtime()
+		time1=GetTime()
 		x_shape=SHAPE(block%field_fft_x_in)
 		y_shape=SHAPE(block%field_fft_y_in)
 
@@ -518,7 +519,7 @@ MODULE DISTRIBUTED_FFT_MODULE
 		ENDDO
 		!$OMP ENDDO
 		!$OMP END PARALLEL
-		time2=MPI_Wtime()
+		time2=GetTime()
 		block%timer(FFT_FWD)%y2x_transpose=time2-time1+block%timer(FFT_FWD)%y2x_transpose
 	END SUBROUTINE
 	SUBROUTINE PrintTimings(DFD,kernel_max)

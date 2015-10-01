@@ -3,7 +3,8 @@ MODULE IE_Kernel_Image_Module
 	USE DATA_TYPES_MODULE
 	USE APQ_Module
 	USE IntegralCodes
-	USE MPI_MODULE 
+!	USE MPI_MODULE
+	USE Timer_Module 
 	IMPLICIT NONE	
 	PRIVATE
 	
@@ -44,7 +45,7 @@ MODULE IE_Kernel_Image_Module
 		COMPLEX(REALPARM) ::f3wdxx,f3wdyy,f3wdxy
 		REAL(KIND = RealParm) ::lm2,time1,time2
 		INTEGER:: Iz,l
-		time1=MPI_WTIME()
+		time1=GetTime()
 		CALL Calc_APQ(bkg,lms,Arr,p,q,eta)
 		DO Iz=1,anomaly%Nz
 			l=anomaly%Lnumber(Iz)
@@ -56,12 +57,12 @@ MODULE IE_Kernel_Image_Module
 		CALL Calc_qexpz(bkg,anomaly,expz,eta,q,qez)
 		CALL Calc_bframe_q(bkg,anomaly,expz,eta,q,qez,fcont_b,b_frame)
 		CALL Calc_FtFb(bkg,anomaly,dz,expz,pez,qez,eta,Arr,Ft,Fb,GII)
-		time2=MPI_WTIME()
+		time2=GetTime()
 		calc_time(1)=calc_time(1)+time2-time1
 
 		lm2=lms*lms
 		DO Iz=1,anomaly%Nz
-			time1=MPI_WTIME()
+			time1=GetTime()
 			l=anomaly%Lnumber(Iz)
 			f1wdxx=GII(1,Iz)*WT(IE_DXX)*lm2
 			f1wdyy=GII(1,Iz)*WT(IE_DYY)*lm2
@@ -83,12 +84,12 @@ MODULE IE_Kernel_Image_Module
 			G(EYZ,Iz,Iz)=f2wdy/bkg%sigma(l)+G(EYZ,Iz,Iz)
 			G(EZZ,Iz,Iz)=f2wdzz+G(EZZ,Iz,Iz)
 
-			time2=MPI_WTIME()
+			time2=GetTime()
 			calc_time(1)=calc_time(1)+time2-time1
-			time1=MPI_WTIME()
+			time1=GetTime()
 			CALL GoByShellsU(Iz,anomaly%Nz,lm2,Ft(:,Iz),fcont_t,t_frame,WT,bkg%iwm,G)
 			CALL GoByShellsL(Iz,anomaly%Nz,Fb(Iz),fcont_b,b_frame,WT,G)
-			time2=MPI_WTIME()
+			time2=GetTime()
 			calc_time(2)=calc_time(2)+time2-time1
 		END DO
 	END SUBROUTINE

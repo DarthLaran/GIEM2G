@@ -4,6 +4,7 @@ MODULE IE_SOLVER_MODULE
 	USE MPI_MODULE
 	USE DATA_TYPES_MODULE
 	USE INTEGRAL_EQUATION_MODULE
+	USE Timer_Module 
 	IMPLICIT NONE
 	PRIVATE
 
@@ -23,16 +24,16 @@ MODULE IE_SOLVER_MODULE
 		INTEGER::tmp_shape(3)
 		INTEGER::Iz,Nz,Nx,Ny_loc
 		INTEGER(MPI_CTL_KIND)::IERROR
-		REAL(8)::time1,time2
+		REAL(DOUBLEPARM)::time1,time2
 		CHARACTER(LEN=*), PARAMETER  :: info_fmt = "(A, ES10.2E3)"
-		CALL MPI_BARRIER(int_eq%matrix_comm,IERROR)
+!		CALL MPI_BARRIER(int_eq%matrix_comm,IERROR)
 		IF (VERBOSE) THEN
 			IF (int_eq%master) THEN
 				PRINT'(A80)','***********************************************************************************'
 				PRINT*, 'Solver started'
 			ENDIF
 		ENDIF
-		time1=MPI_WTIME()
+		time1=GetTime()
 		Nx=int_eq%Nx
 		Nz=int_eq%Nz
 		Ny_loc=int_eq%Ny_loc
@@ -79,8 +80,8 @@ MODULE IE_SOLVER_MODULE
 			!$OMP END WORKSHARE
 			!$OMP END PARALLEL
 		ENDIF
-		CALL MPI_BARRIER(int_eq%matrix_comm,IERROR)
-		time2=MPI_WTIME()
+!		CALL MPI_BARRIER(int_eq%matrix_comm,IERROR)
+		time2=GetTime()
 		IF (VERBOSE) THEN
 			IF (int_eq%master) THEN
 				PRINT*,'Solver finished'
@@ -181,7 +182,7 @@ MODULE IE_SOLVER_MODULE
 		REAL(8)::time1,time2
 		REAL(8)::full_time
 		CHARACTER(LEN=*), PARAMETER  :: info_fmt = "(A, I6, A, ES10.2E2)"
-		full_time=MPI_Wtime()
+		full_time=GetTime()
 		int_eq%counter%mult_num=0
 		int_eq%counter%dotprod_num=0
 		int_eq%counter%apply=0d0
@@ -304,7 +305,7 @@ MODULE IE_SOLVER_MODULE
 							ENDIF
 							CALL APPLY_EQ_OP(int_eq,v_in2,v_out2)
 						CASE (DOTPROD)
-							time1=MPI_WTIME()
+							time1=GetTime()
 !							PRINT*,'dp1',nbscal2,int_eq%Nloc,colx2,coly2
 							CALL zgemv('C',int_eq%Nloc,nbscal2,C_ONE,&
 								&work_gmres(colx2:),int_eq%Nloc,&
@@ -313,7 +314,7 @@ MODULE IE_SOLVER_MODULE
 							CALL MPI_ALLREDUCE(aux,work_gmres(colz2:),nbscal2,&
 								&MPI_DOUBLE_COMPLEX,&
 							&MPI_SUM,comm_inner,IERROR)
-							time2=MPI_WTIME()
+							time2=GetTime()
 							int_eq%counter%dotprod_num=int_eq%counter%dotprod_num+nbscal2
 							int_eq%counter%dotprod=int_eq%counter%dotprod+time2-time1
 !							PRINT*,'dp2'
@@ -323,12 +324,12 @@ MODULE IE_SOLVER_MODULE
 				ENDDO
 				v_out=work_gmres(1:int_eq%Nloc)
 			CASE (DOTPROD)
-				time1=MPI_WTIME()
+				time1=GetTime()
 				CALL ZGEMV('C',int_eq%Nloc,nbscal,C_ONE,work_fgmres(colx:),&
 					&int_eq%Nloc,work_fgmres(coly:),ONE,C_ZERO,aux,ONE)
 				CALL MPI_ALLREDUCE(aux,work_fgmres(colz:),nbscal,&
 					&MPI_DOUBLE_COMPLEX,MPI_SUM,comm_outer,IERROR)
-				time2=MPI_WTIME()
+				time2=GetTime()
 				int_eq%counter%dotprod_num=int_eq%counter%dotprod_num+nbscal
 				int_eq%counter%dotprod=int_eq%counter%dotprod+time2-time1
 			CASE DEFAULT
@@ -347,7 +348,7 @@ MODULE IE_SOLVER_MODULE
 		DEALLOCATE(aux,work_fgmres,work_gmres)
 		CALL MPI_COMM_FREE(comm_inner,IERROR)
 		CALL MPI_COMM_FREE(comm_outer,IERROR)
-		full_time=MPI_WTIME()-full_time
+		full_time=GetTime()-full_time
 		int_eq%counter%solving=full_time
 		IF (info(1)==0) THEN
 			IF(int_eq%master) PRINT info_fmt,'FGMRES converged in', Nfgmres, &
@@ -370,7 +371,7 @@ MODULE IE_SOLVER_MODULE
 		REAL(8)::time1,time2
 		INTEGER::IERROR
 		INTEGER ::Ix,Iy,Iz,Ic,Ixy
-		time1=MPI_Wtime()
+		time1=GetTime()
 		field_in(1:int_eq%Nz,1:3,1:int_eq%Nx,1:int_eq%Ny_loc)=>v_in
 		field_out(1:int_eq%Nz,1:3,1:int_eq%Nx,1:int_eq%Ny_loc)=>v_out
 		DO Iy=1,int_eq%Ny_loc
@@ -413,7 +414,7 @@ MODULE IE_SOLVER_MODULE
 			!$OMP END PARALLEL
 		ENDDO
 !		PRINT*,int_eq%me,'out',v_out(1:5)
-		time2=MPI_WTIME()
+		time2=GetTime()
 		int_eq%counter%mult_num=int_eq%counter%mult_num+1
 		int_eq%counter%apply=int_eq%counter%apply+time2-time1
 	END SUBROUTINE
@@ -431,9 +432,9 @@ MODULE IE_SOLVER_MODULE
 		TYPE(IntegralEquation),INTENT(INOUT)::ie_op
 		INTEGER::Ixy,Nz
 		REAL(8)::time1,time2,time3,time4
-		time1=MPI_WTIME()
+		time1=GetTime()
 		CALL IE_OP_FFTW_FWD(ie_op)
-		time2=MPI_WTIME()
+		time2=GetTime()
 		ie_op%counter%mult_fftw=ie_op%counter%mult_fftw+time2-time1
 		!$OMP PARALLEL	PRIVATE(Ixy) DEFAULT(SHARED)
 		!$OMP DO SCHEDULE(GUIDED) 
@@ -452,9 +453,9 @@ MODULE IE_SOLVER_MODULE
 		ENDDO
 		!$OMP END DO
 		!$OMP END  PARALLEL
-		time3=MPI_WTIME()
+		time3=GetTime()
 		CALL IE_OP_FFTW_BWD(ie_op)
-		time4=MPI_WTIME()
+		time4=GetTime()
 !		PRINT*,ie_op%me,'Tj',ie_op%field_out4(:,EZ,:,:)
 		ie_op%counter%mult_fftw_b=ie_op%counter%mult_fftw_b+time4-time3
 		ie_op%counter%mult_zgemv=ie_op%counter%mult_zgemv+time3-time2

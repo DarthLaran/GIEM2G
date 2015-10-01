@@ -3,6 +3,7 @@ MODULE Calc_RC_Tensor_Module
 	USE FFTW3
 	USE MPI_MODULE
 
+	USE Timer_Module 
 	USE DATA_TYPES_MODULE
 	USE RC_Kernel_Image_Module
 	USE CONTINUATION_FUNCTION_MODULE
@@ -28,8 +29,8 @@ CONTAINS
 		REAL(8)::time(4),time_all
 		REAL(8)::time_max(4),time_min(4)
 		REAL(8)::time1,time2,time3,time4
-		CALL MPI_BARRIER(matrix%matrix_comm,IERROR)
-		time_all=MPI_WTIME()
+!		CALL MPI_BARRIER(matrix%matrix_comm,IERROR)
+		time_all=GetTime()
 		IF (VERBOSE) THEN
 			IF (matrix%master) THEN
 				PRINT'(A80)','***********************************************************************************'
@@ -101,7 +102,7 @@ CONTAINS
 		ENDDO
 		CALL MPI_REDUCE(time,time_min,4,MPI_DOUBLE,MPI_MIN,matrix%master_proc,matrix%matrix_comm,IERROR)
 		CALL MPI_REDUCE(time,time_max,4,MPI_DOUBLE,MPI_MAX,matrix%master_proc,matrix%matrix_comm,IERROR)
-		time_all=MPI_WTIME()-time_all
+		time_all=GetTime()-time_all
 		IF (matrix%master) THEN
 			matrix%counter%tensor_calc(COUNTER_ALL)=time_all	
 			matrix%counter%tensor_calc(COUNTER_WT)=time_max(1)	
@@ -144,12 +145,12 @@ CONTAINS
 		INTEGER::K,Iz,IERROR,I,Ik,Iz0,Ic,Iwt(6),Irecv
 		REAL(REALPARM2)::WT0(Nfirst:Nlast,1:6)
 		REAL(REALPARM2)::WT1(Nfirst:Nlast,1:6)
-		time3=MPI_Wtime()
+		time3=GetTime()
 		dx=anomaly%dx
 		dy=anomaly%dy
 		s=1d0/4.0_REALPARM/PI!*dx*dy
 		DO Irecv=1,Nr
-			time1=MPI_Wtime()
+			time1=GetTime()
 			x=lx*dx-dx/2d0+recvs(Irecv)%x_shift
 			y=ly*dy-dy/2d0+recvs(Irecv)%y_shift
 			r=SQRT(x*x+y*y)
@@ -162,7 +163,7 @@ CONTAINS
 			WT(:,RC_DY)=WT0(:,6)
 			W0=MAXVAL(ABS(WT));
 				   
-			time2=MPI_Wtime()
+			time2=GetTime()
 			calc_time(1)=calc_time(1)+time2-time1
 			G_E1=C_ZERO		
 			G_H1=C_ZERO		
@@ -182,7 +183,7 @@ CONTAINS
 			G_E(:,Irecv,:)=TRANSPOSE(G_E1)*s
 			G_H(:,Irecv,:)=TRANSPOSE(G_H1)*s
 		ENDDO
-		time2=MPI_WTIME()
+		time2=GetTime()
         calc_time(2)=calc_time(2)+time2-time3
 	END SUBROUTINE
 ENDMODULE

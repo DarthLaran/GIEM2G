@@ -13,6 +13,7 @@ PROGRAM GIEMIEMG
 	USE Calc_RC_Tensor_Module
 	USE CHECK_MEMORY
 
+	USE Timer_Module 
 
 	IMPLICIT NONE
 #define debug		 
@@ -46,8 +47,10 @@ PROGRAM GIEMIEMG
 	CHARACTER(len=1024),POINTER::anom_list(:)
 	INTEGER::Istr,Na,Ia
 	REAL(8)::time2
+	REAL(DOUBLEPARM)::tick
 !-------------------MPI INITIALIZATION-------------------------------------!
 	CALL MPI_INIT_THREAD(MPI_THREAD_FUNNELED, PROVIDED, IERROR)
+	CALL InitTimer
 	wcomm=MPI_COMM_WORLD
 	
 	CALL MPI_COMM_RANK(wcomm, me, IERROR)
@@ -81,6 +84,11 @@ PROGRAM GIEMIEMG
 		IF (me==0)	PRINT*,'Number of processes:',wsize
 		NT=OMP_GET_MAX_THREADS()
 		IF (me==0)	PRINT*,'Number of threads:',NT
+
+	tick=MPI_WTICK()
+	IF (me==0) THEN
+		PRINT*, 'Wtime resolution', tick
+	ENDIF
 
 	CALL  FFTW_MPI_INIT
 	freqs=>NULL()
@@ -198,21 +206,21 @@ PROGRAM GIEMIEMG
 
 
 			CALL SolveEquation(int_eq,fgmres_ctl)
-			CALL MPI_BARRIER(int_eq%matrix_comm,IERROR)
-			time2=MPI_WTIME()
+!			CALL MPI_BARRIER(int_eq%matrix_comm,IERROR)
+			time2=GetTime()
 			IF (int_eq%real_space) THEN
 !				CALL SaveIESolutionSeparateBinary(int_eq%Esol,int_eq%me,'SOL_PY_F'//trim(fnum1)//'T_'//trim(fnum2))
 				CALL SaveIESolutionOneFIleBinary(int_eq%Esol,real_comm,'SOL_PY_F'//trim(fnum1)//'T_'//trim(fnum2))
 			ENDIF
-			CALL MPI_BARRIER(int_eq%matrix_comm,IERROR)
-			time2=MPI_WTIME()-time2;
+!			CALL MPI_BARRIER(int_eq%matrix_comm,IERROR)
+			time2=GetTime()-time2;
 			IF (int_eq%master) THEN
 				PRINT*, "Save IE Solution in",time2, 's'
 			ENDIF
 
 			CALL ReCalculation(rc_op,int_eq%Esol,Ea,Ha)
-			CALL MPI_BARRIER(int_eq%matrix_comm,IERROR)
-			time2=MPI_WTIME()
+!			CALL MPI_BARRIER(int_eq%matrix_comm,IERROR)
+			time2=GetTime()
 			IF (int_eq%real_space) THEN
 
 				Et(:,EX,:,:)=Ea(:,EX,:,:)+FY(1,1,1,EX)
@@ -226,8 +234,8 @@ PROGRAM GIEMIEMG
 				CALL SaveOutputOneFile(Ea,Et,Ha,Ht,anomaly,recvs,freqs(Ifreq),real_comm,'PY_F'//trim(fnum1)//'T_'//trim(fnum2))
 				!CALL SaveOutputSeparate(Ea,Et,Ha,Ht,anomaly,recvs,freqs(Ifreq),rc_op%me,rc_op%Ny_offset,'PY_F'//trim(fnum1)//'T_'//trim(fnum2))
 			ENDIF
-			CALL MPI_BARRIER(int_eq%matrix_comm,IERROR)
-			time2=MPI_WTIME()-time2;
+!			CALL MPI_BARRIER(int_eq%matrix_comm,IERROR)
+			time2=GetTime()-time2;
 			IF (int_eq%master) THEN
 				PRINT*, "Save fields in",time2, 's'
 			ENDIF
@@ -238,21 +246,21 @@ PROGRAM GIEMIEMG
 			ENDIF
 
 			CALL SolveEquation(int_eq,fgmres_ctl)
-			CALL MPI_BARRIER(int_eq%matrix_comm,IERROR)
-			time2=MPI_WTIME()
+!			CALL MPI_BARRIER(int_eq%matrix_comm,IERROR)
+			time2=GetTime()
 			IF (int_eq%real_space) THEN
 				!CALL SaveIESolutionSeparateBinary(int_eq%Esol,int_eq%me,'SOL_PX_F'//trim(fnum1)//'T_'//trim(fnum2))
 				CALL SaveIESolutionOneFIleBinary(int_eq%Esol,real_comm,'SOL_PX_F'//trim(fnum1)//'T_'//trim(fnum2))
 			ENDIF
-			CALL MPI_BARRIER(int_eq%matrix_comm,IERROR)
-			time2=MPI_WTIME()-time2;
+!			CALL MPI_BARRIER(int_eq%matrix_comm,IERROR)
+			time2=GetTime()-time2;
 			IF (int_eq%master) THEN
 				PRINT*, "Save IE Solution in",time2, 's'
 			ENDIF
 			CALL ReCalculation(rc_op,int_eq%Esol,Ea,Ha)
 
-			CALL MPI_BARRIER(int_eq%matrix_comm,IERROR)
-			time2=MPI_WTIME()
+!			CALL MPI_BARRIER(int_eq%matrix_comm,IERROR)
+			time2=GetTime()
 			IF (int_eq%real_space) THEN
 
 				Et(:,EX,:,:)=Ea(:,EX,:,:)+FX(1,1,1,EX)
@@ -266,8 +274,8 @@ PROGRAM GIEMIEMG
 
 				CALL SaveOutputOneFile(Ea,Et,Ha,Ht,anomaly,recvs,freqs(Ifreq),real_comm,'PX_F'//trim(fnum1)//'T_'//trim(fnum2))
 			ENDIF
-			CALL MPI_BARRIER(int_eq%matrix_comm,IERROR)
-			time2=MPI_WTIME()-time2;
+!			CALL MPI_BARRIER(int_eq%matrix_comm,IERROR)
+			time2=GetTime()-time2;
 			IF (int_eq%master) THEN
 				PRINT*, "Save fields in",time2, 's'
 			ENDIF

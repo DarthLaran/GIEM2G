@@ -3,6 +3,7 @@ MODULE CONTINUATION_FUNCTION_MODULE
 	USE FFTW3
 	USE MPI_MODULE
 
+	USE Timer_Module 
 	USE DATA_TYPES_MODULE
 	IMPLICIT NONE
 	INTEGER,PARAMETER::COUNTER_ALL=1
@@ -124,14 +125,14 @@ CONTAINS
 		INTEGER::Nx
 		CHARACTER(LEN=*), PARAMETER  :: info_fmt = "(A, ES10.2E3)"
 		REAL(8)::time1,time2
-		CALL MPI_BARRIER(rc_op%matrix_comm,IERROR)
+!		CALL MPI_BARRIER(rc_op%matrix_comm,IERROR)
 		IF (VERBOSE) THEN
 			IF (rc_op%master) THEN
 				PRINT'(A80)','***********************************************************************************'
 				PRINT*, 'Recalculation started'
 			ENDIF
 		ENDIF
-		time1=MPI_WTIME()
+		time1=GetTime()
 		Nx=rc_op%Nx
 		IF (rc_op%real_space) THEN
 			!$OMP PARALLEL	DEFAULT(SHARED)
@@ -173,7 +174,7 @@ CONTAINS
 					Ea=>NULL()
 					Ha=>NULL()
 		ENDIF
-		time2=MPI_WTIME()
+		time2=GetTime()
 		IF (VERBOSE) THEN
 			IF (rc_op%master) THEN
 				PRINT*,'Recalculation finished'
@@ -274,8 +275,8 @@ CONTAINS
 		block=FFTW_MPI_DEFAULT_BLOCK
 		Nz3=3*rc_op%Nz
 		Nr3=3*rc_op%Nr
-		CALL MPI_BARRIER(rc_op%matrix_comm,IERROR)
-		time1=MPI_WTIME()
+!		CALL MPI_BARRIER(rc_op%matrix_comm,IERROR)
+		time1=GetTime()
 		IF (rc_op%fftw_threads_ok) THEN
 			NT=OMP_GET_MAX_THREADS()
 			FFTW_NT=NT
@@ -289,7 +290,7 @@ CONTAINS
 
 		rc_op%planBWD=fftw_mpi_plan_many_dft(FFTW_TWO,fftwsize,Nr3,block,block,&
 		&rc_op%field_out4,rc_op%field_out4,COMM, FFTW_BACKWARD ,FFTW_MEASURE)!FFTW_PATIENT);
-		time2=MPI_WTIME()
+		time2=GetTime()
 		rc_op%counter%plans=time2-time1
 		IF (VERBOSE) THEN
 			IF (rc_op%master) THEN
@@ -312,8 +313,8 @@ CONTAINS
 		
 		INTEGER(MPI_CTL_KIND)::IERROR
 		REAL(8)::time1,time2
-		CALL MPI_BARRIER(rc_op%matrix_comm,IERROR)
-		time1=MPI_WTIME()
+!		CALL MPI_BARRIER(rc_op%matrix_comm,IERROR)
+		time1=GetTime()
 		DO Ir=1,rc_op%Nr
 			rc_op%field_in4=rc_op%G_E_fftw(:,1:3,Ir,:,:)
 			CALL rc_op_FFTW_FWD(rc_op)
@@ -337,7 +338,7 @@ CONTAINS
 			CALL rc_op_FFTW_FWD(rc_op)
 			rc_op%G_H_fftw(:,5:7,Ir,:,:)=rc_op%field_in4
 		ENDDO
-		time2=MPI_WTIME()
+		time2=GetTime()
 		IF (VERBOSE) THEN
 			IF (rc_op%master) THEN
 				PRINT*, 'FFT of tensor has been computed: ',time2-time1 ,' s'
@@ -411,9 +412,9 @@ CONTAINS
 		INTEGER::Ixy
 		REAL(8)::time1,time2,time3,time4
 		COMPLEX(REALPARM),POINTER::G(:,:,:,:)
-		time1=MPI_WTIME()
+		time1=GetTime()
 		CALL RC_OP_FFTW_FWD(rc_op)
-		time2=MPI_WTIME()
+		time2=GetTime()
 		rc_op%counter%mult_fftw=rc_op%counter%mult_fftw+time2-time1
 		G=>rc_op%G_E4
 		!$OMP PARALLEL	PRIVATE(Ixy) DEFAULT(SHARED)
@@ -435,9 +436,9 @@ CONTAINS
 		ENDDO
 		!$OMP END DO
 		!$OMP END  PARALLEL
-		time3=MPI_WTIME()
+		time3=GetTime()
 		CALL RC_OP_FFTW_BWD(rc_op)
-		time4=MPI_WTIME()
+		time4=GetTime()
 		rc_op%counter%mult_fftw=rc_op%counter%mult_fftw+time4-time3
 		rc_op%counter%mult_zgemv=rc_op%counter%mult_zgemv+time3-time2
 	ENDSUBROUTINE
@@ -452,9 +453,9 @@ CONTAINS
                 INTEGER, PARAMETER :: HY=2
                 INTEGER, PARAMETER :: HZ=3
 		!------ ONLY IN THIS SUBROUTINE !!!!
-		time1=MPI_WTIME()
+		time1=GetTime()
 		CALL RC_OP_FFTW_FWD(rc_op)
-		time2=MPI_WTIME()
+		time2=GetTime()
 		rc_op%counter%mult_fftw=rc_op%counter%mult_fftw+time2-time1
 		G=>rc_op%G_H4
 		!$OMP PARALLEL	PRIVATE(Ixy) DEFAULT(SHARED)
@@ -474,9 +475,9 @@ CONTAINS
 		ENDDO
 		!$OMP END DO
 		!$OMP END  PARALLEL
-		time3=MPI_WTIME()
+		time3=GetTime()
 		CALL RC_OP_FFTW_BWD(rc_op)
-		time4=MPI_WTIME()
+		time4=GetTime()
 		rc_op%counter%mult_fftw=rc_op%counter%mult_fftw+time4-time3
 		rc_op%counter%mult_zgemv=rc_op%counter%mult_zgemv+time3-time2
 	ENDSUBROUTINE

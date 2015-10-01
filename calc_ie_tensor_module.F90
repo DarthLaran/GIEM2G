@@ -3,6 +3,7 @@ MODULE Calc_IE_Tensor_Module
 	USE FFTW3
 	USE MPI_MODULE
 
+	USE Timer_Module 
 	USE DATA_TYPES_MODULE
 	USE IE_Kernel_Image_Module
 	USE INTEGRAL_EQUATION_MODULE
@@ -40,8 +41,8 @@ CONTAINS
 		REAL(8)::time(4),time_all!,Wt_Threshold
 		REAL(8)::time_max(4),time_min(4)
 		REAL(8)::time1,time2,time3,time4
-		CALL MPI_BARRIER(matrix%matrix_comm,IERROR)
-		time_all=MPI_WTIME()
+!		CALL MPI_BARRIER(matrix%matrix_comm,IERROR)
+		time_all=GetTime()
                 requests(1:matrix%Ny_loc,1:4)=>all_requests
 		IF (VERBOSE) THEN
 			IF (matrix%master) THEN
@@ -195,7 +196,7 @@ CONTAINS
 		time(3)=time(2)-time(4) 
 		CALL MPI_REDUCE(time,time_min,4,MPI_DOUBLE,MPI_MIN,matrix%master_proc,matrix%matrix_comm,IERROR)
 		CALL MPI_REDUCE(time,time_max,4,MPI_DOUBLE,MPI_MAX,matrix%master_proc,matrix%matrix_comm,IERROR)
-		time_all=MPI_WTIME()-time_all
+		time_all=GetTime()-time_all
 		IF (matrix%master) THEN
 			matrix%counter%tensor_calc(COUNTER_ALL)=time_all	
 			matrix%counter%tensor_calc(COUNTER_WT)=time_max(1)	
@@ -236,7 +237,7 @@ CONTAINS
 		REAL(REALPARM2)::WT1(Nfirst:Nlast,1:6)
 		REAL(REALPARM)::x,y,lm,W0(1:6),Wm(1:6),time1,time2
 		INTEGER::K,Iz,IERROR,I,Ik,Iz0,Ic,Iwt(6)
-		time1=MPI_Wtime()
+		time1=GetTime()
 		dx=anomaly%dx
 		dy=anomaly%dy
 		x=lx*dx+dx/2d0
@@ -276,7 +277,7 @@ CONTAINS
 		ENDIF
 		W0(IE_D0)=maxval(ABS(WT(:,IE_D0)))
 		G1=C_ZERO		
-		time2=MPI_Wtime()
+		time2=GetTime()
 		calc_time(1)=calc_time(1)+time2-time1
 		time1=time2
 		DO K=Nfirst,Nlast
@@ -303,7 +304,7 @@ CONTAINS
 				G_symm(Iz0+Iz*(Iz-1)/2,S_EZZ)=G1(EZZ,Iz0,Iz)/PI/4.0_REALPARM
 			ENDDO
 		ENDDO
-		time2=MPI_WTIME()
+		time2=GetTime()
 		calc_time(2)=calc_time(2)+time2-time1
 	END SUBROUTINE
 ENDMODULE

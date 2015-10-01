@@ -3,6 +3,7 @@ MODULE INTEGRAL_EQUATION_MODULE
 	USE FFTW3
 	USE MPI_MODULE
 
+	USE Timer_Module 
 	USE DATA_TYPES_MODULE
 	USE DISTRIBUTED_FFT_MODULE
 
@@ -284,14 +285,14 @@ CONTAINS
 !		INTEGER::nt
 		INTEGER(FFTW_COMM_SIZE)::COMM, FFTW_NT
 		REAL(8)::time1,time2
-		CALL MPI_BARRIER(ie_op%matrix_comm,IERROR)
-		time1=MPI_WTIME()
+!		CALL MPI_BARRIER(ie_op%matrix_comm,IERROR)
+		time1=GetTime()
 		IF (ie_op%fftw_threads_ok) THEN
 			NT=OMP_GET_MAX_THREADS()
 			FFTW_NT=NT
 			CALL FFTW_PLAN_WITH_NTHREADS(FFTW_NT)
 		ENDIF
-		time2=MPI_WTIME()
+		time2=GetTime()
 		!CALL CreateAllPlans(ie_op%DFD)
 		ie_op%counter%plans=time2-time1
 		IF (VERBOSE) THEN
@@ -314,8 +315,8 @@ CONTAINS
 		INTEGER::Is1,Ia1
 		INTEGER(MPI_CTL_KIND)::IERROR
 		   REAL(8)::time1,time2
-		   CALL MPI_BARRIER(ie_op%matrix_comm,IERROR)
-		   time1=MPI_WTIME()
+!		   CALL MPI_BARRIER(ie_op%matrix_comm,IERROR)
+		   time1=GetTime()
 		Is=1
 		Ia=1
 		ie_op%field_in4=C_ZERO
@@ -395,7 +396,7 @@ CONTAINS
 			CALL IE_OP_FFTW_FWD(ie_op) 
 			ie_op%G_symm_fftw(:,1:2,Is,:,:)=ie_op%field_out4(:,1:2,:,:)
 		ENDIF
-		time2=MPI_WTIME()
+		time2=GetTime()
 		IF (VERBOSE) THEN
 			IF (ie_op%master) THEN
 				PRINT*, 'FFT of tensor has been computed: ',time2-time1 ,' s'
