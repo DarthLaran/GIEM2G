@@ -316,25 +316,15 @@ MODULE DISTRIBUTED_FFT_MODULE
 		p_recv=>DFD%FFTW_TRANSPOSE%p_out
 		CALL DistributedFourierX(block,FFT_DIR)
 		CALL BlockTransposeXToY(block)
-!		p_send=>block%field_fft_y_out
-!		p_recv=>block%field_fft_y_in
 		chunk=block%chunk_len
 		comm=block%comm
 
-!		CALL MPI_ALLTOALL(p_send,chunk , MPI_DOUBLE_COMPLEX,&
-!					p_recv, chunk, MPI_DOUBLE_COMPLEX,&
-!					comm,  IERROR)
 !		CALL MPI_ALLTOALL(p_send,2*chunk, MPI_DOUBLE,&
 !				p_recv, 2*chunk, MPI_DOUBLE,&
 !				comm, IERROR)
 		CALL fftw_mpi_execute_r2r(DFD%FFTW_TRANSPOSE%plan,p_send,p_recv)
 
 		CALL DistributedFourierY(block,FFT_DIR)
-!		p_send=>block%field_fft_y_out
-!		p_recv=>block%field_fft_y_in
-!		CALL MPI_ALLTOALL(p_send,chunk , MPI_DOUBLE_COMPLEX,&
-!				p_recv, chunk, MPI_DOUBLE_COMPLEX,&
-!				comm, IERROR)
 
 !		CALL MPI_ALLTOALL(p_send,2*chunk, MPI_DOUBLE,&
 !				p_recv, 2*chunk, MPI_DOUBLE,&
@@ -389,7 +379,7 @@ MODULE DISTRIBUTED_FFT_MODULE
 		Ny=DFD%Ny_loc
 		Nc=DFD%Nc
 		!$OMP PARALLEL DEFAULT(SHARED), PRIVATE(Ic,Iy,Ix,l)
-		!$OMP DO SCHEDULE(GUIDED)
+		!$OMP DO SCHEDULE(GUIDED) COLLAPSE(3)
 		DO Ic=1,Nc
 			DO Iy=1,Ny
 				DO Ix=1,Nx
@@ -413,7 +403,7 @@ MODULE DISTRIBUTED_FFT_MODULE
 		Ny=DFD%Ny_loc
 		Nc=DFD%Nc
 		!$OMP PARALLEL DEFAULT(SHARED), PRIVATE(Ic,Iy,Ix,l)
-		!$OMP DO SCHEDULE(GUIDED)! COLLAPSE(2)
+		!$OMP DO SCHEDULE(GUIDED) COLLAPSE(3)
 		DO Iy=1,Ny
 			DO Ix=1,Nx
 				DO Ic=1,Nc
