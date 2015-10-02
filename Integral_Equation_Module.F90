@@ -133,9 +133,6 @@ CONTAINS
 			ie_op%fftw_threads_ok=.FALSE.
 		ENDIF
 		
-!		PRINT*,'!!  222  !!'
-!		CALL MPI_COMM_DUP(mcomm,tt,IERROR)
-!		PRINT*,'?? dddd  ??'
 
 		IF (ie_op%fftw_threads_ok) THEN
 			NT=OMP_GET_MAX_THREADS()
@@ -145,17 +142,15 @@ CONTAINS
 #ifdef LEGACY_MPI
 		Nopt=1
 #else
-		CALL TestBlocksNumber(ie_op%DFD,Nx2,Ny2,Nc,comm,Nb,Nopt)
-!		Nopt=Nb
+		IF (Nb/=1) THEN
+			CALL TestBlocksNumber(ie_op%DFD,Nx2,Ny2,Nc,comm,Nb,Nopt)
+		ELSE
+			Nopt=1
+		ENDIF
 #endif
 		CALL PrepareDistributedFourierData(ie_op%DFD,Nx2,Ny2,Nc,comm,Nopt)
 		IF (VERBOSE) THEN
 			IF (ie_op%master) THEN
-!				PRINT'(A)' ,'Block distributed FFT plan calculations:'
-!				PRINT'(A ES10.2E3 )' ,'Forward along X', ie_op%DFD%plans_time(1,FFT_FWD)
-!				PRINT'(A ES10.2E3 )' ,'Forward along Y', ie_op%DFD%plans_time(2,FFT_FWD)
-!				PRINT'(A ES10.2E3 )' ,'Backward along X', ie_op%DFD%plans_time(1,FFT_BWD)
-!				PRINT'(A ES10.2E3 )' ,'Backward along Y', ie_op%DFD%plans_time(2,FFT_BWD)
 			ENDIF
 		ENDIF
 		CALL PrepareOperatorIE_OP(ie_op)
@@ -275,32 +270,7 @@ CONTAINS
 		ie_op%field_out3(1:Nz,1:3,1:Nx2Ny_loc)=>ie_op%DFD%field_out
 
 	ENDSUBROUTINE
-	SUBROUTINE CalcFFTWPlansIE_OP(ie_op)
-		TYPE(IntegralEquation),INTENT(INOUT)::ie_op
-		INTEGER(C_INTPTR_T)::fftwsize(2)
-		INTEGER(C_INTPTR_T)::Nz3
-		INTEGER(C_INTPTR_T)::block
-		INTEGER(MPI_CTL_KIND)::IERROR
-		INTEGER::omp_get_max_threads,nt
-!		INTEGER::nt
-		INTEGER(FFTW_COMM_SIZE)::COMM, FFTW_NT
-		REAL(8)::time1,time2
-!		CALL MPI_BARRIER(ie_op%matrix_comm,IERROR)
-		time1=GetTime()
-		IF (ie_op%fftw_threads_ok) THEN
-			NT=OMP_GET_MAX_THREADS()
-			FFTW_NT=NT
-			CALL FFTW_PLAN_WITH_NTHREADS(FFTW_NT)
-		ENDIF
-		time2=GetTime()
-		!CALL CreateAllPlans(ie_op%DFD)
-		ie_op%counter%plans=time2-time1
-		IF (VERBOSE) THEN
-			IF (ie_op%master) THEN
-				PRINT*,'FFTW3 plan calculations:', time2-time1,'s'
-			ENDIF
-		ENDIF
-	ENDSUBROUTINE
+
 	SUBROUTINE IE_OP_FFTW_FWD(ie_op)
 		TYPE(IntegralEquation),INTENT(INOUT)::ie_op
 		CALL	CalcDistributedFourier(ie_op%DFD,FFT_FWD)

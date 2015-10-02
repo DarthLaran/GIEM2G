@@ -2,9 +2,9 @@ MODULE CONTINUATION_FUNCTION_MODULE
 	USE CONST_MODULE
 	USE FFTW3
 	USE MPI_MODULE
-
 	USE Timer_Module 
 	USE DATA_TYPES_MODULE
+	USE DISTRIBUTED_FFT_MODULE
 	IMPLICIT NONE
 	INTEGER,PARAMETER::COUNTER_ALL=1
 	INTEGER,PARAMETER::COUNTER_WT=2
@@ -56,16 +56,21 @@ MODULE CONTINUATION_FUNCTION_MODULE
 		REAL(REALPARM),POINTER ::dsig(:,:,:)
 		LOGICAL::real_space
 		LOGICAL::fftw_threads_ok
+		TYPE(DistributedFourierData)::DFD_Current
+		TYPE(DistributedFourierData)::DFD_Result
 	  ENDTYPE
 CONTAINS
-	SUBROUTINE PrepareContinuationOperator(rc_op,anomaly,recvs,mcomm,fftw_threads_ok)
+	SUBROUTINE PrepareContinuationOperator(rc_op,anomaly,recvs,mcomm,fftw_threads_ok,DFD)
 		TYPE(RC_OPERATOR),INTENT(INOUT)::rc_op
 		TYPE (ANOMALY_TYPE),INTENT(INOUT)::anomaly
 		TYPE (RECEIVER_TYPE),POINTER,INTENT(IN)::recvs(:)
 		INTEGER(MPI_CTL_KIND),INTENT(IN)::mcomm 
 		LOGICAL,OPTIONAL,INTENT(IN)::fftw_threads_ok
+		TYPE (DistributedFourierData),OPTIONAL,INTENT(INOUT)::DFD
 		INTEGER::Nx,Ny,Nz
+		INTEGER::Nx2,Ny2,Nc,Nr3,Nopt
 		INTEGER(MPI_CTL_KIND)::comm_size,IERROR,me
+		INTEGER::NT,OMP_GET_MAX_THREADS
 		Nx=anomaly%Nx
 		Ny=anomaly%Ny
 		Nz=anomaly%Nz
@@ -74,6 +79,10 @@ CONTAINS
 		rc_op%Nz=Nz
 		rc_op%Nr=SIZE(recvs)
 		rc_op%recvs=>recvs
+		Nc=3*Nz
+		Nr3=3*rc_op%Nr
+		Nx2=2*Nx
+		Ny2=2*Ny
 		rc_op%matrix_comm=mcomm
 		CALL MPI_COMM_RANK(mcomm, me, IERROR)
 		CALL MPI_COMM_SIZE(mcomm,comm_size,IERROR) 
@@ -95,9 +104,27 @@ CONTAINS
 		ELSE
 			rc_op%fftw_threads_ok=.FALSE.
 		ENDIF
+		IF (rc_op%fftw_threads_ok) THEN
+			NT=OMP_GET_MAX_THREADS()
+			CALL FFTW_PLAN_WITH_NTHREADS(NT)
+			IF (rc_op%master) PRINT* ,'MULTITHREADED FFTW'
+		ENDIF
+		IF (PRESENT(DFD)) THEN
+			rc_op%DFD_Current=DFD
+			Nopt=DFD%Nb
+		ELSE
+#ifdef LEGACY_MPI
+		Nopt=1
+#else
+!		CALL TestBlocksNumber(rc_op%DFD,Nx2,Ny2,Nc,comm,Nb,Nopt)
+		Nopt=1
+#endif
+			CALL PrepareDistributedFourierData(rc_op%DFD_Current,Nx2,Ny2,Nc,mcomm,Nopt)
+		ENDIF
+		CALL PrepareDistributedFourierData(rc_op%DFD_Result,Nx2,Ny2,Nr3,mcomm,Nopt)
+
 		CALL CalcSizesForRC_OP(rc_op)
 		CALL AllocateRC_OP(rc_op)
-		CALL CalcFFTWPlansRC_OP(rc_op)
 		IF (rc_op%Ny_offset >= Ny) THEN	  
 			rc_op%real_space=.FALSE.
 		ELSE
@@ -194,24 +221,18 @@ CONTAINS
 		INTEGER(FFTW_COMM_SIZE)::COMM
 		REAL(REALPARM)::size_g
 		REAL(REALPARM)::tensor_size
-		tsize8=(/rc_op%Ny*2,rc_op%Nx*2/)
 		
 		COMM=rc_op%matrix_comm
-		block=FFTW_MPI_DEFAULT_BLOCK!(0)
 !----------------------------------------------------------------------------------------------------------!
 		Nz3=rc_op%Nz*3
-		rc_op%localsize_in = fftw_mpi_local_size_many(FFTW_TWO,tsize8,Nz3,block,COMM, &
-			& CNy, CNy_offset)
-		rc_op%Ny_loc=INT(CNy,KIND(rc_op%Ny_loc))
-		rc_op%Ny_offset=INT(CNy_offset,KIND(rc_op%Ny_offset))
+		rc_op%Ny_loc=rc_op%DFD_Current%Ny_loc
+		rc_op%Ny_offset=rc_op%me*rc_op%Ny_loc
+
 		rc_op%Nx2=rc_op%Nx*2
 		rc_op%Nx2Ny_loc=rc_op%Nx2*rc_op%Ny_loc
 		rc_op%Nx2Ny2=rc_op%Nx*rc_op%Ny*4
 
 		Nr3=rc_op%Nr*3
-		rc_op%localsize_out = fftw_mpi_local_size_many(FFTW_TWO,tsize8,Nr3,block,COMM, &
-			& CNy, CNy_offset)
-
 
 		size_g=rc_op%Nx2Ny_loc*rc_op%Nz*rc_op%Nr*15.0*REALPARM/1024/1024/1024
 		IF (VERBOSE) THEN
@@ -250,62 +271,27 @@ CONTAINS
 	SUBROUTINE AllocateRC_OP(rc_op)
 		TYPE(rc_operator),INTENT(INOUT)::rc_op
 		INTEGER::shape4(4),shape3(3)
+		INTEGER::Nx2,Nz,Ny_loc,Nx2Ny_loc,Nr
 		CALL AllocateRCMatrix(rc_op)
-		rc_op%p_in=fftw_alloc_complex(rc_op%localsize_in)
-		rc_op%p_out=fftw_alloc_complex(rc_op%localsize_out)
-		shape4=(/rc_op%Nz,3,rc_op%Nx2,rc_op%Ny_loc/)
-		shape3=(/rc_op%Nz,3,rc_op%Nx2Ny_loc/)
-		CALL c_f_pointer(rc_op%p_in,rc_op%field_in4, shape4)
-		CALL c_f_pointer(rc_op%p_in,rc_op%field_in3, shape3)
-		shape4=(/rc_op%Nr,3,rc_op%Nx2,rc_op%Ny_loc/)
-		shape3=(/rc_op%Nr,3,rc_op%Nx2Ny_loc/)
-		CALL c_f_pointer(rc_op%p_out,rc_op%field_out4, shape4)
-		CALL c_f_pointer(rc_op%p_out,rc_op%field_out3, shape3)
-	ENDSUBROUTINE
-	SUBROUTINE CalcFFTWPlansRC_OP(rc_op)
-		TYPE(rc_operator),INTENT(INOUT)::rc_op
-		INTEGER(C_INTPTR_T)::fftwsize(2)
-		INTEGER(C_INTPTR_T)::Nz3,Nr3
-		INTEGER(C_INTPTR_T)::block
-		INTEGER(MPI_CTL_KIND)::IERROR
-		INTEGER::omp_get_max_threads,nt
-		INTEGER(FFTW_COMM_SIZE)::COMM, FFTW_NT
-		REAL(8)::time1,time2
-		fftwsize=(/rc_op%Ny*2,rc_op%Nx*2/)
-		block=FFTW_MPI_DEFAULT_BLOCK
-		Nz3=3*rc_op%Nz
-		Nr3=3*rc_op%Nr
-!		CALL MPI_BARRIER(rc_op%matrix_comm,IERROR)
-		time1=GetTime()
-		IF (rc_op%fftw_threads_ok) THEN
-			NT=OMP_GET_MAX_THREADS()
-			FFTW_NT=NT
-			CALL FFTW_PLAN_WITH_NTHREADS(FFTW_NT)
-		ENDIF
-		COMM=rc_op%matrix_comm
-!		 CALL fftw_set_timelimit(5d0)
-				 
-		rc_op%planFWD=fftw_mpi_plan_many_dft(FFTW_TWO,fftwsize,Nz3,block,block,&
-		&rc_op%field_in4,rc_op%field_in4,COMM, FFTW_FORWARD ,FFTW_MEASURE)!FFTW_PATIENT);
+		Nz=rc_op%Nz
+		Nx2=rc_op%Nx2
+		Ny_loc=rc_op%Ny_loc
+		Nx2Ny_loc=rc_op%Nx2Ny_loc
+		Nr=rc_op%Nr
+		
+		rc_op%field_in4(1:Nz,1:3,1:Nx2,1:Ny_loc)=>rc_op%DFD_Current%field_out
+		rc_op%field_in3(1:Nz,1:3,1:Nx2Ny_loc)=>rc_op%DFD_Current%field_out
 
-		rc_op%planBWD=fftw_mpi_plan_many_dft(FFTW_TWO,fftwsize,Nr3,block,block,&
-		&rc_op%field_out4,rc_op%field_out4,COMM, FFTW_BACKWARD ,FFTW_MEASURE)!FFTW_PATIENT);
-		time2=GetTime()
-		rc_op%counter%plans=time2-time1
-		IF (VERBOSE) THEN
-			IF (rc_op%master) THEN
-				PRINT*,'FFTW3 plan calculations:', time2-time1,'s'
-			ENDIF
-		ENDIF
+		rc_op%field_out4(1:Nr,1:3,1:Nx2,1:Ny_loc)=>rc_op%DFD_Result%field_in
+		rc_op%field_out3(1:Nr,1:3,1:Nx2Ny_loc)=>rc_op%DFD_Result%field_in
 	ENDSUBROUTINE
 	SUBROUTINE RC_OP_FFTW_FWD(rc_op)
 		TYPE(rc_operator),INTENT(INOUT)::rc_op
-		CALL fftw_mpi_execute_dft(rc_op%planFWD,rc_op%field_in4,rc_op%field_in4)
+		CALL	CalcDistributedFourier(rc_op%DFD_Current,FFT_FWD)
 	ENDSUBROUTINE
 	SUBROUTINE RC_OP_FFTW_BWD(rc_op)
 		TYPE(rc_operator),INTENT(INOUT)::rc_op
-		CALL fftw_mpi_execute_dft(rc_op%planBWD,rc_op%field_out4,rc_op%field_out4)
-		rc_op%field_out4=rc_op%field_out4/rc_op%Nx2Ny2
+		CALL	CalcDistributedFourier(rc_op%DFD_Result,FFT_BWD)
 	ENDSUBROUTINE
 	SUBROUTINE CalcFFTofRCTensor(rc_op)
 		TYPE(rc_operator),INTENT(INOUT)::rc_op
@@ -313,7 +299,7 @@ CONTAINS
 		
 		INTEGER(MPI_CTL_KIND)::IERROR
 		REAL(8)::time1,time2
-!		CALL MPI_BARRIER(rc_op%matrix_comm,IERROR)
+!!!! ----------------------ATTENTION DIRTY TRICK with output of CalcDistributedFourier(rc_op%DFD_Result,FFT_BWD) -----------!!!!
 		time1=GetTime()
 		DO Ir=1,rc_op%Nr
 			rc_op%field_in4=rc_op%G_E_fftw(:,1:3,Ir,:,:)
@@ -366,9 +352,9 @@ CONTAINS
 		rc_op%field_in3=>NULL()
 		rc_op%field_out4=>NULL()
 		rc_op%field_out3=>NULL()
-		CALL fftw_destroy_plan(rc_op%planFwd)
-		CALL fftw_destroy_plan(rc_op%planBwd)
 		CALL DeleteMatrix(rc_op)
+		CALL DeleteDistributedFourierData(rc_op%DFD_Current)
+		CALL DeleteDistributedFourierData(rc_op%DFD_Result)
 	ENDSUBROUTINE
 
 	SUBROUTINE SetSigbRC(rc_op,anomaly,bkg)

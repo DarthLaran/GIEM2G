@@ -231,11 +231,8 @@ MODULE DISTRIBUTED_FFT_MODULE
 		TYPE (DistributedFourierData),INTENT(INOUT)::DFD
 		INTEGER,INTENT(IN)::FFT_DIR
                 CALL InitialTranspose(DFD)
-!		print*,'after init'
 	        CALL ProcessDistributedFourierKernel(DFD,FFT_DIR)
-!		print*,'after kernel'
                 CALL FinalTranspose(DFD)
-!		print*,'after fin'
                 IF (FFT_DIR/=FFT_BWD) THEN
                         DFD%field_load_out=DFD%field_load_in
                 ELSE
@@ -722,27 +719,30 @@ MODULE DISTRIBUTED_FFT_MODULE
 		TYPE (DistributedFourierData),TARGET,INTENT(INOUT)::DFD
 		INTEGER::Ib
 		INTEGER(MPI_CTL_KIND)::IERROR
-		IF ((DFD%Nb/=0).AND.ASSOCIATED(DFD%Block)) THEN
-			DO Ib=1,DFD%Nb
-				CALL	fftw_destroy_plan(DFD%block(Ib)%plan(FFT_FWD)%planX);	
-				CALL	fftw_destroy_plan(DFD%block(Ib)%plan(FFT_FWD)%planY);	
-				CALL	fftw_destroy_plan(DFD%block(Ib)%plan(FFT_BWD)%planX);	
-				CALL	fftw_destroy_plan(DFD%block(Ib)%plan(FFT_BWD)%planY);
-				CALL MPI_COMM_FREE(DFD%block(Ib)%comm,IERROR)	
-			ENDDO
-			DEALLOCATE(DFD%block)
-		ELSEIF (ASSOCIATED(DFD%FFTW_TRANSFORM)) THEN
-			CALL	fftw_destroy_plan(DFD%FFTW_TRANSFORM%plan_Fwd);	
-			CALL	fftw_destroy_plan(DFD%FFTW_TRANSFORM%plan_Bwd);	
+		IF (DFD%Nb>0) THEN
+			IF ((DFD%Nb/=0).AND.ASSOCIATED(DFD%Block)) THEN
+				DO Ib=1,DFD%Nb
+					CALL	fftw_destroy_plan(DFD%block(Ib)%plan(FFT_FWD)%planX);	
+					CALL	fftw_destroy_plan(DFD%block(Ib)%plan(FFT_FWD)%planY);	
+					CALL	fftw_destroy_plan(DFD%block(Ib)%plan(FFT_BWD)%planX);	
+					CALL	fftw_destroy_plan(DFD%block(Ib)%plan(FFT_BWD)%planY);
+					CALL MPI_COMM_FREE(DFD%block(Ib)%comm,IERROR)	
+				ENDDO
+				DEALLOCATE(DFD%block)
+			ELSEIF (ASSOCIATED(DFD%FFTW_TRANSFORM)) THEN
+				CALL	fftw_destroy_plan(DFD%FFTW_TRANSFORM%plan_Fwd);	
+				CALL	fftw_destroy_plan(DFD%FFTW_TRANSFORM%plan_Bwd);	
+			ENDIF
+			CALL fftw_free(DFD%p_in)
+			CALL fftw_free(DFD%p_out)
+			DFD%block=>NULL()
+			DFD%field_in=>NULL()
+			DFD%field_out=>NULL()
+			DFD%field_load_in=>NULL()
+			DFD%field_load_out=>NULL()
+			DFD%FFTW_TRANSFORM=>NULL()
+			DFD%Nb=-1
 		ENDIF
-		CALL fftw_free(DFD%p_in)
-		CALL fftw_free(DFD%p_out)
-		DFD%block=>NULL()
-		DFD%field_in=>NULL()
-		DFD%field_out=>NULL()
-		DFD%field_load_in=>NULL()
-		DFD%field_load_out=>NULL()
-		DFD%FFTW_TRANSFORM=>NULL()
 	ENDSUBROUTINE
 	
 	SUBROUTINE TestBlocksNumber(DFD,Nx,Ny,Nc,comm,Nbmax,Nopt)
@@ -777,9 +777,10 @@ MODULE DISTRIBUTED_FFT_MODULE
 			CALL MPI_BCAST(Nopt,1,MPI_INTEGER,0,comm, IERROR)
 		ENDIF
 	END SUBROUTINE
-	SUBROUTINE PrepareDFDLocal(DFD,Nx,Ny,Nc,Np,Nb,alloc_mem)
+	SUBROUTINE PrepareDFDLocal(DFD,Nx,Ny,Nc,Np,Nb,OptTrans,alloc_mem)
 		TYPE (DistributedFourierData),TARGET,INTENT(INOUT)::DFD
 		INTEGER,INTENT(IN)::Nx,Ny,Nc,Nb,Np
+		LOGICAL,INTENT(IN)::OptTrans
 		LOGICAL,OPTIONAL,INTENT(IN)::alloc_mem
 		INTEGER::Ny_loc
 		INTEGER::M,Lblock,My
@@ -914,6 +915,7 @@ MODULE DISTRIBUTED_FFT_MODULE
 		
 		DFD%timer(FFT_BWD)%kernel_total=0d0
 !-----------------------------------------------------------------------------!
+		
 		CALL SetOptimalTranspose(DFD)
 		
 	ENDSUBROUTINE

@@ -85,10 +85,14 @@ PROGRAM GIEMIEMG
 		NT=OMP_GET_MAX_THREADS()
 		IF (me==0)	PRINT*,'Number of threads:',NT
 
-	tick=MPI_WTICK()
+
+#ifdef performance_test
 	IF (me==0) THEN
-		PRINT*, 'Wtime resolution', tick
+		PRINT'(A)','PERFORMACE TEST'
+		PRINT'(A)','NO ANOMALY LOADING'
+		PRINT'(A)','NO RESULT STORAGE'
 	ENDIF
+#endif
 
 	CALL  FFTW_MPI_INIT
 	freqs=>NULL()
@@ -111,39 +115,15 @@ PROGRAM GIEMIEMG
 	sig2(2)=.01d0/3.d0
 	sig2(3)=.01d0/10
 	
-!	CALL SliceAnomaly(anomaly,bkg,0d0,10000d0,N)
 	CALL PrepareRecvs(recvs,anomaly,bkg)
 	IF (me==0) PRINT'(A80)','%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%'
 	IF (me==0) PRINT*, 'Nx=',anomaly%Nx, 'Ny=',anomaly%Ny,'Nz=',anomaly%Nz
-	CALL PrepareIntegralEquation(int_eq,anomaly,wcomm,threads_ok,6)
+	CALL PrepareIntegralEquation(int_eq,anomaly,wcomm,threads_ok,1)
 	IF (me==0) PRINT*, 'Number of blocks in async FFT', int_eq%DFD%Nb
  
-#ifdef test2
-		int_eq%DFD%field_out=0d0
-		int_eq%DFD%field_load_in=(1d0,-246d0)
-                IF (me==0) THEN
-        		int_eq%DFD%field_load_in(1,1,1)=(-119d0,0d0)
-        		int_eq%DFD%field_load_in(1,1,2:)=(239d0,0d0)
-                       	int_eq%DFD%field_load_in(1,2:,:)=(11d0,0d0)
-                ELSE
-        		int_eq%DFD%field_load_in(1,1,:)=(2340d0,0d0)
-                       	int_eq%DFD%field_load_in(1,2:,:)=(19d0,0d0)
-                ENDIF
-		CALL CalcDistributedFourier(int_eq%DFD,FFT_FWD)
-                IF (me==0)	PRINT'(I7, 8F13.5)' ,me, int_eq%DFD%field_load_out(1,1,1),int_eq%DFD%field_load_out(1,2,1),int_eq%DFD%field_load_out(2,1,1),int_eq%DFD%field_load_out(2,2,1)
-                int_eq%DFD%field_load_in=int_eq%DFD%field_load_out
-		CALL CalcDistributedFourier(int_eq%DFD,FFT_BWD)
-                IF (me==0)	PRINT'(I7, 8F13.5)',me, int_eq%DFD%field_load_out(1,1,1),int_eq%DFD%field_load_out(1,2,1),int_eq%DFD%field_load_out(2,1,1),int_eq%DFD%field_load_out(2,2,1)
-
-
-
-!		CALL MPI_BARRIER(wcomm,IERROR)
-!		CALL MPI_FINALIZE(IERROR)
-!		STOP
-#endif
 	real_comm=int_eq%fgmres_comm
 
-	CALL PrepareContinuationOperator(rc_op,anomaly,recvs,wcomm,threads_ok)
+	CALL PrepareContinuationOperator(rc_op,anomaly,recvs,wcomm,threads_ok);!,int_eq%DFD)
 
 	CALL  SetSigb(int_eq,anomaly,bkg)
 	CALL SetSigbRC(rc_op,anomaly,bkg)
@@ -182,8 +162,6 @@ PROGRAM GIEMIEMG
 
 
 		CALL CalcIntegralGreenTensor(int_eq,bkg,anomaly,IE_Threshold)
-
-
 		CALL CalcFFTofIETensor(int_eq)
 
 
@@ -193,12 +171,15 @@ PROGRAM GIEMIEMG
 		DO Ia=1,Na
 			WRITE (fnum2,'(I5.5)') Ia
 			IF (me==0)	PRINT*, 'Anomaly ', Ia, ' from ', trim(anom_list(Ia))
-!#endif			  
 			IF (int_eq%real_space) THEN
 				CALL PlaneWaveIntegral(EY,bkg,anomaly,int_eq%E_n)
 				CALL PlaneWave(EY,bkg,(/recvs(1)%zrecv/),FY)
 				IF ((Na/=1).OR.(Ifreq==1))THEN
+#ifndef performance_test
 			                CALL LoadAnomalySigma(anomaly,real_comm,trim(anom_list(Ia)))
+#else
+					anomaly%siga=1
+#endif
 				ENDIF
 			ENDIF
 
@@ -206,20 +187,19 @@ PROGRAM GIEMIEMG
 
 
 			CALL SolveEquation(int_eq,fgmres_ctl)
-!			CALL MPI_BARRIER(int_eq%matrix_comm,IERROR)
 			time2=GetTime()
+#ifndef performance_test
 			IF (int_eq%real_space) THEN
 !				CALL SaveIESolutionSeparateBinary(int_eq%Esol,int_eq%me,'SOL_PY_F'//trim(fnum1)//'T_'//trim(fnum2))
 				CALL SaveIESolutionOneFIleBinary(int_eq%Esol,real_comm,'SOL_PY_F'//trim(fnum1)//'T_'//trim(fnum2))
 			ENDIF
-!			CALL MPI_BARRIER(int_eq%matrix_comm,IERROR)
 			time2=GetTime()-time2;
 			IF (int_eq%master) THEN
 				PRINT*, "Save IE Solution in",time2, 's'
 			ENDIF
-
+#endif
 			CALL ReCalculation(rc_op,int_eq%Esol,Ea,Ha)
-!			CALL MPI_BARRIER(int_eq%matrix_comm,IERROR)
+#ifndef performance_test
 			time2=GetTime()
 			IF (int_eq%real_space) THEN
 
@@ -234,32 +214,32 @@ PROGRAM GIEMIEMG
 				CALL SaveOutputOneFile(Ea,Et,Ha,Ht,anomaly,recvs,freqs(Ifreq),real_comm,'PY_F'//trim(fnum1)//'T_'//trim(fnum2))
 				!CALL SaveOutputSeparate(Ea,Et,Ha,Ht,anomaly,recvs,freqs(Ifreq),rc_op%me,rc_op%Ny_offset,'PY_F'//trim(fnum1)//'T_'//trim(fnum2))
 			ENDIF
-!			CALL MPI_BARRIER(int_eq%matrix_comm,IERROR)
 			time2=GetTime()-time2;
 			IF (int_eq%master) THEN
 				PRINT*, "Save fields in",time2, 's'
 			ENDIF
 
+#endif
 			IF (int_eq%real_space) THEN
 				CALL PlaneWaveIntegral(EX,bkg,anomaly,int_eq%E_n)
 				CALL PlaneWave(EX,bkg,(/recvs(1)%zrecv/),FX)
 			ENDIF
 
 			CALL SolveEquation(int_eq,fgmres_ctl)
-!			CALL MPI_BARRIER(int_eq%matrix_comm,IERROR)
+#ifndef performance_test
 			time2=GetTime()
 			IF (int_eq%real_space) THEN
 				!CALL SaveIESolutionSeparateBinary(int_eq%Esol,int_eq%me,'SOL_PX_F'//trim(fnum1)//'T_'//trim(fnum2))
 				CALL SaveIESolutionOneFIleBinary(int_eq%Esol,real_comm,'SOL_PX_F'//trim(fnum1)//'T_'//trim(fnum2))
 			ENDIF
-!			CALL MPI_BARRIER(int_eq%matrix_comm,IERROR)
 			time2=GetTime()-time2;
 			IF (int_eq%master) THEN
 				PRINT*, "Save IE Solution in",time2, 's'
 			ENDIF
+#endif
 			CALL ReCalculation(rc_op,int_eq%Esol,Ea,Ha)
 
-!			CALL MPI_BARRIER(int_eq%matrix_comm,IERROR)
+#ifndef performance_test
 			time2=GetTime()
 			IF (int_eq%real_space) THEN
 
@@ -274,11 +254,11 @@ PROGRAM GIEMIEMG
 
 				CALL SaveOutputOneFile(Ea,Et,Ha,Ht,anomaly,recvs,freqs(Ifreq),real_comm,'PX_F'//trim(fnum1)//'T_'//trim(fnum2))
 			ENDIF
-!			CALL MPI_BARRIER(int_eq%matrix_comm,IERROR)
 			time2=GetTime()-time2;
 			IF (int_eq%master) THEN
 				PRINT*, "Save fields in",time2, 's'
 			ENDIF
+#endif
 		ENDDO
 	ENDDO
 	CALL CHECK_MEM(int_eq%me,int_eq%master_proc,int_eq%matrix_comm)
