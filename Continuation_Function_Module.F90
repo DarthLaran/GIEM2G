@@ -83,6 +83,7 @@ CONTAINS
 		Nr3=3*rc_op%Nr
 		Nx2=2*Nx
 		Ny2=2*Ny
+		rc_op%Nx2Ny2=Nx2*Ny2
 		rc_op%matrix_comm=mcomm
 		CALL MPI_COMM_RANK(mcomm, me, IERROR)
 		CALL MPI_COMM_SIZE(mcomm,comm_size,IERROR) 
@@ -282,8 +283,8 @@ CONTAINS
 		rc_op%field_in4(1:Nz,1:3,1:Nx2,1:Ny_loc)=>rc_op%DFD_Current%field_out
 		rc_op%field_in3(1:Nz,1:3,1:Nx2Ny_loc)=>rc_op%DFD_Current%field_out
 
-		rc_op%field_out4(1:Nr,1:3,1:Nx2,1:Ny_loc)=>rc_op%DFD_Result%field_in
-		rc_op%field_out3(1:Nr,1:3,1:Nx2Ny_loc)=>rc_op%DFD_Result%field_in
+		rc_op%field_out4(1:Nr,1:3,1:Nx2,1:Ny_loc)=>rc_op%DFD_Result%field_out
+		rc_op%field_out3(1:Nr,1:3,1:Nx2Ny_loc)=>rc_op%DFD_Result%field_out
 	ENDSUBROUTINE
 	SUBROUTINE RC_OP_FFTW_FWD(rc_op)
 		TYPE(rc_operator),INTENT(INOUT)::rc_op
@@ -292,6 +293,7 @@ CONTAINS
 	SUBROUTINE RC_OP_FFTW_BWD(rc_op)
 		TYPE(rc_operator),INTENT(INOUT)::rc_op
 		CALL	CalcDistributedFourier(rc_op%DFD_Result,FFT_BWD)
+		rc_op%field_out4=rc_op%field_out4/rc_op%Nx2Ny2
 	ENDSUBROUTINE
 	SUBROUTINE CalcFFTofRCTensor(rc_op)
 		TYPE(rc_operator),INTENT(INOUT)::rc_op
@@ -299,7 +301,7 @@ CONTAINS
 		
 		INTEGER(MPI_CTL_KIND)::IERROR
 		REAL(8)::time1,time2
-!!!! ----------------------ATTENTION DIRTY TRICK with output of CalcDistributedFourier(rc_op%DFD_Result,FFT_BWD) -----------!!!!
+!!!! ----------------------ATTENTION DIRTY TRICK with output of CalcDistributedFourier(rc_op%DFD_*,FFT_FWD) -----------!!!!
 		time1=GetTime()
 		DO Ir=1,rc_op%Nr
 			rc_op%field_in4=rc_op%G_E_fftw(:,1:3,Ir,:,:)
