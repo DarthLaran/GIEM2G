@@ -411,7 +411,11 @@ MODULE DISTRIBUTED_FFT_MODULE
 		INTEGER,INTENT(IN)::Nxy,Nc,Nt
 		INTEGER::M
 		M=Nxy
+#ifndef IBM_Bluegene
 		CALL ZOMATCOPY('C','T',Nc,M,C_ONE,p_in,Nc,p_out,M)
+#else
+		p_out=TRANSPOSE(p_in)
+#endif
         ENDSUBROUTINE
 	
 	SUBROUTINE SetOptimalTranspose(DFD)

@@ -46,6 +46,6 @@ giem2g_lib: $(ALL_O)  $(MAKECMDGOALS).make Makefile
 %.o:%.F90
 	$(FC) $(OPTS) -c $*.F90 -o $*.o $(INCLUDE)
 clean:
-	rm $(ALL_O)  # *.mod  FFT_Quadruple.o
+	rm $(ALL_O)   *.mod  FFT_Quadruple.o
 	$(MAKE) -C ZFGMRES clean
 	rm libgiem2g.a
