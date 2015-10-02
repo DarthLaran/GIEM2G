@@ -57,7 +57,9 @@ MODULE RC_Kernel_Image_Module
 		REAL(KIND = RealParm) ::lm2,time1,time2
 		INTEGER::N,Nz
 		INTEGER:: Iz,l
+#ifdef internal_timer
 		time1=GetTime()
+#endif
 		lm2=lms*lms
 		CALL Calc_APQ(bkg,lms,Arr,p,q,eta,A)
 		DO Iz=1,anomaly%Nz
@@ -86,8 +88,10 @@ MODULE RC_Kernel_Image_Module
 !			CALL Calc_G_match(bkg,anomaly,A,p,eta,recv,N,Fb,G)
 			
 		ENDIF
+#ifdef internal_timer
 		time2=GetTime()
 		calc_time(2)=calc_time(2)+time2-time1
+#endif
 		DO Iz=1,anomaly%Nz
 !--------------------------------- G_E ----------------------------------------------!
 			G11=G(G1,Iz)*bkg%iwm
@@ -118,8 +122,10 @@ MODULE RC_Kernel_Image_Module
 			G_H(RHZY,Iz)=G_H(RHZY,Iz)+G(G1,Iz)*WT(RC_DX)
 
 		END DO
+#ifdef internal_timer
 		time1=GetTime()
 		calc_time(1)=calc_time(1)+time1-time2
+#endif
 	END SUBROUTINE
 
 	SUBROUTINE	 Calc_G_not_match(bkg,anomaly,A,eta,recv,lm2,Ftb,w1,w2,G)

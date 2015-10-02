@@ -55,7 +55,13 @@ PROGRAM GIEMIEMG
 	
 	CALL MPI_COMM_RANK(wcomm, me, IERROR)
 	CALL MPI_COMM_SIZE(wcomm,wsize,IERROR) 
-	
+	IF (me==0) THEN
+#ifndef MPI_TIMER
+		 PRINT '(A)', "Timer is based in SYSTEM_CLOCK"
+#else
+		 PRINT '(A)', "Timer is based on MPI_Wtime()"
+#endif
+	ENDIF
 	IF ( .NOT. FFTW_THREADS_DISABLE) THEN
 		IF (PROVIDED>=MPI_THREAD_FUNNELED) THEN 
 			threads_ok=.TRUE.

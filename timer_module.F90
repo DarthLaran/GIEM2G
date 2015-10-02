@@ -5,13 +5,18 @@ MODULE TIMER_MODULE
 	INTEGER(KIND8)::StartCount
 	INTEGER(KIND8)::CountRate
 	CONTAINS
+#ifndef MPI_TIMER
 	SUBROUTINE InitTimer
 		REAL(DOUBLEPARM)::t1,t2
 		CALL SYSTEM_CLOCK(StartCount, CountRate)
 		t1=StartCount
 		t2=CountRate
-		StartTime=t1/t2 
+		StartTime=t1/t2
 	ENDSUBROUTINE
+#else
+	SUBROUTINE InitTimer
+	ENDSUBROUTINE
+#endif
 #ifndef MPI_TIMER
 	FUNCTION GetTime() RESULT(t)
 		INTEGER(KIND8)::Ticks

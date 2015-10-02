@@ -71,15 +71,23 @@ CONTAINS
 
 			!$OMP PARALLEL PRIVATE(Ix),DEFAULT(SHARED)&
 			!$OMP &FIRSTPRIVATE(time)
+#ifdef internal_timer
 				!$OMP DO SCHEDULE(GUIDED)&
 				!$OMP& REDUCTION (MAX:time1,time2,time3,time4)
+#else
+				!$OMP DO SCHEDULE(GUIDED)
+#endif
 				DO Ix=0,Nx-1
 					CALL CalcRecalculationGreenTensor3dElement(Ix,ly,G_H(:,:,:,Ix,Iy),&
 					&G_E(:,:,:,Ix,Iy),Wt_Threshold,time,anomaly,bkg,matrix%recvs,matrix%Nr)
 				ENDDO
 				!$OMP ENDDO
+#ifdef internal_timer
 				!$OMP DO SCHEDULE(GUIDED)&
 				!$OMP& REDUCTION (MAX:time1,time2,time3,time4)
+#else
+				!$OMP DO SCHEDULE(GUIDED)
+#endif
 				DO Ix=Nx+1,2*Nx-1
 					CALL CalcRecalculationGreenTensor3dElement(Ix-2*Nx,ly,G_H(:,:,:,Ix,Iy),&
 					&G_E(:,:,:,Ix,Iy),Wt_Threshold,time,anomaly,bkg,matrix%recvs,matrix%Nr)
@@ -89,6 +97,7 @@ CONTAINS
 					G_E(:,:,:,Nx,Iy)=C_ZERO
 					G_H(:,:,:,Nx,Iy)=C_ZERO
 				!$OMP END WORKSHARE
+#ifdef internal_timer
 				time1=time(1)
 				time2=time(2)
 				time3=time(3)
@@ -98,11 +107,16 @@ CONTAINS
 			time(2)=time2
 			time(3)=time3
 			time(4)=time4
-
+#else
+			!$OMP END PARALLEL
+#endif
 		ENDDO
+#ifdef internal_timer
 		CALL MPI_REDUCE(time,time_min,4,MPI_DOUBLE,MPI_MIN,matrix%master_proc,matrix%matrix_comm,IERROR)
 		CALL MPI_REDUCE(time,time_max,4,MPI_DOUBLE,MPI_MAX,matrix%master_proc,matrix%matrix_comm,IERROR)
+#endif
 		time_all=GetTime()-time_all
+#ifdef internal_timer
 		IF (matrix%master) THEN
 			matrix%counter%tensor_calc(COUNTER_ALL)=time_all	
 			matrix%counter%tensor_calc(COUNTER_WT)=time_max(1)	
@@ -125,6 +139,18 @@ CONTAINS
 			matrix%counter%tensor_calc(COUNTER_SQR)=time(4) 
 			matrix%counter%tensor_calc(COUNTER_OTHER)=time_all-time(2)-time(1)	
 		ENDIF
+#else
+		IF (matrix%master) THEN
+			matrix%counter%tensor_calc(COUNTER_ALL)=time_all	
+			IF (VERBOSE) THEN
+				PRINT *,'Recalculation Green Tensor has been computed.'
+				PRINT '(A14, 1ES10.2E2, A3)','in:     ',time_all,'s'
+				PRINT '(A80)','***********************************************************************************'
+			ENDIF
+		ELSE
+			matrix%counter%tensor_calc(COUNTER_ALL)=time_all	
+		ENDIF
+#endif
 	END SUBROUTINE
 !---------------------------------------------------------------------------------------------------------------------------------------------!
 	SUBROUTINE CalcRecalculationGreenTensor3dElement(lx,ly,G_H,G_E,Wt_Threshold,calc_time,anomaly,bkg,recvs,Nr)
@@ -145,12 +171,16 @@ CONTAINS
 		INTEGER::K,Iz,IERROR,I,Ik,Iz0,Ic,Iwt(6),Irecv
 		REAL(REALPARM2)::WT0(Nfirst:Nlast,1:6)
 		REAL(REALPARM2)::WT1(Nfirst:Nlast,1:6)
+#ifdef internal_timer
 		time3=GetTime()
+#endif
 		dx=anomaly%dx
 		dy=anomaly%dy
 		s=1d0/4.0_REALPARM/PI!*dx*dy
 		DO Irecv=1,Nr
+#ifdef internal_timer
 			time1=GetTime()
+#endif
 			x=lx*dx-dx/2d0+recvs(Irecv)%x_shift
 			y=ly*dy-dy/2d0+recvs(Irecv)%y_shift
 			r=SQRT(x*x+y*y)
@@ -163,8 +193,10 @@ CONTAINS
 			WT(:,RC_DY)=WT0(:,6)
 			W0=MAXVAL(ABS(WT));
 				   
+#ifdef internal_timer
 			time2=GetTime()
 			calc_time(1)=calc_time(1)+time2-time1
+#endif
 			G_E1=C_ZERO		
 			G_H1=C_ZERO		
 			DO K=Nfirst,Nlast
@@ -183,7 +215,9 @@ CONTAINS
 			G_E(:,Irecv,:)=TRANSPOSE(G_E1)*s
 			G_H(:,Irecv,:)=TRANSPOSE(G_H1)*s
 		ENDDO
+#ifdef internal_timer
 		time2=GetTime()
         calc_time(2)=calc_time(2)+time2-time3
+#endif
 	END SUBROUTINE
 ENDMODULE
