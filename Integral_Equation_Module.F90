@@ -145,8 +145,8 @@ CONTAINS
 #ifdef LEGACY_MPI
 		Nopt=1
 #else
-!		CALL TestBlocksNumber(ie_op%DFD,Nx2,Ny2,Nc,comm,Nb,Nopt)
-		Nopt=Nb
+		CALL TestBlocksNumber(ie_op%DFD,Nx2,Ny2,Nc,comm,Nb,Nopt)
+!		Nopt=Nb
 #endif
 		CALL PrepareDistributedFourierData(ie_op%DFD,Nx2,Ny2,Nc,comm,Nopt)
 		IF (VERBOSE) THEN
