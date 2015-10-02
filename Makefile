@@ -1,7 +1,7 @@
 ifneq ($(MAKECMDGOALS), clean)
 include $(MAKECMDGOALS).make	
 endif
-MISC_O=const_module.o timer_module.o  mpi_module.o fftw3_mod.o check_memory_module.o Distributed_FFT.o
+MISC_O=const_module.o  mpi_module.o timer_module.o fftw3_mod.o check_memory_module.o Distributed_FFT.o
 #FILTER_WEIGHTS_O=IntegralCodes.o VolumeBesselTransforms.o 
 ifdef FFT_QUAD_OURA
 	FILTER_WEIGHTS_O=IntegralCodes.o FFT_Quadruple.o  VolumeBesselTransforms.o 

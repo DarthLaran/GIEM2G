@@ -12,7 +12,7 @@ MODULE TIMER_MODULE
 		t2=CountRate
 		StartTime=t1/t2 
 	ENDSUBROUTINE
-
+#ifndef MPI_TIMER
 	FUNCTION GetTime() RESULT(t)
 		INTEGER(KIND8)::Ticks
 		REAL(DOUBLEPARM)::t1
@@ -20,4 +20,10 @@ MODULE TIMER_MODULE
 		t1=(Ticks-StartCount)
 		t=t1/CountRate
 	ENDFUNCTION
+#else
+	FUNCTION GetTime() RESULT(t)
+		USE MPI_MODULE
+		t=MPI_Wtime()
+	ENDFUNCTION
+#endif
 END MODULE 
