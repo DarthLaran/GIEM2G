@@ -99,6 +99,9 @@ MODULE IE_SOLVER_MODULE
 				PRINT*,			'Number of matrix-vector multiplications: ', int_eq%counter%mult_num
 				PRINT*,			'Number of dotproducts:					  ', int_eq%counter%dotprod_num
 				PRINT'(A80)','***********************************************************************************'
+#ifdef performance_test
+				PRINT '(A12,I5,A7, 1ES10.2E2, A3)','Performance test', int_eq%Ny_loc ,'IE solver', time2-time1,'s'
+#endif
 			ENDIF
 		ENDIF
 	END SUBROUTINE

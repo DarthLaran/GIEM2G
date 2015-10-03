@@ -91,11 +91,9 @@ PROGRAM GIEMIEMG
 		NT=OMP_GET_MAX_THREADS()
 		IF (me==0)	PRINT*,'Number of threads:',NT
 
-
 #ifdef performance_test
 	IF (me==0) THEN
 		PRINT'(A)','PERFORMACE TEST'
-		PRINT'(A)','NO ANOMALY LOADING'
 		PRINT'(A)','NO RESULT STORAGE'
 	ENDIF
 #endif
@@ -124,7 +122,7 @@ PROGRAM GIEMIEMG
 	CALL PrepareRecvs(recvs,anomaly,bkg)
 	IF (me==0) PRINT'(A80)','%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%'
 	IF (me==0) PRINT*, 'Nx=',anomaly%Nx, 'Ny=',anomaly%Ny,'Nz=',anomaly%Nz
-	CALL PrepareIntegralEquation(int_eq,anomaly,wcomm,threads_ok,1)
+	CALL PrepareIntegralEquation(int_eq,anomaly,wcomm,threads_ok,12)
 	IF (me==0) PRINT*, 'Number of blocks in async FFT', int_eq%DFD%Nb
  
 	real_comm=int_eq%fgmres_comm
@@ -181,11 +179,7 @@ PROGRAM GIEMIEMG
 				CALL PlaneWaveIntegral(EY,bkg,anomaly,int_eq%E_n)
 				CALL PlaneWave(EY,bkg,(/recvs(1)%zrecv/),FY)
 				IF ((Na/=1).OR.(Ifreq==1))THEN
-#ifndef performance_test
 			                CALL LoadAnomalySigma(anomaly,real_comm,trim(anom_list(Ia)))
-#else
-					anomaly%siga=1
-#endif
 				ENDIF
 			ENDIF
 

@@ -765,7 +765,7 @@ MODULE DISTRIBUTED_FFT_MODULE
 			CALL PrepareDistributedFourierData(DFD,Nx,Ny,Nc,comm,Nb,NEW_DFD_ALLOC)
 			DFD%field_out=1d0
 			DFD%field_load_in=(1d0,-246d0)
-			DO Ic=1,Nc/3
+			DO Ic=1,Nc/30
 				CALL ProcessDistributedFourierKernel(DFD,FFT_FWD)
 				CALL ProcessDistributedFourierKernel(DFD,FFT_BWD)
 			ENDDO
