@@ -143,7 +143,8 @@ CONTAINS
 		Nopt=1
 #else
 		IF (Nb/=1) THEN
-			CALL TestBlocksNumber(ie_op%DFD,Nx2,Ny2,Nc,comm,Nb,Nopt)
+!			CALL TestBlocksNumber(ie_op%DFD,Nx2,Ny2,Nc,comm,Nb,Nopt)
+			Nopt=Nb
 		ELSE
 			Nopt=1
 		ENDIF

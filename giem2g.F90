@@ -122,7 +122,7 @@ PROGRAM GIEMIEMG
 	CALL PrepareRecvs(recvs,anomaly,bkg)
 	IF (me==0) PRINT'(A80)','%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%'
 	IF (me==0) PRINT*, 'Nx=',anomaly%Nx, 'Ny=',anomaly%Ny,'Nz=',anomaly%Nz
-	CALL PrepareIntegralEquation(int_eq,anomaly,wcomm,threads_ok,12)
+	CALL PrepareIntegralEquation(int_eq,anomaly,wcomm,threads_ok,2)
 	IF (me==0) PRINT*, 'Number of blocks in async FFT', int_eq%DFD%Nb
  
 	real_comm=int_eq%fgmres_comm
