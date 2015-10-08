@@ -28,6 +28,7 @@ PROGRAM GIEMIEMG
 	REAL(REALPARM),POINTER::freqs(:)
 	TYPE (RECEIVER_TYPE),POINTER::recvs(:)
 	TYPE(IntegralEquation)::int_eq
+	TYPE(IntegralEquation)::int_eq2
 	TYPE(RC_OPERATOR)::rc_op
 	COMPLEX(REALPARM),POINTER::FX(:,:,:,:),FY(:,:,:,:)
 	COMPLEX(REALPARM),POINTER::Ea(:,:,:,:),Ha(:,:,:,:)
@@ -123,56 +124,39 @@ PROGRAM GIEMIEMG
 	IF (me==0) PRINT'(A80)','%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%'
 	IF (me==0) PRINT*, 'Nx=',anomaly%Nx, 'Ny=',anomaly%Ny,'Nz=',anomaly%Nz
 #define test2 
-	CALL PrepareIntegralEquation(int_eq,anomaly,wcomm,threads_ok,2)
-	IF (me==0) PRINT*, 'Number of blocks in async FFT', int_eq%DFD%Nb
-#ifdef test2
-
-		int_eq%DFD%field_load_out=0d0
-		int_eq%DFD%field_load_in=(1d0,0d0)
-
-		int_eq%DFD%field_load_in(2:,:,:)=(0d0,-1d0)
-		int_eq%DFD%field_load_in(1,1,:)=(0d0,0d0)
-                IF (me==0) THEN
-        		int_eq%DFD%field_load_in(1,1,1)=(-119d0,0d0)
-!        		int_eq%DFD%field_load_in(1,:,:)=(0d0,-17d0)
-                       	int_eq%DFD%field_load_in(1,2:,:)=(11d0,0d0)
-                ELSE
-        		int_eq%DFD%field_load_in(1,1,:)=(2340d0,0d0)
-                      	int_eq%DFD%field_load_in(1,2:,:)=(19d0,0d0)
-                ENDIF
-
-
-		CALL CalcDistributedFourier(int_eq%DFD,FFT_FWD)
-                IF (me==0)	PRINT'(I7, 8F25.10)' ,me, int_eq%DFD%field_load_out(1,1,1),int_eq%DFD%field_load_out(1,2,1),int_eq%DFD%field_load_out(2,1,1),int_eq%DFD%field_load_out(2,2,1)
-                int_eq%DFD%field_load_in=int_eq%DFD%field_load_out
-		CALL CalcDistributedFourier(int_eq%DFD,FFT_BWD)
-                IF (me==0)	PRINT'(I7, 8F25.10)',me, int_eq%DFD%field_load_out(1,1,1),int_eq%DFD%field_load_out(1,2,1),int_eq%DFD%field_load_out(2,1,1),int_eq%DFD%field_load_out(2,2,1)
-
-
-	CALL DeleteIE_OP(int_eq)
 	CALL PrepareIntegralEquation(int_eq,anomaly,wcomm,threads_ok,1)
 	IF (me==0) PRINT*, 'Number of blocks in async FFT', int_eq%DFD%Nb
-		int_eq%DFD%field_load_out=0d0
-		int_eq%DFD%field_load_in=(1d0,0d0)
-
-		int_eq%DFD%field_load_in(2:,:,:)=(0d0,-1d0)
-		int_eq%DFD%field_load_in(1,1,:)=(0d0,0d0)
-                IF (me==0) THEN
-        		int_eq%DFD%field_load_in(1,1,1)=(-119d0,0d0)
-!        		int_eq%DFD%field_load_in(1,:,:)=(0d0,-17d0)
-                       	int_eq%DFD%field_load_in(1,2:,:)=(11d0,0d0)
-                ELSE
-        		int_eq%DFD%field_load_in(1,1,:)=(2340d0,0d0)
-                      	int_eq%DFD%field_load_in(1,2:,:)=(19d0,0d0)
-                ENDIF
-
-		CALL CalcDistributedFourier(int_eq%DFD,FFT_FWD)
-                IF (me==0)	PRINT'(I7, 8F25.10)' ,me, int_eq%DFD%field_load_out(1,1,1),int_eq%DFD%field_load_out(1,2,1),int_eq%DFD%field_load_out(2,1,1),int_eq%DFD%field_load_out(2,2,1)
-                int_eq%DFD%field_load_in=int_eq%DFD%field_load_out
-		CALL CalcDistributedFourier(int_eq%DFD,FFT_BWD)
-                IF (me==0)	PRINT'(I7, 8F25.10)',me, int_eq%DFD%field_load_out(1,1,1),int_eq%DFD%field_load_out(1,2,1),int_eq%DFD%field_load_out(2,1,1),int_eq%DFD%field_load_out(2,2,1)
+#ifdef test2
+		CALL Set_Freq(bkg,freqs(1))
+		CALL  SetSigb(int_eq,anomaly,bkg)
+		CALL CalcIntegralGreenTensor(int_eq,bkg,anomaly,IE_Threshold)
+		CALL CalcFFTofIETensor(int_eq)
 
 
+
+		CALL PrepareIntegralEquation(int_eq2,anomaly,wcomm,threads_ok,2)
+		IF (me==0) PRINT*, 'Number of blocks in async FFT', int_eq2%DFD%Nb
+
+
+		CALL Set_Freq(bkg,freqs(1))
+		CALL  SetSigb(int_eq2,anomaly,bkg)
+		CALL CalcIntegralGreenTensor(int_eq2,bkg,anomaly,IE_Threshold)
+		CALL CalcFFTofIETensor(int_eq2)
+		
+		PRINT'(A5,I7, 1F25.10)','$1',me,MAXVAL(ABS(int_eq%G_symm(175,EXX,:,:)-int_eq2%G_symm(175,EXX,:,:)))!,SUM(ABS(int_eq%G_asym-int_eq2%G_asym))
+		PRINT'(A5,I7, 1F25.10)','$2',me,MAXVAL(ABS(int_eq%G_symm(176,EXX,:,:)-int_eq2%G_symm(176,EXX,:,:)))!,SUM(ABS(int_eq%G_asym-int_eq2%G_asym))
+		PRINT'(A5,I7, 1F25.10)','$3',me,MAXVAL(ABS(int_eq%G_symm(177,EXX,:,:)-int_eq2%G_symm(177,EXX,:,:)))!,SUM(ABS(int_eq%G_asym-int_eq2%G_asym))
+		PRINT'(A5,I7, 1F25.10)','$4',me,MAXVAL(ABS(int_eq%G_symm(178,EXX,:,:)-int_eq2%G_symm(178,EXX,:,:)))!,SUM(ABS(int_eq%G_asym-int_eq2%G_asym))
+!	PRINT'(A5,I7, I16)','$2',me,MAXLOC(ABS(int_eq%G_symm(:,EXX,:,:)-int_eq2%G_symm(:,EXX,:,:)))!,SUM(ABS(int_eq%G_asym-int_eq2%G_asym))
+!		PRINT'(I7, 1F25.10)',me,MAXVAL(ABS(int_eq%G_symm(:,EXY,:,:)-int_eq2%G_symm(:,EXY,:,:)))!,SUM(ABS(int_eq%G_asym-int_eq2%G_asym))
+!		PRINT'(I7, 1F25.10)',me,MAXVAL(ABS(int_eq%G_symm(:,EYY,:,:)-int_eq2%G_symm(:,EYY,:,:)))!,SUM(ABS(int_eq%G_asym-int_eq2%G_asym))
+!		PRINT'(I7, 1F25.10)',me,MAXVAL(ABS(int_eq%G_symm(:,EZZ,:,:)-int_eq2%G_symm(:,EZZ,:,:)))!,SUM(ABS(int_eq%G_asym-int_eq2%G_asym))
+!               IF (me==0)	PRINT'(I7, 2F25.10)' ,me, int_eq%G_symm(1,EXX,0,0)
+!               IF (me==0)	PRINT'(I7, 2F25.10)' ,me, int_eq%G_symm(1,EXY,1,1)
+!               IF (me==0)	PRINT'(I7, 2F25.10)' ,me, int_eq%G_asym(1,1,1,1,1)
+
+!		CALL DeleteIE_OP(int_eq)
+!		CALL DeleteIE_OP(int_eq2)
 		CALL MPI_BARRIER(wcomm,IERROR)
 		CALL MPI_FINALIZE(IERROR)
 		STOP
@@ -220,6 +204,8 @@ PROGRAM GIEMIEMG
 		CALL CalcIntegralGreenTensor(int_eq,bkg,anomaly,IE_Threshold)
 		CALL CalcFFTofIETensor(int_eq)
 
+        IF (me==0)	PRINT'(I7, 8F25.10)' ,me, int_eq%G_symm(1,:,1,1)
+        IF (me==0)	PRINT'(I7, 4F25.10)' ,me, int_eq%G_asym(1,1,:,1,1)
 
 		CALL CalcRecalculationGreenTensor(rc_op,bkg,anomaly,RC_Threshold)
 		CALL CalcFFTofRCTensor(rc_op)
