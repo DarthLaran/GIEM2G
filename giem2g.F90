@@ -122,9 +122,61 @@ PROGRAM GIEMIEMG
 	CALL PrepareRecvs(recvs,anomaly,bkg)
 	IF (me==0) PRINT'(A80)','%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%'
 	IF (me==0) PRINT*, 'Nx=',anomaly%Nx, 'Ny=',anomaly%Ny,'Nz=',anomaly%Nz
+#define test2 
 	CALL PrepareIntegralEquation(int_eq,anomaly,wcomm,threads_ok,2)
 	IF (me==0) PRINT*, 'Number of blocks in async FFT', int_eq%DFD%Nb
- 
+#ifdef test2
+
+		int_eq%DFD%field_load_out=0d0
+		int_eq%DFD%field_load_in=(1d0,0d0)
+
+		int_eq%DFD%field_load_in(2:,:,:)=(0d0,-1d0)
+		int_eq%DFD%field_load_in(1,1,:)=(0d0,0d0)
+                IF (me==0) THEN
+        		int_eq%DFD%field_load_in(1,1,1)=(-119d0,0d0)
+!        		int_eq%DFD%field_load_in(1,:,:)=(0d0,-17d0)
+                       	int_eq%DFD%field_load_in(1,2:,:)=(11d0,0d0)
+                ELSE
+        		int_eq%DFD%field_load_in(1,1,:)=(2340d0,0d0)
+                      	int_eq%DFD%field_load_in(1,2:,:)=(19d0,0d0)
+                ENDIF
+
+
+		CALL CalcDistributedFourier(int_eq%DFD,FFT_FWD)
+                IF (me==0)	PRINT'(I7, 8F25.10)' ,me, int_eq%DFD%field_load_out(1,1,1),int_eq%DFD%field_load_out(1,2,1),int_eq%DFD%field_load_out(2,1,1),int_eq%DFD%field_load_out(2,2,1)
+                int_eq%DFD%field_load_in=int_eq%DFD%field_load_out
+		CALL CalcDistributedFourier(int_eq%DFD,FFT_BWD)
+                IF (me==0)	PRINT'(I7, 8F25.10)',me, int_eq%DFD%field_load_out(1,1,1),int_eq%DFD%field_load_out(1,2,1),int_eq%DFD%field_load_out(2,1,1),int_eq%DFD%field_load_out(2,2,1)
+
+
+	CALL DeleteIE_OP(int_eq)
+	CALL PrepareIntegralEquation(int_eq,anomaly,wcomm,threads_ok,1)
+	IF (me==0) PRINT*, 'Number of blocks in async FFT', int_eq%DFD%Nb
+		int_eq%DFD%field_load_out=0d0
+		int_eq%DFD%field_load_in=(1d0,0d0)
+
+		int_eq%DFD%field_load_in(2:,:,:)=(0d0,-1d0)
+		int_eq%DFD%field_load_in(1,1,:)=(0d0,0d0)
+                IF (me==0) THEN
+        		int_eq%DFD%field_load_in(1,1,1)=(-119d0,0d0)
+!        		int_eq%DFD%field_load_in(1,:,:)=(0d0,-17d0)
+                       	int_eq%DFD%field_load_in(1,2:,:)=(11d0,0d0)
+                ELSE
+        		int_eq%DFD%field_load_in(1,1,:)=(2340d0,0d0)
+                      	int_eq%DFD%field_load_in(1,2:,:)=(19d0,0d0)
+                ENDIF
+
+		CALL CalcDistributedFourier(int_eq%DFD,FFT_FWD)
+                IF (me==0)	PRINT'(I7, 8F25.10)' ,me, int_eq%DFD%field_load_out(1,1,1),int_eq%DFD%field_load_out(1,2,1),int_eq%DFD%field_load_out(2,1,1),int_eq%DFD%field_load_out(2,2,1)
+                int_eq%DFD%field_load_in=int_eq%DFD%field_load_out
+		CALL CalcDistributedFourier(int_eq%DFD,FFT_BWD)
+                IF (me==0)	PRINT'(I7, 8F25.10)',me, int_eq%DFD%field_load_out(1,1,1),int_eq%DFD%field_load_out(1,2,1),int_eq%DFD%field_load_out(2,1,1),int_eq%DFD%field_load_out(2,2,1)
+
+
+		CALL MPI_BARRIER(wcomm,IERROR)
+		CALL MPI_FINALIZE(IERROR)
+		STOP
+#endif
 	real_comm=int_eq%fgmres_comm
 
 	CALL PrepareContinuationOperator(rc_op,anomaly,recvs,wcomm,threads_ok);!,int_eq%DFD)

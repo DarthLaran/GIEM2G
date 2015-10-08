@@ -369,6 +369,8 @@ MODULE DISTRIBUTED_FFT_MODULE
 		pout=>block%field_fft_y_out
 		plan=block%plan(FFT_DIR)%planY
 		CALL fftw_execute_dft(plan,pin,pout)
+!		pout=pin
+!
 		time2=GetTime()
 		block%timer(FFT_DIR)%ffty=block%timer(FFT_DIR)%ffty+time2-time1
 !		pout=pin
@@ -385,6 +387,7 @@ MODULE DISTRIBUTED_FFT_MODULE
 		pout=>block%field_fft_x_out
 		plan=block%plan(FFT_DIR)%planX
 		CALL fftw_execute_dft(plan,pin,pout)
+!		pout=pin
 		time2=GetTime()
 		block%timer(FFT_DIR)%fftx=block%timer(FFT_DIR)%fftx+time2-time1
 	END SUBROUTINE
