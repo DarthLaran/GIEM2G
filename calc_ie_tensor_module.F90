@@ -237,7 +237,7 @@ CONTAINS
 			IF (VERBOSE) THEN
 				PRINT *,'Electrical Green Tensor has been computed.'
 #ifdef performance_test
-				PRINT '(A12,I5,A7, 1ES10.2E2, A3)','Performance test', Ny_loc ,'IE tensor', time_all,'s'
+				PRINT '(A12,I5, A15, 1ES10.2E2, A3)','Performance test', Ny_loc ,'IE tensor', time_all,'s'
 #else
 				PRINT '(A12, 1ES10.2E2, A3)','in:  ',time_all,'s'
 #endif

@@ -144,6 +144,10 @@ MODULE DISTRIBUTED_FFT_MODULE
 		DO Ib=1,Nb
 			block=>DFD%block(Ib)
 			CALL MPI_COMM_DUP(comm,block%comm, IERROR)
+			IF (dfd%me==0) THEN
+				PRINT '(I4,4I16)',Ib, SIZE(block%field_fft_x_in),SHAPE(block%field_fft_x_in)
+				PRINT '(I4,4I16)',Ib, SIZE(block%field_fft_y_in),SHAPE(block%field_fft_y_in)
+			ENDIF
 		ENDDO
 		IF (Nb==1) THEN
 			CALL CreateAll2AllPlan(DFD)
@@ -329,7 +333,9 @@ MODULE DISTRIBUTED_FFT_MODULE
 		REAL(REALPARM),POINTER::p_send(:),p_recv(:)
 		REAL(DOUBLEPARM)::time1,time2
 		TYPE(C_PTR)::cp
+#ifndef performance_test
 		time1=GetTime()
+#endif
 		DFD%timer(FFT_DIR)%N=DFD%timer(FFT_DIR)%N+1
 		block=>DFD%block(1)
 		p_send=>DFD%FFTW_TRANSPOSE%p_in
@@ -352,8 +358,10 @@ MODULE DISTRIBUTED_FFT_MODULE
 !				comm, IERROR)
 		CALL fftw_mpi_execute_r2r(DFD%FFTW_TRANSPOSE%plan,p_send,p_recv)
 		CALL BlockTransposeYToX(block)
-		time2=GetTime()
+#ifndef performance_test
+		time1=GetTime()
 		DFD%timer(FFT_DIR)%kernel_total=DFD%timer(FFT_DIR)%kernel_total+time2-time1
+#endif
 	END SUBROUTINE
 
 	
@@ -364,16 +372,17 @@ MODULE DISTRIBUTED_FFT_MODULE
 		COMPLEX(REALPARM),POINTER::pin(:,:,:),pout(:,:,:)
 		TYPE(C_PTR)::plan
 		REAL(DOUBLEPARM)::time1,time2
+#ifndef performance_test
 		time1=GetTime()
+#endif
 		pin=>block%field_fft_y_in
 		pout=>block%field_fft_y_out
 		plan=block%plan(FFT_DIR)%planY
 		CALL fftw_execute_dft(plan,pin,pout)
-!		pout=pin
-!
+#ifndef performance_test
 		time2=GetTime()
 		block%timer(FFT_DIR)%ffty=block%timer(FFT_DIR)%ffty+time2-time1
-!		pout=pin
+#endif
 	END SUBROUTINE
 
 	SUBROUTINE DistributedFourierX(block,FFT_DIR)
@@ -382,14 +391,18 @@ MODULE DISTRIBUTED_FFT_MODULE
 		COMPLEX(REALPARM),POINTER::pin(:,:,:),pout(:,:,:)
 		TYPE(C_PTR)::plan
 		REAL(DOUBLEPARM)::time1,time2
+#ifndef performance_test
 		time1=GetTime()
+#endif
 		pin=>block%field_fft_x_in
 		pout=>block%field_fft_x_out
 		plan=block%plan(FFT_DIR)%planX
 		CALL fftw_execute_dft(plan,pin,pout)
 !		pout=pin
+#ifndef performance_test
 		time2=GetTime()
 		block%timer(FFT_DIR)%fftx=block%timer(FFT_DIR)%fftx+time2-time1
+#endif
 	END SUBROUTINE
 
         SUBROUTINE TransposeLoopOMP(p_in,p_out,Nc,Nxy,Nt)
@@ -539,7 +552,9 @@ MODULE DISTRIBUTED_FFT_MODULE
 		INTEGER::M
 		COMPLEX(REALPARM),POINTER::p_in(:),p_out(:,:,:)
 		REAL(DOUBLEPARM)::time1,time2
+#ifndef performance_test
 		time1=GetTime()
+#endif
 		x_shape=SHAPE(block%field_fft_x_in)
 		y_shape=SHAPE(block%field_fft_y_in)
 		K=block%K
@@ -567,7 +582,10 @@ MODULE DISTRIBUTED_FFT_MODULE
 		ENDDO
 		!$OMP ENDDO
 		!$OMP END PARALLEL
+
+#ifndef performance_test
 		time2=GetTime()
+#endif
 		block%timer(FFT_FWD)%x2y_transpose=time2-time1+block%timer(FFT_FWD)%x2y_transpose
 	END SUBROUTINE
 
@@ -580,7 +598,9 @@ MODULE DISTRIBUTED_FFT_MODULE
 		INTEGER::sK,dK,sI,dI,sL,dL,I2	
 		COMPLEX(REALPARM),POINTER::p_in(:),p_out(:,:,:)
 		REAL(DOUBLEPARM)::time1,time2
+#ifndef performance_test
 		time1=GetTime()
+#endif
 		x_shape=SHAPE(block%field_fft_x_in)
 		y_shape=SHAPE(block%field_fft_y_in)
 
@@ -623,7 +643,9 @@ MODULE DISTRIBUTED_FFT_MODULE
 		ENDDO
 		!$OMP ENDDO
 		!$OMP END PARALLEL
+#ifndef performance_test
 		time2=GetTime()
+#endif
 		block%timer(FFT_FWD)%y2x_transpose=time2-time1+block%timer(FFT_FWD)%y2x_transpose
 	END SUBROUTINE
 	SUBROUTINE PrintTimings(DFD,kernel_max)
@@ -888,7 +910,6 @@ MODULE DISTRIBUTED_FFT_MODULE
 
 			block%timer=>DFD%timer
 			block%plans_time=0d0
-
 			CALL CreateBlockPlans(block)
 			DFD%plans_time=DFD%plans_time+block%plans_time
 			IF (Ib/=Nb) THEN
