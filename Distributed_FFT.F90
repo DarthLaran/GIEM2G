@@ -346,20 +346,14 @@ MODULE DISTRIBUTED_FFT_MODULE
 		chunk=block%chunk_len
 		comm=block%comm
 
-!		CALL MPI_ALLTOALL(p_send,2*chunk, MPI_DOUBLE,&
-!				p_recv, 2*chunk, MPI_DOUBLE,&
-!				comm, IERROR)
 		CALL fftw_mpi_execute_r2r(DFD%FFTW_TRANSPOSE%plan,p_send,p_recv)
 
 		CALL DistributedFourierY(block,FFT_DIR)
 
-!		CALL MPI_ALLTOALL(p_send,2*chunk, MPI_DOUBLE,&
-!				p_recv, 2*chunk, MPI_DOUBLE,&
-!				comm, IERROR)
 		CALL fftw_mpi_execute_r2r(DFD%FFTW_TRANSPOSE%plan,p_send,p_recv)
 		CALL BlockTransposeYToX(block)
 #ifndef performance_test
-		time1=GetTime()
+		time2=GetTime()
 		DFD%timer(FFT_DIR)%kernel_total=DFD%timer(FFT_DIR)%kernel_total+time2-time1
 #endif
 	END SUBROUTINE
@@ -585,8 +579,8 @@ MODULE DISTRIBUTED_FFT_MODULE
 
 #ifndef performance_test
 		time2=GetTime()
-#endif
 		block%timer(FFT_FWD)%x2y_transpose=time2-time1+block%timer(FFT_FWD)%x2y_transpose
+#endif
 	END SUBROUTINE
 
 	SUBROUTINE BlockTransposeYToX(block)
@@ -645,8 +639,8 @@ MODULE DISTRIBUTED_FFT_MODULE
 		!$OMP END PARALLEL
 #ifndef performance_test
 		time2=GetTime()
-#endif
 		block%timer(FFT_FWD)%y2x_transpose=time2-time1+block%timer(FFT_FWD)%y2x_transpose
+#endif
 	END SUBROUTINE
 	SUBROUTINE PrintTimings(DFD,kernel_max)
 		TYPE (DistributedFourierData),INTENT(IN)::DFD
