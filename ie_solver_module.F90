@@ -95,7 +95,8 @@ MODULE IE_SOLVER_MODULE
 				PRINT info_fmt, 'Average zgemv:							', int_eq%counter%mult_zgemv/int_eq%counter%mult_num
 				PRINT info_fmt, 'Average mult:							', int_eq%counter%apply/int_eq%counter%mult_num
 				PRINT info_fmt, 'Total mult/dp:							', int_eq%counter%apply/int_eq%counter%dotprod
-				PRINT info_fmt, 'Average mult/dp:						', int_eq%counter%apply/int_eq%counter%dotprod*int_eq%counter%dotprod_num/int_eq%counter%mult_num
+				PRINT info_fmt, 'Average mult/dp:						',&
+                                & int_eq%counter%apply/int_eq%counter%dotprod*int_eq%counter%dotprod_num/int_eq%counter%mult_num
 				PRINT*,			'Number of matrix-vector multiplications: ', int_eq%counter%mult_num
 				PRINT*,			'Number of dotproducts:					  ', int_eq%counter%dotprod_num
 				PRINT'(A80)','***********************************************************************************'
