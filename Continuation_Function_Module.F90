@@ -235,7 +235,7 @@ CONTAINS
 
 		Nr3=rc_op%Nr*3
 
-		size_g=rc_op%Nx2Ny_loc*rc_op%Nz*rc_op%Nr*15.0*REALPARM/1024/1024/1024
+		size_g=rc_op%Nx2Ny_loc*rc_op%Nz*rc_op%Nr*15.0*2*REALPARM/1024/1024/1024
 		IF (VERBOSE) THEN
 			IF (rc_op%master) THEN
 				PRINT*,'RC matricies needs', size_g, 'Gb per process'
