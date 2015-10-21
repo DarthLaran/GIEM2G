@@ -266,10 +266,14 @@
 !     w() and ip() are compatible with all routines.
 !
 !
+
 MODULE FFT_QUAD
         IMPLICIT NONE
+#ifdef VOLUME_WEIGHT_QUAD
+        INTEGER,PARAMETER::QUAD_PRECISION=SELECTED_REAL_KIND(30)
+#else
         INTEGER,PARAMETER::QUAD_PRECISION=SELECTED_REAL_KIND(15)
-!        INTEGER,PARAMETER::QUAD_PRECISION=8
+#endif
       REAL(QUAD_PRECISION),PARAMETER::HALF=0.5_QUAD_PRECISION
 		CONTAINS
 	subroutine cdft(n, isgn, a, ip, w)
