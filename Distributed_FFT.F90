@@ -651,7 +651,7 @@ MODULE DISTRIBUTED_FFT_MODULE
 		REAL(REALPARM)::variation(8)
 		INTEGER(MPI_CTL_KIND)::IERROR
 		INTEGER::M,Nfwd,Nbwd
-		CHARACTER(LEN=*), PARAMETER  :: info_fmt = "(A36, ES10.2E3, A3, F10.3 A3)"
+		CHARACTER(LEN=*), PARAMETER  :: info_fmt = "(A36, ES10.2E3, A3, F10.3, A3)"
 		Nfwd=DFD%timer(FFT_FWD)%N
 		Nbwd=DFD%timer(FFT_BWD)%N
 		M=Nfwd+Nbwd
