@@ -310,18 +310,15 @@ MODULE IE_SOLVER_MODULE
 							CALL APPLY_EQ_OP(int_eq,v_in2,v_out2)
 						CASE (DOTPROD)
 							time1=GetTime()
-!							PRINT*,'dp1',nbscal2,int_eq%Nloc,colx2,coly2
 							CALL zgemv('C',int_eq%Nloc,nbscal2,C_ONE,&
 								&work_gmres(colx2:),int_eq%Nloc,&
 								&work_gmres(coly2:),1,C_ZERO,aux,1)
-!							PRINT*,'dp3'
 							CALL MPI_ALLREDUCE(aux,work_gmres(colz2:),nbscal2,&
 								&MPI_DOUBLE_COMPLEX,&
 							&MPI_SUM,comm_inner,IERROR)
 							time2=GetTime()
 							int_eq%counter%dotprod_num=int_eq%counter%dotprod_num+nbscal2
 							int_eq%counter%dotprod=int_eq%counter%dotprod+time2-time1
-!							PRINT*,'dp2'
 						CASE DEFAULT
 							EXIT
 					ENDSELECT
