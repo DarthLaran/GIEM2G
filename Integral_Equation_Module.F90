@@ -55,7 +55,7 @@ MODULE INTEGRAL_EQUATION_MODULE
 
 		INTEGER(8)::N
 		INTEGER::Nloc
-		COMPLEX(REALPARM),POINTER ::siga(:,:,:)
+		COMPLEX(REALPARM),POINTER ::csiga(:,:,:)
 		COMPLEX(REALPARM),POINTER ::csigb(:)
 		REAL(REALPARM),POINTER ::sqsigb(:)
 
@@ -183,7 +183,7 @@ CONTAINS
 			ie_op%initial_guess=>NULL()
 			ie_op%rhs=>NULL()
 		ENDIF
-		ie_op%siga=>NULL()
+		ie_op%csiga=>NULL()
 !		ie_op%sigb=>NULL()
 !		ie_op%asiga=>NULL()
 !		ie_op%sqsigb=>NULL()

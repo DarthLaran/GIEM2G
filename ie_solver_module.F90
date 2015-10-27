@@ -60,7 +60,7 @@ MODULE IE_SOLVER_MODULE
 				DO Ix=1,int_eq%Nx
 					DO Ic=1,3
 						DO Iz=1,Nz
-							asiga=C_TWO*int_eq%sqsigb(Iz)/(int_eq%siga(Iz,Ix,Iy)+int_eq%csigb(Iz))
+							asiga=C_TWO*int_eq%sqsigb(Iz)/(int_eq%csiga(Iz,Ix,Iy)+int_eq%csigb(Iz))
 							int_eq%Esol(Iz,Ic,Ix,Iy)=asiga*int_eq%Esol(Iz,Ic,Ix,Iy)
 						ENDDO
 					ENDDO
@@ -98,10 +98,10 @@ MODULE IE_SOLVER_MODULE
 		REAL(REALPARM),INTENT(IN)::freq
 		REAL(REALPARM)::w
 		IF (int_eq%real_space) THEN
-			IF (ASSOCIATED(int_eq%siga)) DEALLOCATE(int_eq%siga)
-			ALLOCATE(int_eq%siga(int_eq%Nz,int_eq%Nx,int_eq%Ny_loc))
+			IF (ASSOCIATED(int_eq%csiga)) DEALLOCATE(int_eq%csiga)
+			ALLOCATE(int_eq%csiga(int_eq%Nz,int_eq%Nx,int_eq%Ny_loc))
 			w=freq*PI*2
-			int_eq%siga=siga-C_IONE*w*EPS0	
+			int_eq%csiga=siga-C_IONE*w*EPS0	
 		ENDIF
 
 	ENDSUBROUTINE
@@ -389,8 +389,8 @@ MODULE IE_SOLVER_MODULE
 			DO Ix=1,int_eq%Nx
 				DO Ic=1,3
 					DO Iz=1,int_eq%Nz
-						asiga=C_TWO*int_eq%sqsigb(Iz)/(int_eq%siga(Iz,Ix,Iy)+int_eq%csigb(Iz))
-						dsig=int_eq%siga(Iz,Ix,Iy)-int_eq%csigb(Iz)
+						asiga=C_TWO*int_eq%sqsigb(Iz)/(int_eq%csiga(Iz,Ix,Iy)+int_eq%csigb(Iz))
+						dsig=int_eq%csiga(Iz,Ix,Iy)-int_eq%csigb(Iz)
 						gsig=dsig*asiga
 						int_eq%field_in4(Iz,Ic,Ix,Iy)=&
 						&field_in(Iz,Ic,Ix,Iy)*gsig
@@ -416,7 +416,7 @@ MODULE IE_SOLVER_MODULE
 			DO Ix=1,int_eq%Nx
 				DO Ic=1,3
 					DO Iz=1,int_eq%Nz
-						asiga=C_TWO*int_eq%csigb(Iz)/(int_eq%siga(Iz,Ix,Iy)+int_eq%csigb(Iz))
+						asiga=C_TWO*int_eq%csigb(Iz)/(int_eq%csiga(Iz,Ix,Iy)+int_eq%csigb(Iz))
 						d1=field_in(Iz,Ic,Ix,Iy)*asiga
 						d2=d1-int_eq%field_out4(Iz,Ic,Ix,Iy)/(int_eq%dz(Iz))*int_eq%sqsigb(Iz)
 						field_out(Iz,Ic,Ix,Iy)=d2
