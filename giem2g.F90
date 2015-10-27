@@ -95,6 +95,7 @@ PROGRAM GIEMIEMG
 #ifdef performance_test
 	IF (me==0) THEN
 		PRINT'(A)','PERFORMACE TEST'
+		PRINT'(A)','NO CONTINUATION TO RECIEVERS'
 		PRINT'(A)','NO RESULT STORAGE'
 	ENDIF
 #endif
@@ -121,8 +122,9 @@ PROGRAM GIEMIEMG
 	IF (me==0) PRINT*, 'Number of blocks in async FFT', int_eq%DFD%Nb
 	real_comm=int_eq%fgmres_comm
 
+#ifndef performance_test
 	CALL PrepareContinuationOperator(rc_op,anomaly,recvs,wcomm,threads_ok);!,int_eq%DFD)
-
+#endif
 	CALL  SetSigb(int_eq,anomaly,bkg)
 	CALL SetSigbRC(rc_op,anomaly,bkg)
 
@@ -165,9 +167,10 @@ PROGRAM GIEMIEMG
         IF (me==0)	PRINT'(I7, 8F25.10)' ,me, int_eq%G_symm(1,:,1,1)
         IF (me==0)	PRINT'(I7, 4F25.10)' ,me, int_eq%G_asym(1,1,:,1,1)
 
+#ifndef performance_test
 		CALL CalcRecalculationGreenTensor(rc_op,bkg,anomaly,RC_Threshold)
 		CALL CalcFFTofRCTensor(rc_op)
-
+#endif
 		DO Ia=1,Na
 			WRITE (fnum2,'(I5.5)') Ia
 			IF (me==0)	PRINT*, 'Anomaly ', Ia, ' from ', trim(anom_list(Ia))
@@ -193,9 +196,7 @@ PROGRAM GIEMIEMG
 			IF (int_eq%master) THEN
 				PRINT*, "Save IE Solution in",time2, 's'
 			ENDIF
-#endif
 			CALL ReCalculation(rc_op,int_eq%Esol,Ea,Ha)
-#ifndef performance_test
 			time2=GetTime()
 			IF (int_eq%real_space) THEN
 
@@ -232,10 +233,8 @@ PROGRAM GIEMIEMG
 			IF (int_eq%master) THEN
 				PRINT*, "Save IE Solution in",time2, 's'
 			ENDIF
-#endif
 			CALL ReCalculation(rc_op,int_eq%Esol,Ea,Ha)
 
-#ifndef performance_test
 			time2=GetTime()
 			IF (int_eq%real_space) THEN
 

@@ -25,7 +25,7 @@ MODULE GIEM2G_C_API
                         ALLOCATE(bkg)
                         RES=C_LOC(bkg)
 			bkg%Nl=N
-			ALLOCATE (bkg%sigma(N), bkg%thick(1:N-1), bkg%depth(1:N-1),bkg%csig(1:N-1))
+			ALLOCATE (bkg%sigma(N), bkg%thick(1:N-1), bkg%depth(1:N-1),bkg%csigma(0:N))
                         CALL C_F_POINTER(p_sig,sig,(/N/))
                         bkg%sigma=sig
         		IF (N>1) THEN

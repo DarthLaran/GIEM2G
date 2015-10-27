@@ -241,7 +241,7 @@ CONTAINS
 				DO J=I-1,1,-1
 					A(J,I,:)=A(J+1,I,:)*w(J,:)
 					A(I,J,1)=A(J,I,1)
-					A(I,J,2)=A(J,I,2)*bkg%csigma(I)/bkg%сsigma(J)
+					A(I,J,2)=A(J,I,2)*bkg%csigma(I)/bkg%csigma(J)
 				ENDDO
 			ENDDO
 		ENDIF

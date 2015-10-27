@@ -15,7 +15,7 @@ CONTAINS
 			OPEN(077,file=background)
 			READ(077,*) N
 			bkg%Nl=N
-			ALLOCATE (bkg%sigma(N), bkg%thick(1:N-1), bkg%depth(1:N-1),bkg%csig(0:N))
+			ALLOCATE (bkg%sigma(N), bkg%thick(1:N-1), bkg%depth(1:N-1),bkg%csigma(0:N))
 			READ(077,*) bkg%sigma
 			READ(077,*) bkg%thick
 			CLOSE(077)
