@@ -16,7 +16,7 @@ IMAGE_O= apq_module.o  ie_kernel_hankel_module.o  rc_kernel_hankel_module.o
 IE_O=Integral_Equation_Module.o calc_ie_tensor_module.o ie_solver_module.o   
 RC_O=Continuation_Function_Module.o calc_rc_tensor_module.o
 SRC_O=sources_module.o
-API_O=giem2g_c_api.o
+API_O=#giem2g_c_api.o
 
 ALL_O=$(MISC_O) $(FILTER_WEIGHTS_O) $(MODEL_O) $(IMAGE_O) $(IE_O) $(RC_O) $(SRC_O) $(API_O)
 
