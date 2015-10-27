@@ -125,7 +125,7 @@ PROGRAM GIEMIEMG
 #ifndef performance_test
 	CALL PrepareContinuationOperator(rc_op,anomaly,recvs,wcomm,threads_ok);!,int_eq%DFD)
 #endif
-	CALL  SetSigb(int_eq,anomaly,bkg)
+!	CALL  SetSigb(int_eq,anomaly,bkg)
 	CALL SetSigbRC(rc_op,anomaly,bkg)
 
 	IF (int_eq%real_space) THEN
@@ -134,7 +134,7 @@ PROGRAM GIEMIEMG
 		ALLOCATE(Ea(Nr,EX:EZ,int_eq%Nx,int_eq%Ny_loc),Ha(Nr,HX:HZ,int_eq%Nx,int_eq%Ny_loc))
 		ALLOCATE(Et(Nr,EX:EZ,int_eq%Nx,int_eq%Ny_loc),Ht(Nr,HX:HZ,int_eq%Nx,int_eq%Ny_loc))
 		
-		int_eq%siga=>anomaly%siga
+!		int_eq%siga=>anomaly%siga
 		rc_op%siga=>anomaly%siga
 
 	ELSE
@@ -185,6 +185,7 @@ PROGRAM GIEMIEMG
 			IF (me==0) PRINT*, 'FY=', FY
 
 
+			CALL SetAnomalySigma(int_eq,anomaly%siga,freqs(Ifreq))
 			CALL SolveEquation(int_eq,fgmres_ctl)
 			time2=GetTime()
 #ifndef performance_test

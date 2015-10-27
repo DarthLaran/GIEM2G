@@ -17,8 +17,8 @@ MODULE Data_Types_Module
 		REAL(REALPARM)::dx,dy
 		REAL(REALPARM),POINTER::z(:)
 		INTEGER,POINTER::Lnumber(:)
-		COMPLEX(REALPARM),POINTER::csiga(:,:,:)
 		REAL(REALPARM),POINTER::siga(:,:,:)
+		REAL(REALPARM),POINTER::epsa(:,:,:)
 	ENDTYPE
 
 	TYPE RECEIVER_TYPE
@@ -89,8 +89,8 @@ MODULE Data_Types_Module
 		REAL(KIND=RealParm),INTENT(IN)::f
 		bkg%freq=f
 		bkg%omega=f*2D0*PI
-		bkg%csigma(0)=0!-C_IONE*bkg%omega*EPS0
-		bkg%csigma(1:)=bkg%sigma!-C_IONE*bkg%omega*EPS0
+		bkg%csigma(0)=0-C_IONE*bkg%omega*EPS0
+		bkg%csigma(1:)=bkg%sigma-C_IONE*bkg%omega*EPS0
 		bkg%k2=C_IONE*bkg%csigma*MU0*bkg%omega
 		bkg%k=SQRT(bkg%k2)
 		bkg%iwm=C_IONE*MU0*bkg%omega

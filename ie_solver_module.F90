@@ -11,7 +11,7 @@ MODULE IE_SOLVER_MODULE
 #define no_compile
 !For integral equation kernel!
 
-	PUBLIC:: SolveEquation,SetSigb
+	PUBLIC:: SolveEquation,SetSigb,SetAnomalySigma
 	
 	CONTAINS
 
@@ -23,7 +23,9 @@ MODULE IE_SOLVER_MODULE
 		INTEGER::anom_shape(3)
 		INTEGER::tmp_shape(3)
 		INTEGER::Iz,Nz,Nx,Ny_loc
+		INTEGER::Ix,Iy,Ic
 		INTEGER(MPI_CTL_KIND)::IERROR
+		COMPLEX(REALPARM)::asiga
 		REAL(DOUBLEPARM)::time1,time2
 		CHARACTER(LEN=*), PARAMETER  :: info_fmt = "(A, ES10.2E3)"
 !		CALL MPI_BARRIER(int_eq%matrix_comm,IERROR)
@@ -38,49 +40,33 @@ MODULE IE_SOLVER_MODULE
 		Nz=int_eq%Nz
 		Ny_loc=int_eq%Ny_loc
 		IF (int_eq%real_space) THEN
-			!$OMP PARALLEL	DEFAULT(SHARED) PRIVATE(Iz)
-			!$OMP WORKSHARE
-				int_eq%sqsigb=SQRT(int_eq%sigb)
-				int_eq%asiga=2d0*int_eq%sqsigb/(int_eq%siga+int_eq%sigb)
-				int_eq%dsig=(int_eq%siga-int_eq%sigb)
-				int_eq%gsig=int_eq%dsig*int_eq%asiga
-				int_eq%Esol(:,EX,:,:)=int_eq%sqsigb*int_eq%E_n(:,EX,:,:)
-				int_eq%Esol(:,EY,:,:)=int_eq%sqsigb*int_eq%E_n(:,EY,:,:)
-				int_eq%Esol(:,EZ,:,:)=int_eq%sqsigb*int_eq%E_n(:,EZ,:,:)
-			!$OMP END WORKSHARE
-			!$OMP END PARALLEL
+			DO Iz=1,Nz
+				int_eq%Esol(Iz,:,:,:)=int_eq%sqsigb(Iz)*int_eq%E_n(Iz,:,:,:)
+			ENDDO
 			tmp(1:Nz,1:3,1:Nx,1:Ny_loc)=>int_eq%initial_guess
 			IF (PRESENT(guess)) THEN
-				!$OMP PARALLEL	DEFAULT(SHARED) PRIVATE(Iz)
-				!$OMP WORKSHARE
-					tmp(:,EX,:,:)=int_eq%sqsigb*guess(:,EX,:,:)
-					tmp(:,EY,:,:)=int_eq%sqsigb*guess(:,EY,:,:)
-					tmp(:,EZ,:,:)=int_eq%sqsigb*guess(:,EZ,:,:)
-				!$OMP END WORKSHARE
-				!$OMP END PARALLEL
+				DO Iz=1,Nz
+					tmp(Iz,:,:,:)=int_eq%sqsigb(Iz)*guess(Iz,:,:,:)
+				ENDDO
 			ELSE
-				!$OMP PARALLEL	DEFAULT(SHARED) PRIVATE(Iz)
-				!$OMP WORKSHARE
-					tmp(:,EX,:,:)=int_eq%sqsigb*int_eq%E_n(:,EX,:,:)
-					tmp(:,EY,:,:)=int_eq%sqsigb*int_eq%E_n(:,EY,:,:)
-					tmp(:,EZ,:,:)=int_eq%sqsigb*int_eq%E_n(:,EZ,:,:)
-				!$OMP END WORKSHARE
-				!$OMP END PARALLEL
+				tmp=int_eq%Esol
 			ENDIF			
 		ENDIF
 		CALL GIEM2G_FGMRES(int_eq,fgmres_ctl)
 
 
 		IF (int_eq%real_space) THEN
-			!$OMP PARALLEL DEFAULT(SHARED)
-			!$OMP WORKSHARE
-				int_eq%Esol(:,EX,:,:)=int_eq%asiga*int_eq%Esol(:,EX,:,:)
-				int_eq%Esol(:,EY,:,:)=int_eq%asiga*int_eq%Esol(:,EY,:,:)
-				int_eq%Esol(:,EZ,:,:)=int_eq%asiga*int_eq%Esol(:,EZ,:,:)
-			!$OMP END WORKSHARE
-			!$OMP END PARALLEL
+			DO Iy=1,Ny_loc
+				DO Ix=1,int_eq%Nx
+					DO Ic=1,3
+						DO Iz=1,Nz
+							asiga=C_TWO*int_eq%sqsigb(Iz)/(int_eq%siga(Iz,Ix,Iy)+int_eq%csigb(Iz))
+							int_eq%Esol(Iz,Ic,Ix,Iy)=asiga*int_eq%Esol(Iz,Ic,Ix,Iy)
+						ENDDO
+					ENDDO
+				ENDDO
+			ENDDO
 		ENDIF
-!		CALL MPI_BARRIER(int_eq%matrix_comm,IERROR)
 		time2=GetTime()
 		IF (VERBOSE) THEN
 			IF (int_eq%master) THEN
@@ -106,6 +92,21 @@ MODULE IE_SOLVER_MODULE
 			ENDIF
 		ENDIF
 	END SUBROUTINE
+	SUBROUTINE SetAnomalySigma(int_eq,siga,freq)
+		TYPE(IntegralEquation),INTENT(INOUT)::int_eq
+		REAL(REALPARM),INTENT(IN),POINTER::siga(:,:,:)
+		REAL(REALPARM),INTENT(IN)::freq
+		REAL(REALPARM)::w
+		IF (int_eq%real_space) THEN
+			IF (ASSOCIATED(int_eq%siga)) DEALLOCATE(int_eq%siga)
+			ALLOCATE(int_eq%siga(int_eq%Nz,int_eq%Nx,int_eq%Ny_loc))
+			w=freq*PI*2
+			int_eq%siga=siga-C_IONE*w*EPS0	
+		ENDIF
+
+	ENDSUBROUTINE
+#define no_compile
+#ifndef no_compile
 	SUBROUTINE SetSigb(int_eq,anomaly,bkg)
 		TYPE(IntegralEquation),INTENT(INOUT)::int_eq
         TYPE (BKG_DATA_TYPE),TARGET,INTENT(INOUT)::bkg
@@ -153,7 +154,13 @@ MODULE IE_SOLVER_MODULE
 			!$OMP END PARALLEL
 		ENDIF
 	ENDSUBROUTINE
-
+#else
+	SUBROUTINE SetSigb(int_eq,anomaly,bkg)
+		TYPE(IntegralEquation),INTENT(INOUT)::int_eq
+        TYPE (BKG_DATA_TYPE),TARGET,INTENT(INOUT)::bkg
+		TYPE (ANOMALY_TYPE),TARGET,INTENT(INOUT)::anomaly
+	ENDSUBROUTINE
+#endif
 !-------------------------------------PRIVATE---------------------------------------------------------------------!
 	SUBROUTINE GIEM2G_FGMRES(int_eq,fgmres_ctl)
 		TYPE(IntegralEquation),INTENT(INOUT)::int_eq
@@ -369,6 +376,7 @@ MODULE IE_SOLVER_MODULE
 		COMPLEX(REALPARM),POINTER::field_in(:,:,:,:)
 		COMPLEX(REALPARM),POINTER::field_out(:,:,:,:)
 		COMPLEX(REALPARM)::d1,d2
+		COMPLEX(REALPARM)::asiga,dsig,gsig
 		REAL(8)::time1,time2
 		INTEGER::IERROR
 		INTEGER ::Ix,Iy,Iz,Ic,Ixy
@@ -376,13 +384,16 @@ MODULE IE_SOLVER_MODULE
 		field_in(1:int_eq%Nz,1:3,1:int_eq%Nx,1:int_eq%Ny_loc)=>v_in
 		field_out(1:int_eq%Nz,1:3,1:int_eq%Nx,1:int_eq%Ny_loc)=>v_out
 		DO Iy=1,int_eq%Ny_loc
-		!$OMP PARALLEL DEFAULT(SHARED),PRIVATE(Ix,Ic,Iz)
+		!$OMP PARALLEL DEFAULT(SHARED),PRIVATE(Ix,Ic,Iz,asiga,dsig,gsig)
 			!$OMP DO SCHEDULE(GUIDED)
 			DO Ix=1,int_eq%Nx
 				DO Ic=1,3
 					DO Iz=1,int_eq%Nz
+						asiga=C_TWO*int_eq%sqsigb(Iz)/(int_eq%siga(Iz,Ix,Iy)+int_eq%csigb(Iz))
+						dsig=int_eq%siga(Iz,Ix,Iy)-int_eq%csigb(Iz)
+						gsig=dsig*asiga
 						int_eq%field_in4(Iz,Ic,Ix,Iy)=&
-						&field_in(Iz,Ic,Ix,Iy)*int_eq%gsig(Iz,Ix,Iy)
+						&field_in(Iz,Ic,Ix,Iy)*gsig
 					ENDDO
 				ENDDO
 			ENDDO
@@ -400,14 +411,15 @@ MODULE IE_SOLVER_MODULE
 		ENDDO
 		CALL	Apply_IE_OP(int_eq)
 		DO Iy=1,int_eq%Ny_loc
-			!$OMP PARALLEL DEFAULT(SHARED), PRIVATE(Ix,Ic,Iz,d1,d2)
+			!$OMP PARALLEL DEFAULT(SHARED), PRIVATE(Ix,Ic,Iz,d1,d2,asiga)
 			!$OMP DO SCHEDULE(GUIDED)
 			DO Ix=1,int_eq%Nx
 				DO Ic=1,3
 					DO Iz=1,int_eq%Nz
-						d1=field_in(Iz,Ic,Ix,Iy)*int_eq%asiga(Iz,Ix,Iy)
-						d2=d1-int_eq%field_out4(Iz,Ic,Ix,Iy)/(int_eq%dz(Iz))
-						field_out(Iz,Ic,Ix,Iy)=d2*int_eq%sqsigb(Iz,Ix,Iy)
+						asiga=C_TWO*int_eq%csigb(Iz)/(int_eq%siga(Iz,Ix,Iy)+int_eq%csigb(Iz))
+						d1=field_in(Iz,Ic,Ix,Iy)*asiga
+						d2=d1-int_eq%field_out4(Iz,Ic,Ix,Iy)/(int_eq%dz(Iz))*int_eq%sqsigb(Iz)
+						field_out(Iz,Ic,Ix,Iy)=d2
 					ENDDO
 				ENDDO
 			ENDDO

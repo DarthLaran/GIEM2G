@@ -14,8 +14,8 @@ MODULE Calc_IE_Tensor_Module
 	REAL(REALPARM)::lms(Nfirst:Nlast)
 	PUBLIC::CalcIntegralGreenTensor
 CONTAINS
-	SUBROUTINE CalcIntegralGreenTensor(matrix,bkg,anomaly,Wt_Threshold)
-		TYPE(IntegralEquation),INTENT(INOUT)::matrix
+	SUBROUTINE CalcIntegralGreenTensor(ie_op,bkg,anomaly,Wt_Threshold)
+		TYPE(IntegralEquation),INTENT(INOUT)::ie_op
 		TYPE (BKG_DATA_TYPE),TARGET,INTENT(INOUT)::bkg
 		TYPE (ANOMALY_TYPE),TARGET,INTENT(INOUT)::anomaly
 		REAL(REALPARM),INTENT(IN)::Wt_Threshold
@@ -35,34 +35,37 @@ CONTAINS
 		INTEGER::xfirst,xlast
 		INTEGER::recv_start,send_start
 !------------------------- workaround for bug in some realizations of MPI_WAITALL
-                INTEGER(MPI_CTL_KIND),TARGET::all_requests(4*matrix%Ny_loc)
+		INTEGER(MPI_CTL_KIND),TARGET::all_requests(4*ie_op%Ny_loc)
 		INTEGER(MPI_CTL_KIND),POINTER::requests(:,:)
 !---------------------------------------------------------------------------
 		REAL(8)::time(4),time_all!,Wt_Threshold
 		REAL(8)::time_max(4),time_min(4)
 		REAL(8)::time1,time2,time3,time4
-!		CALL MPI_BARRIER(matrix%matrix_comm,IERROR)
+!		CALL MPI_BARRIER(ie_op%ie_op_comm,IERROR)
 		time_all=GetTime()
-        requests(1:matrix%Ny_loc,1:4)=>all_requests
+        requests(1:ie_op%Ny_loc,1:4)=>all_requests
 		IF (VERBOSE) THEN
-			IF (matrix%master) THEN
+			IF (ie_op%master) THEN
 				PRINT'(A80)','***********************************************************************************'
 				PRINT*, '  IE kernel with threshold', WT_Threshold, 'start'
 			ENDIF
 		ENDIF
 		time=0d0
-		Nx=matrix%Nx 
+		Nx=ie_op%Nx 
 		Nx2=Nx/2
-		Ny=matrix%Ny 
-		Ny_loc=matrix%Ny_loc 
-		Ny_offset=matrix%Ny_offset
-		Nz=matrix%Nz
-		G_symm=>matrix%G_symm
-		G_asym=>matrix%G_asym
+		Ny=ie_op%Ny 
+		Ny_loc=ie_op%Ny_loc 
+		Ny_offset=ie_op%Ny_offset
+		Nz=ie_op%Nz
+		G_symm=>ie_op%G_symm
+		G_asym=>ie_op%G_asym
 		G_symm=C_ZERO
 		G_asym=C_ZERO
 		dx=anomaly%dx
 		dy=anomaly%dy
+
+		CALL	PreparePreconditioner(ie_op,bkg,anomaly)
+
 		rmin=SQRT(dx*dx+dy*dy)/2
 		CALL VBTransformInit(rmin,lms)
 		IF (Ny_offset<Ny) THEN
@@ -102,9 +105,9 @@ CONTAINS
 				ly=shift-Iy
 			ENDIF
 			CALL MPI_IRECV(pGrecv_symm,Nrecv_symm,MPI_DOUBLE_COMPLEX,send_proc,Iy,&
-				&matrix%matrix_comm,requests(Iy+1-Ny_offset,1),IERROR)
+				&ie_op%matrix_comm,requests(Iy+1-Ny_offset,1),IERROR)
 			CALL MPI_IRECV(pGrecv_asym,Nrecv_asym,MPI_DOUBLE_COMPLEX,send_proc,Iy,&
-				&matrix%matrix_comm,requests(Iy+1-Ny_offset,3),IERROR)
+				&ie_op%matrix_comm,requests(Iy+1-Ny_offset,3),IERROR)
 			!$OMP PARALLEL PRIVATE(Ix),DEFAULT(SHARED)&
 			!$OMP &FIRSTPRIVATE(time)
 #ifdef internal_timer
@@ -115,7 +118,7 @@ CONTAINS
 #endif
 				DO Ix=xfirst,xlast
 					CALL CalcIntegralGreenTensor3dElement(Ix,ly,G_symm(:,:,Ix,Iy),&
-					&G_asym(:,:,:,Ix,Iy),Wt_Threshold,time,anomaly,bkg,matrix%dz)
+					&G_asym(:,:,:,Ix,Iy),Wt_Threshold,time,anomaly,bkg,ie_op%dz)
 				ENDDO
 				!$OMP ENDDO
 #ifdef internal_timer
@@ -132,9 +135,9 @@ CONTAINS
 			!$OMP END PARALLEL
 #endif
 			CALL MPI_ISEND(pGsend_symm,Nsend_symm,MPI_DOUBLE_COMPLEX,recv_proc,shift-Iy,&
-				&matrix%matrix_comm,requests(Iy+1-Ny_offset,2),IERROR)
+				&ie_op%matrix_comm,requests(Iy+1-Ny_offset,2),IERROR)
 			CALL MPI_ISEND(pGsend_asym,Nsend_asym,MPI_DOUBLE_COMPLEX,recv_proc,shift-Iy,&
-				&matrix%matrix_comm,requests(Iy+1-Ny_offset,4),IERROR)
+				&ie_op%matrix_comm,requests(Iy+1-Ny_offset,4),IERROR)
 		ENDDO
                 
 		CALL MPI_WAITALL(Ny_loc*4, all_requests,  MPI_STATUSES_IGNORE, IERROR)  
@@ -203,37 +206,37 @@ CONTAINS
 		ENDIF
 #ifdef internal_timer
 		time(3)=time(2)-time(4) 
-		CALL MPI_REDUCE(time,time_min,4,MPI_DOUBLE,MPI_MIN,matrix%master_proc,matrix%matrix_comm,IERROR)
-		CALL MPI_REDUCE(time,time_max,4,MPI_DOUBLE,MPI_MAX,matrix%master_proc,matrix%matrix_comm,IERROR)
+		CALL MPI_REDUCE(time,time_min,4,MPI_DOUBLE,MPI_MIN,ie_op%master_proc,ie_op%matrix_comm,IERROR)
+		CALL MPI_REDUCE(time,time_max,4,MPI_DOUBLE,MPI_MAX,ie_op%master_proc,ie_op%matrix_comm,IERROR)
 #endif
 		time_all=GetTime()-time_all
 
 #ifdef internal_timer
-		IF (matrix%master) THEN
-			matrix%counter%tensor_calc(COUNTER_ALL)=time_all	
-			matrix%counter%tensor_calc(COUNTER_WT)=time_max(1)	
-			matrix%counter%tensor_calc(COUNTER_LIN)=time_max(3) 
-			matrix%counter%tensor_calc(COUNTER_SQR)=time_max(4) 
-			matrix%counter%tensor_calc(COUNTER_OTHER)=time_all-time_max(2)-time_max(1)	
+		IF (ie_op%master) THEN
+			ie_op%counter%tensor_calc(COUNTER_ALL)=time_all	
+			ie_op%counter%tensor_calc(COUNTER_WT)=time_max(1)	
+			ie_op%counter%tensor_calc(COUNTER_LIN)=time_max(3) 
+			ie_op%counter%tensor_calc(COUNTER_SQR)=time_max(4) 
+			ie_op%counter%tensor_calc(COUNTER_OTHER)=time_all-time_max(2)-time_max(1)	
 			IF (VERBOSE) THEN
 				PRINT *,'Electrical Green Tensor has been computed.'
 				PRINT '(A12, 1ES10.2E2, A3)','Full time:  ',time_all,'s'
 				PRINT '(A12, 2ES10.2E2, A3)','Weights:	  ',time_min(1), time_max(1),'s'
 				PRINT '(A12, 2ES10.2E2, A3)','Linear part:',time_min(3), time_max(3),'s'
 				PRINT '(A12, 2ES10.2E2, A3)','Square part:',time_min(4), time_max(4),'s'
-				PRINT '(A12, 1ES10.2E2, A3)','Other:	  ',matrix%counter%tensor_calc(COUNTER_OTHER),'s'
+				PRINT '(A12, 1ES10.2E2, A3)','Other:	  ',ie_op%counter%tensor_calc(COUNTER_OTHER),'s'
 				PRINT '(A80)','***********************************************************************************'
 			ENDIF
 		ELSE
-			matrix%counter%tensor_calc(COUNTER_ALL)=time_all	
-			matrix%counter%tensor_calc(COUNTER_WT)=time(1)	
-			matrix%counter%tensor_calc(COUNTER_LIN)=time(3) 
-			matrix%counter%tensor_calc(COUNTER_SQR)=time(4) 
-			matrix%counter%tensor_calc(COUNTER_OTHER)=time_all-time(2)-time(1)	
+			ie_op%counter%tensor_calc(COUNTER_ALL)=time_all	
+			ie_op%counter%tensor_calc(COUNTER_WT)=time(1)	
+			ie_op%counter%tensor_calc(COUNTER_LIN)=time(3) 
+			ie_op%counter%tensor_calc(COUNTER_SQR)=time(4) 
+			ie_op%counter%tensor_calc(COUNTER_OTHER)=time_all-time(2)-time(1)	
 		ENDIF
 #else
-		IF (matrix%master) THEN
-			matrix%counter%tensor_calc(COUNTER_ALL)=time_all	
+		IF (ie_op%master) THEN
+			ie_op%counter%tensor_calc(COUNTER_ALL)=time_all	
 			IF (VERBOSE) THEN
 				PRINT *,'Electrical Green Tensor has been computed.'
 #ifdef performance_test
@@ -336,5 +339,17 @@ CONTAINS
 		time2=GetTime()
 		calc_time(2)=calc_time(2)+time2-time1
 #endif
+	END SUBROUTINE
+	SUBROUTINE PreparePreconditioner(ie_op,bkg,anomaly)
+		TYPE(IntegralEquation),INTENT(INOUT)::ie_op
+		TYPE (BKG_DATA_TYPE),TARGET,INTENT(INOUT)::bkg
+		TYPE (ANOMALY_TYPE),TARGET,INTENT(INOUT)::anomaly
+		INTEGER::Iz
+		IF (ie_op%real_space) THEN
+			DO Iz=1,ie_op%Nz
+					ie_op%csigb(Iz)=bkg%csigma(anomaly%Lnumber(Iz))
+					ie_op%sqsigb(Iz)=SQRT(bkg%sigma(anomaly%Lnumber(Iz)))
+			ENDDO
+		ENDIF
 	END SUBROUTINE
 ENDMODULE
