@@ -101,7 +101,11 @@ MODULE IE_SOLVER_MODULE
 			IF (ASSOCIATED(int_eq%csiga)) DEALLOCATE(int_eq%csiga)
 			ALLOCATE(int_eq%csiga(int_eq%Nz,int_eq%Nx,int_eq%Ny_loc))
 			w=freq*PI*2
+#ifdef DISPLACEMENT_CURRENTS
 			int_eq%csiga=siga-C_IONE*w*EPS0	
+#else
+			int_eq%csiga=siga	
+#endif
 		ENDIF
 
 	ENDSUBROUTINE

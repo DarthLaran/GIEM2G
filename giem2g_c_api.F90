@@ -91,7 +91,7 @@ MODULE GIEM2G_C_API
                         CALL C_F_POINTER(c_anomaly,anomaly)
                 	CALL PrepareIntegralEquation(int_eq,anomaly,wcomm,threads_ok)
                 	IF (int_eq%real_space) THEN
-				ALLOCATE(int_eq%siga(int_eq%Nz,int_eq%Nx,int_eq%Ny_loc))
+				ALLOCATE(int_eq%csiga(int_eq%Nz,int_eq%Nx,int_eq%Ny_loc))
                 	ENDIF
                 END FUNCTION
                 FUNCTION GIEM2G_CREATE_RC_OPERATOR(c_anomaly,Nr,c_recvs,wcomm,threads_ok) RESULT(RES)

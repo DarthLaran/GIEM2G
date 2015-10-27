@@ -44,7 +44,7 @@ PROGRAM GIEMIEMG
 	TYPE (ANOMALY_TYPE)::anomaly
 	TYPE (FGMRES_CTL_TYPE)::fgmres_ctl
 	REAL(REALPARM)::RC_Threshold,IE_Threshold
-	CHARACTER(len=11)::fnum1,fnum2
+	CHARACTER(len=22)::fnum1,fnum2
 	CHARACTER(len=1024),POINTER::anom_list(:)
 	INTEGER::Istr,Na,Ia
 	REAL(8)::time2
@@ -149,12 +149,12 @@ PROGRAM GIEMIEMG
 
 
 	DO Ifreq=1,Nfreq
-		WRITE (fnum1,'(F11.5)') freqs(Ifreq)
+		WRITE (fnum1,'(F22.10)') freqs(Ifreq)
 		DO Istr=1,11
-				IF (fnum1(Istr:Istr)==' ') fnum1(Istr:Istr)='0'
+		    IF (fnum1(Istr:Istr)==' ') fnum1(Istr:Istr)='0'
 		ENDDO
 		IF (me==0) THEN
-			PRINT'(A, F11.5, A)', 'Frequency:', freqs(Ifreq), 'Hz'
+		    PRINT'(A, F22.10, A)', 'Frequency:', freqs(Ifreq), 'Hz'
 		ENDIF
 		CALL Set_Freq(bkg,freqs(Ifreq))
 
@@ -162,8 +162,6 @@ PROGRAM GIEMIEMG
 		CALL CalcIntegralGreenTensor(int_eq,bkg,anomaly,IE_Threshold)
 		CALL CalcFFTofIETensor(int_eq)
 
-        IF (me==0)	PRINT'(I7, 8F25.10)' ,me, int_eq%G_symm(1,:,1,1)
-        IF (me==0)	PRINT'(I7, 4F25.10)' ,me, int_eq%G_asym(1,1,:,1,1)
 
 #ifndef performance_test
 		CALL CalcRecalculationGreenTensor(rc_op,bkg,anomaly,RC_Threshold)
@@ -180,7 +178,6 @@ PROGRAM GIEMIEMG
 				ENDIF
 			ENDIF
 
-			IF (me==0) PRINT*, 'FY=', FY
 
 
 			CALL SetAnomalySigma(int_eq,anomaly%siga,freqs(Ifreq))
