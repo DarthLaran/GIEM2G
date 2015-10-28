@@ -11,7 +11,7 @@ MODULE IE_SOLVER_MODULE
 #define no_compile
 !For integral equation kernel!
 
-	PUBLIC:: SolveEquation,SetSigb,SetAnomalySigma
+	PUBLIC:: SolveEquation,SetAnomalySigma
 	
 	CONTAINS
 
@@ -60,7 +60,7 @@ MODULE IE_SOLVER_MODULE
 				DO Ix=1,int_eq%Nx
 					DO Ic=1,3
 						DO Iz=1,Nz
-							asiga=C_TWO*int_eq%sqsigb(Iz)/(int_eq%csiga(Iz,Ix,Iy)+int_eq%csigb(Iz))
+							asiga=C_TWO*int_eq%sqsigb(Iz)/(int_eq%csiga(Iz,Ix,Iy)+CONJG(int_eq%csigb(Iz)))
 							int_eq%Esol(Iz,Ic,Ix,Iy)=asiga*int_eq%Esol(Iz,Ic,Ix,Iy)
 						ENDDO
 					ENDDO
@@ -101,7 +101,7 @@ MODULE IE_SOLVER_MODULE
 			IF (ASSOCIATED(int_eq%csiga)) DEALLOCATE(int_eq%csiga)
 			ALLOCATE(int_eq%csiga(int_eq%Nz,int_eq%Nx,int_eq%Ny_loc))
 			w=freq*PI*2
-#ifdef DISPLACEMENT_CURRENTS
+#ifndef NO_DISPLACEMENT_CURRENTS
 			int_eq%csiga=siga-C_IONE*w*EPS0	
 #else
 			int_eq%csiga=siga	
@@ -109,62 +109,6 @@ MODULE IE_SOLVER_MODULE
 		ENDIF
 
 	ENDSUBROUTINE
-#define no_compile
-#ifndef no_compile
-	SUBROUTINE SetSigb(int_eq,anomaly,bkg)
-		TYPE(IntegralEquation),INTENT(INOUT)::int_eq
-        TYPE (BKG_DATA_TYPE),TARGET,INTENT(INOUT)::bkg
-		TYPE (ANOMALY_TYPE),TARGET,INTENT(INOUT)::anomaly
-		INTEGER::anom_shape(3),tmp_shape(3)
-		INTEGER::Iz,Nx,Nz,Ny_loc
-		Nx=int_eq%Nx
-		Nz=int_eq%Nz
-		Ny_loc=int_eq%Ny_loc
-		IF (int_eq%real_space) THEN
-			IF (ASSOCIATED(int_eq%sigb))	THEN
-				anom_shape=(/Nz,Nx,Ny_loc/)
-				tmp_shape=SHAPE(int_eq%sigb)
-				IF ((tmp_shape(1)/=anom_shape(1)).OR.&
-					&(tmp_shape(2)/=anom_shape(2)).OR.&
-					&(tmp_shape(3)/=anom_shape(3))) THEN
-					DEALLOCATE(int_eq%sigb)
-					IF(ASSOCIATED(int_eq%sqsigb))DEALLOCATE(int_eq%sqsigb)
-					IF(ASSOCIATED(int_eq%asiga))DEALLOCATE(int_eq%asiga)
-					IF(ASSOCIATED(int_eq%gsig))DEALLOCATE(int_eq%gsig)
-					IF(ASSOCIATED(int_eq%dsig))DEALLOCATE(int_eq%dsig)
-					ALLOCATE(int_eq%sigb(Nz,Nx,Ny_loc))
-					ALLOCATE(int_eq%sqsigb(Nz,Nx,Ny_loc))
-					ALLOCATE(int_eq%asiga(Nz,Nx,Ny_loc))
-					ALLOCATE(int_eq%gsig(Nz,Nx,Ny_loc))
-					ALLOCATE(int_eq%dsig(Nz,Nx,Ny_loc))
-				ENDIF
-			ELSE
-				IF(ASSOCIATED(int_eq%sqsigb))DEALLOCATE(int_eq%sqsigb)
-				IF(ASSOCIATED(int_eq%asiga))DEALLOCATE(int_eq%asiga)
-				IF(ASSOCIATED(int_eq%gsig))DEALLOCATE(int_eq%gsig)
-				IF(ASSOCIATED(int_eq%dsig))DEALLOCATE(int_eq%dsig)
-				ALLOCATE(int_eq%sigb(Nz,Nx,Ny_loc))
-				ALLOCATE(int_eq%sqsigb(Nz,Nx,Ny_loc))
-				ALLOCATE(int_eq%asiga(Nz,Nx,Ny_loc))
-				ALLOCATE(int_eq%gsig(Nz,Nx,Ny_loc))
-				ALLOCATE(int_eq%dsig(Nz,Nx,Ny_loc))
-			ENDIF
-			!$OMP PARALLEL	DEFAULT(SHARED) PRIVATE(Iz)
-			!$OMP DO SCHEDULE(GUIDED)
-			DO Iz=1,int_eq%Nz
-					int_eq%sigb(Iz,:,:)=bkg%sigma(anomaly%Lnumber(Iz))
-			ENDDO
-			!$OMP ENDDO
-			!$OMP END PARALLEL
-		ENDIF
-	ENDSUBROUTINE
-#else
-	SUBROUTINE SetSigb(int_eq,anomaly,bkg)
-		TYPE(IntegralEquation),INTENT(INOUT)::int_eq
-        TYPE (BKG_DATA_TYPE),TARGET,INTENT(INOUT)::bkg
-		TYPE (ANOMALY_TYPE),TARGET,INTENT(INOUT)::anomaly
-	ENDSUBROUTINE
-#endif
 !-------------------------------------PRIVATE---------------------------------------------------------------------!
 	SUBROUTINE GIEM2G_FGMRES(int_eq,fgmres_ctl)
 		TYPE(IntegralEquation),INTENT(INOUT)::int_eq
@@ -393,7 +337,7 @@ MODULE IE_SOLVER_MODULE
 			DO Ix=1,int_eq%Nx
 				DO Ic=1,3
 					DO Iz=1,int_eq%Nz
-						asiga=C_TWO*int_eq%sqsigb(Iz)/(int_eq%csiga(Iz,Ix,Iy)+int_eq%csigb(Iz))
+						asiga=C_TWO*int_eq%sqsigb(Iz)/(int_eq%csiga(Iz,Ix,Iy)+CONJG(int_eq%csigb(Iz)))
 						dsig=int_eq%csiga(Iz,Ix,Iy)-int_eq%csigb(Iz)
 						gsig=dsig*asiga
 						int_eq%field_in4(Iz,Ic,Ix,Iy)=&
@@ -420,10 +364,10 @@ MODULE IE_SOLVER_MODULE
 			DO Ix=1,int_eq%Nx
 				DO Ic=1,3
 					DO Iz=1,int_eq%Nz
-						asiga=C_TWO*int_eq%csigb(Iz)/(int_eq%csiga(Iz,Ix,Iy)+int_eq%csigb(Iz))
+						asiga=C_TWO*int_eq%sqsigb(Iz)/(int_eq%csiga(Iz,Ix,Iy)+CONJG(int_eq%csigb(Iz)))
 						d1=field_in(Iz,Ic,Ix,Iy)*asiga
-						d2=d1-int_eq%field_out4(Iz,Ic,Ix,Iy)/(int_eq%dz(Iz))*int_eq%sqsigb(Iz)
-						field_out(Iz,Ic,Ix,Iy)=d2
+						d2=d1-int_eq%field_out4(Iz,Ic,Ix,Iy)/(int_eq%dz(Iz))
+						field_out(Iz,Ic,Ix,Iy)=d2*int_eq%sqsigb(Iz)
 					ENDDO
 				ENDDO
 			ENDDO

@@ -62,6 +62,18 @@ PROGRAM GIEMIEMG
 #else
 		 PRINT '(A)', "Timer is based on MPI_Wtime()"
 #endif
+#ifndef VOLUME_WEIGHT_QUAD
+		 PRINT '(A)', "Convolution weights are computed using double	 precision"
+#else
+		 PRINT '(A)', "Convolution weights are computed using quadruple	 precision"
+#endif
+
+#ifndef NO_DISPLACEMENT_CURRENTS 
+		 PRINT '(A)', "Displacement currents are modelled"
+#else
+		 PRINT '(A)', "Displacement currents are ignored"
+#endif
+
 	ENDIF
 	IF ( .NOT. FFTW_THREADS_DISABLE) THEN
 		IF (PROVIDED>=MPI_THREAD_FUNNELED) THEN 
@@ -132,8 +144,6 @@ PROGRAM GIEMIEMG
 		ALLOCATE(Ea(Nr,EX:EZ,int_eq%Nx,int_eq%Ny_loc),Ha(Nr,HX:HZ,int_eq%Nx,int_eq%Ny_loc))
 		ALLOCATE(Et(Nr,EX:EZ,int_eq%Nx,int_eq%Ny_loc),Ht(Nr,HX:HZ,int_eq%Nx,int_eq%Ny_loc))
 		
-!		int_eq%siga=>anomaly%siga
-!		rc_op%siga=>anomaly%siga
 
 	ELSE
 				FX=>NULL()

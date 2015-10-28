@@ -176,12 +176,12 @@ CONTAINS
 		IF (rc_op%real_space) THEN
 			!$OMP PARALLEL	DEFAULT(SHARED)
 			!$OMP WORKSHARE
-					Ha=rc_op%field_out4(:,:,1:Nx,:)
-				!$OMP END WORKSHARE
+				Ha=rc_op%field_out4(:,:,1:Nx,:)
+			!$OMP END WORKSHARE
 			!$OMP END PARALLEL
 		ELSE
-					Ea=>NULL()
-					Ha=>NULL()
+			Ea=>NULL()
+			Ha=>NULL()
 		ENDIF
 		time2=GetTime()
 		IF (VERBOSE) THEN

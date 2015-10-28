@@ -89,11 +89,11 @@ MODULE Data_Types_Module
 		REAL(KIND=RealParm),INTENT(IN)::f
 		bkg%freq=f
 		bkg%omega=f*2D0*PI
-#ifdef DISPLACEMENT_CURRENTS
-		bkg%csigma(0)=1d-10-C_IONE*bkg%omega*EPS0
+#ifndef NO_DISPLACEMENT_CURRENTS
+		bkg%csigma(0)=AIR_CONDUCTIVITY-C_IONE*bkg%omega*EPS0
 		bkg%csigma(1:)=bkg%sigma-C_IONE*bkg%omega*EPS0
 #else
-		bkg%csigma(0)=0
+		bkg%csigma(0)=0!AIR_CONDUCTIVITY
 		bkg%csigma(1:)=bkg%sigma
 #endif
 		bkg%k2=C_IONE*bkg%csigma*MU0*bkg%omega
