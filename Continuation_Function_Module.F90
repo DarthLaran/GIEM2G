@@ -160,9 +160,9 @@ CONTAINS
 			ENDIF
 		ENDIF
 		time1=GetTime()
+		Nx=rc_op%Nx
 		CALL LoadEint(rc_op,Eint)
 		CALL APPLY_RC_E_OP(rc_op)
-		CALL LoadEint(rc_op,Eint)
 		IF (rc_op%real_space) THEN
 			!$OMP PARALLEL	DEFAULT(SHARED)
 			!$OMP WORKSHARE
