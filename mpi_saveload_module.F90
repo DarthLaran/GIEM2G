@@ -429,10 +429,10 @@ CONTAINS
 		IF (me==0) THEN
 			Ic=0
 			fshape=SHAPE(Ea)
-			ALLOCATE(Ea1(fshape(1),fshape(2),fshape(3),fshape(4)))
-			ALLOCATE(Et1(fshape(1),fshape(2),fshape(3),fshape(4)))
-			ALLOCATE(Ha1(fshape(1),fshape(2),fshape(3),fshape(4)))
-			ALLOCATE(Ht1(fshape(1),fshape(2),fshape(3),fshape(4)))
+			ALLOCATE(Ea1(fshape(1),EX:EZ,fshape(3),fshape(4)))
+			ALLOCATE(Et1(fshape(1),EX:EZ,fshape(3),fshape(4)))
+			ALLOCATE(Ha1(fshape(1),HX:HZ,fshape(3),fshape(4)))
+			ALLOCATE(Ht1(fshape(1),HX:HZ,fshape(3),fshape(4)))
 			OPEN(UNIT = 77,STATUS='replace',FILE=fname//'.dat')
 			WRITE (UNIT =77,FMT=title_fmt) "%","x_recv","y_recv","z_recv","frequency",&
 							&"Re Ex^a","Im Ex^a", "Re Ey^a", "Im Ey^a",&
