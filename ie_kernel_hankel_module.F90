@@ -81,11 +81,11 @@ MODULE IE_Kernel_Image_Module
 			f3wdxy=GII(4,Iz)*WT(IE_DXY)
 
 
-			G(EXX,Iz,Iz)=(GII(1,Iz)*WT(IE_D0)*bkg%iwm+(f1wdxx+f3wdxx)/bkg%sigma(l))+G(EXX,Iz,Iz)
-			G(EXY,Iz,Iz)=(f1wdxy+f3wdxy)/bkg%sigma(l)+G(EXY,Iz,Iz)
-			G(EXZ,Iz,Iz)=f2wdx/bkg%sigma(l)+G(EXZ,Iz,Iz)
-			G(EYY,Iz,Iz)=(GII(1,Iz)*WT(IE_D0)*bkg%iwm+(f1wdyy+f3wdyy)/bkg%sigma(l))+G(EYY,Iz,Iz)
-			G(EYZ,Iz,Iz)=f2wdy/bkg%sigma(l)+G(EYZ,Iz,Iz)
+			G(EXX,Iz,Iz)=(GII(1,Iz)*WT(IE_D0)*bkg%iwm+(f1wdxx+f3wdxx)/bkg%csigma(l))+G(EXX,Iz,Iz)
+			G(EXY,Iz,Iz)=(f1wdxy+f3wdxy)/bkg%csigma(l)+G(EXY,Iz,Iz)
+			G(EXZ,Iz,Iz)=f2wdx/bkg%csigma(l)+G(EXZ,Iz,Iz)
+			G(EYY,Iz,Iz)=(GII(1,Iz)*WT(IE_D0)*bkg%iwm+(f1wdyy+f3wdyy)/bkg%csigma(l))+G(EYY,Iz,Iz)
+			G(EYZ,Iz,Iz)=f2wdy/bkg%csigma(l)+G(EYZ,Iz,Iz)
 			G(EZZ,Iz,Iz)=f2wdzz+G(EZZ,Iz,Iz)
 
 #ifdef internal_timer

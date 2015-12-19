@@ -44,7 +44,7 @@ PROGRAM GIEMIEMG
 	TYPE (ANOMALY_TYPE)::anomaly
 	TYPE (FGMRES_CTL_TYPE)::fgmres_ctl
 	REAL(REALPARM)::RC_Threshold,IE_Threshold
-	CHARACTER(len=11)::fnum1,fnum2
+	CHARACTER(len=22)::fnum1,fnum2
 	CHARACTER(len=1024),POINTER::anom_list(:)
 	INTEGER::Istr,Na,Ia
 	REAL(8)::time2
@@ -62,6 +62,18 @@ PROGRAM GIEMIEMG
 #else
 		 PRINT '(A)', "Timer is based on MPI_Wtime()"
 #endif
+#ifndef VOLUME_WEIGHT_QUAD
+		 PRINT '(A)', "Convolution weights are computed using double	 precision"
+#else
+		 PRINT '(A)', "Convolution weights are computed using quadruple	 precision"
+#endif
+
+#ifndef NO_DISPLACEMENT_CURRENTS 
+		 PRINT '(A)', "Displacement currents are modelled"
+#else
+		 PRINT '(A)', "Displacement currents are ignored"
+#endif
+
 	ENDIF
 	IF ( .NOT. FFTW_THREADS_DISABLE) THEN
 		IF (PROVIDED>=MPI_THREAD_FUNNELED) THEN 
@@ -95,6 +107,7 @@ PROGRAM GIEMIEMG
 #ifdef performance_test
 	IF (me==0) THEN
 		PRINT'(A)','PERFORMACE TEST'
+		PRINT'(A)','NO CONTINUATION TO RECIEVERS'
 		PRINT'(A)','NO RESULT STORAGE'
 	ENDIF
 #endif
@@ -121,10 +134,9 @@ PROGRAM GIEMIEMG
 	IF (me==0) PRINT*, 'Number of blocks in async FFT', int_eq%DFD%Nb
 	real_comm=int_eq%fgmres_comm
 
+#ifndef performance_test
 	CALL PrepareContinuationOperator(rc_op,anomaly,recvs,wcomm,threads_ok);!,int_eq%DFD)
-
-	CALL  SetSigb(int_eq,anomaly,bkg)
-	CALL SetSigbRC(rc_op,anomaly,bkg)
+#endif
 
 	IF (int_eq%real_space) THEN
 		CALL AllocateSiga(anomaly)
@@ -132,8 +144,6 @@ PROGRAM GIEMIEMG
 		ALLOCATE(Ea(Nr,EX:EZ,int_eq%Nx,int_eq%Ny_loc),Ha(Nr,HX:HZ,int_eq%Nx,int_eq%Ny_loc))
 		ALLOCATE(Et(Nr,EX:EZ,int_eq%Nx,int_eq%Ny_loc),Ht(Nr,HX:HZ,int_eq%Nx,int_eq%Ny_loc))
 		
-		int_eq%siga=>anomaly%siga
-		rc_op%siga=>anomaly%siga
 
 	ELSE
 				FX=>NULL()
@@ -149,12 +159,12 @@ PROGRAM GIEMIEMG
 
 
 	DO Ifreq=1,Nfreq
-		WRITE (fnum1,'(F11.5)') freqs(Ifreq)
+		WRITE (fnum1,'(F22.10)') freqs(Ifreq)
 		DO Istr=1,11
-				IF (fnum1(Istr:Istr)==' ') fnum1(Istr:Istr)='0'
+		    IF (fnum1(Istr:Istr)==' ') fnum1(Istr:Istr)='0'
 		ENDDO
 		IF (me==0) THEN
-			PRINT'(A, F11.5, A)', 'Frequency:', freqs(Ifreq), 'Hz'
+		    PRINT'(A, F22.10, A)', 'Frequency:', freqs(Ifreq), 'Hz'
 		ENDIF
 		CALL Set_Freq(bkg,freqs(Ifreq))
 
@@ -162,12 +172,11 @@ PROGRAM GIEMIEMG
 		CALL CalcIntegralGreenTensor(int_eq,bkg,anomaly,IE_Threshold)
 		CALL CalcFFTofIETensor(int_eq)
 
-        IF (me==0)	PRINT'(I7, 8F25.10)' ,me, int_eq%G_symm(1,:,1,1)
-        IF (me==0)	PRINT'(I7, 4F25.10)' ,me, int_eq%G_asym(1,1,:,1,1)
 
+#ifndef performance_test
 		CALL CalcRecalculationGreenTensor(rc_op,bkg,anomaly,RC_Threshold)
 		CALL CalcFFTofRCTensor(rc_op)
-
+#endif
 		DO Ia=1,Na
 			WRITE (fnum2,'(I5.5)') Ia
 			IF (me==0)	PRINT*, 'Anomaly ', Ia, ' from ', trim(anom_list(Ia))
@@ -179,10 +188,13 @@ PROGRAM GIEMIEMG
 				ENDIF
 			ENDIF
 
-			IF (me==0) PRINT*, 'FY=', FY
 
 
+			CALL SetAnomalySigma(int_eq,anomaly%siga,freqs(Ifreq))
+			rc_op%csigb=>int_eq%csigb
+			rc_op%csiga=>int_eq%csiga
 			CALL SolveEquation(int_eq,fgmres_ctl)
+
 			time2=GetTime()
 #ifndef performance_test
 			IF (int_eq%real_space) THEN
@@ -193,9 +205,7 @@ PROGRAM GIEMIEMG
 			IF (int_eq%master) THEN
 				PRINT*, "Save IE Solution in",time2, 's'
 			ENDIF
-#endif
 			CALL ReCalculation(rc_op,int_eq%Esol,Ea,Ha)
-#ifndef performance_test
 			time2=GetTime()
 			IF (int_eq%real_space) THEN
 
@@ -232,10 +242,8 @@ PROGRAM GIEMIEMG
 			IF (int_eq%master) THEN
 				PRINT*, "Save IE Solution in",time2, 's'
 			ENDIF
-#endif
 			CALL ReCalculation(rc_op,int_eq%Esol,Ea,Ha)
 
-#ifndef performance_test
 			time2=GetTime()
 			IF (int_eq%real_space) THEN
 

@@ -15,7 +15,7 @@ CONTAINS
 			OPEN(077,file=background)
 			READ(077,*) N
 			bkg%Nl=N
-			ALLOCATE (bkg%sigma(N), bkg%thick(1:N-1), bkg%depth(1:N-1),bkg%csig(1:N-1))
+			ALLOCATE (bkg%sigma(N), bkg%thick(1:N-1), bkg%depth(1:N-1),bkg%csigma(0:N))
 			READ(077,*) bkg%sigma
 			READ(077,*) bkg%thick
 			CLOSE(077)
@@ -23,9 +23,9 @@ CONTAINS
 		CALL MPI_BCAST(N,1,MPI_INTEGER, 0, comm, IERROR)
 		IF (me/=0) THEN 
 			bkg%Nl=N
-			ALLOCATE (bkg%sigma(N), bkg%thick(1:N-1), bkg%depth(1:N-1),bkg%csig(1:N-1))
+			ALLOCATE (bkg%sigma(N), bkg%thick(1:N-1), bkg%depth(1:N-1),bkg%csigma(0:N))
 		ENDIF
-		ALLOCATE (bkg%k(N),bkg%k2(N))
+		ALLOCATE (bkg%k(0:N),bkg%k2(0:N))
 		CALL MPI_BCAST(bkg%sigma,N,MPI_DOUBLE_PRECISION, 0, comm, IERROR)
 		IF (N>1) THEN
 			CALL MPI_BCAST(bkg%thick,N-1,MPI_DOUBLE_PRECISION, 0, comm, IERROR)
@@ -45,7 +45,7 @@ CONTAINS
 	ENDSUBROUTINE
 	SUBROUTINE LoadAnomalyShape(anomaly,bkg,comm,anomaly_shape,loadz)
 		TYPE (ANOMALY_TYPE),INTENT(INOUT)::anomaly
-        TYPE (BKG_DATA_TYPE),TARGET,INTENT(IN)::bkg
+	        TYPE (BKG_DATA_TYPE),TARGET,INTENT(IN)::bkg
 		INTEGER(MPI_CTL_KIND),INTENT(IN)::comm
 		CHARACTER(*),INTENT(IN)::anomaly_shape
 		LOGICAL,OPTIONAL,INTENT(IN)::loadz

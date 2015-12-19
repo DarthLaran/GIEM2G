@@ -144,10 +144,6 @@ MODULE DISTRIBUTED_FFT_MODULE
 		DO Ib=1,Nb
 			block=>DFD%block(Ib)
 			CALL MPI_COMM_DUP(comm,block%comm, IERROR)
-			IF (dfd%me==0) THEN
-				PRINT '(I4,4I16)',Ib, SIZE(block%field_fft_x_in),SHAPE(block%field_fft_x_in)
-				PRINT '(I4,4I16)',Ib, SIZE(block%field_fft_y_in),SHAPE(block%field_fft_y_in)
-			ENDIF
 		ENDDO
 		IF (Nb==1) THEN
 			CALL CreateAll2AllPlan(DFD)
@@ -655,7 +651,7 @@ MODULE DISTRIBUTED_FFT_MODULE
 		REAL(REALPARM)::variation(8)
 		INTEGER(MPI_CTL_KIND)::IERROR
 		INTEGER::M,Nfwd,Nbwd
-		CHARACTER(LEN=*), PARAMETER  :: info_fmt = "(A36, ES10.2E3, A3, F10.3 A3)"
+		CHARACTER(LEN=*), PARAMETER  :: info_fmt = "(A36, ES10.2E3, A3, F10.3, A3)"
 		Nfwd=DFD%timer(FFT_FWD)%N
 		Nbwd=DFD%timer(FFT_BWD)%N
 		M=Nfwd+Nbwd

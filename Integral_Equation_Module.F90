@@ -55,14 +55,9 @@ MODULE INTEGRAL_EQUATION_MODULE
 
 		INTEGER(8)::N
 		INTEGER::Nloc
-		REAL(REALPARM),POINTER ::siga(:,:,:)
-		REAL(REALPARM),POINTER ::sigb(:,:,:)
-		REAL(REALPARM),POINTER ::dsig(:,:,:)
-
-
-		REAL(REALPARM),POINTER ::asiga(:,:,:)
-		REAL(REALPARM),POINTER ::sqsigb(:,:,:)
-		REAL(REALPARM),POINTER ::gsig(:,:,:)
+		COMPLEX(REALPARM),POINTER ::csiga(:,:,:)
+		COMPLEX(REALPARM),POINTER ::csigb(:)
+		REAL(REALPARM),POINTER ::sqsigb(:)
 
 		COMPLEX(REALPARM),POINTER::Esol(:,:,:,:)
 		COMPLEX(REALPARM),POINTER::E_n(:,:,:,:)
@@ -73,7 +68,7 @@ MODULE INTEGRAL_EQUATION_MODULE
 		INTEGER(MPI_CTL_KIND)::fgmres_comm
 		INTEGER(MPI_CTL_KIND)::fgmres_me
 		LOGICAL::real_space
-	  ENDTYPE
+	ENDTYPE
 	PUBLIC::  IntegralEquation,TypeCounter
 	PUBLIC::PrepareIntegralEquation
 CONTAINS
@@ -176,6 +171,8 @@ CONTAINS
 			ALLOCATE(ie_op%solution(ie_op%Nloc))
 			ALLOCATE(ie_op%initial_guess(ie_op%Nloc))
 			ALLOCATE(ie_op%rhs(ie_op%Nloc))
+			ALLOCATE(ie_op%csigb(Nz))
+			ALLOCATE(ie_op%sqsigb(Nz))
 			ie_op%Esol(1:Nz,1:3,1:Nx,1:ie_op%Ny_loc)=>ie_op%solution
 			ie_op%E_n(1:Nz,1:3,1:Nx,1:ie_op%Ny_loc)=>ie_op%rhs
 		ELSE
@@ -186,12 +183,12 @@ CONTAINS
 			ie_op%initial_guess=>NULL()
 			ie_op%rhs=>NULL()
 		ENDIF
-		ie_op%siga=>NULL()
-		ie_op%sigb=>NULL()
-		ie_op%asiga=>NULL()
-		ie_op%sqsigb=>NULL()
-		ie_op%gsig=>NULL()
-		ie_op%dsig=>NULL()
+		ie_op%csiga=>NULL()
+!		ie_op%sigb=>NULL()
+!		ie_op%asiga=>NULL()
+!		ie_op%sqsigb=>NULL()
+!		ie_op%gsig=>NULL()
+!		ie_op%dsig=>NULL()
 		anomaly%Ny_loc=ie_op%Ny_loc
 		ie_op%dz=anomaly%z(1:Nz)-anomaly%z(0:Nz-1)
 	ENDSUBROUTINE
@@ -397,6 +394,7 @@ CONTAINS
 		ie_op%field_out3=>NULL()
 		CALL DeleteMatrix(ie_op)
 		CALL DeleteDistributedFourierData(ie_op%DFD)
+		IF (ie_op%real_space )	DEALLOCATE(ie_op%csigb,ie_op%sqsigb)
 	ENDSUBROUTINE
 
 ENDMODULE

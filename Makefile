@@ -1,21 +1,22 @@
 ifneq ($(MAKECMDGOALS), clean)
 include $(MAKECMDGOALS).make	
+else
+	FFT_QUAD_OOURA=1
 endif
-MISC_O=const_module.o  mpi_module.o timer_module.o fftw3_mod.o check_memory_module.o Distributed_FFT.o
-#FILTER_WEIGHTS_O=IntegralCodes.o VolumeBesselTransforms.o 
-ifdef FFT_QUAD_OURA
+ifdef FFT_QUAD_OOURA
 	FILTER_WEIGHTS_O=IntegralCodes.o FFT_Quadruple.o  VolumeBesselTransforms.o 
 	OPTS=$(FOPTS) -D FFT_QUAD_OOURA
 else
 	FILTER_WEIGHTS_O=IntegralCodes.o   VolumeBesselTransforms.o  
 	OPTS=$(FOPTS)
 endif
+MISC_O=const_module.o  mpi_module.o timer_module.o fftw3_mod.o check_memory_module.o Distributed_FFT.o
 MODEL_O=data_types_module.o  mpi_saveload_module.o
 IMAGE_O= apq_module.o  ie_kernel_hankel_module.o  rc_kernel_hankel_module.o 
 IE_O=Integral_Equation_Module.o calc_ie_tensor_module.o ie_solver_module.o   
 RC_O=Continuation_Function_Module.o calc_rc_tensor_module.o
 SRC_O=sources_module.o
-API_O=giem2g_c_api.o
+API_O=#giem2g_c_api.o
 
 ALL_O=$(MISC_O) $(FILTER_WEIGHTS_O) $(MODEL_O) $(IMAGE_O) $(IE_O) $(RC_O) $(SRC_O) $(API_O)
 
@@ -46,6 +47,6 @@ giem2g_lib: $(ALL_O)  $(MAKECMDGOALS).make Makefile
 %.o:%.F90
 	$(FC) $(OPTS) -c $*.F90 -o $*.o $(INCLUDE)
 clean:
-	rm $(ALL_O)   *.mod  FFT_Quadruple.o
+	rm $(ALL_O)   *.mod  
 	$(MAKE) -C ZFGMRES clean
 	rm libgiem2g.a

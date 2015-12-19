@@ -51,9 +51,8 @@ MODULE CONTINUATION_FUNCTION_MODULE
 		COMPLEX(REALPARM),POINTER::field_in4(:,:,:,:),field_out4(:,:,:,:)
 		COMPLEX(REALPARM),POINTER::field_in3(:,:,:),field_out3(:,:,:)
 		TYPE(C_PTR)::planFwd,planBwd
-		REAL(REALPARM),POINTER ::siga(:,:,:)
-		REAL(REALPARM),POINTER ::sigb(:,:,:)
-		REAL(REALPARM),POINTER ::dsig(:,:,:)
+		COMPLEX(REALPARM),POINTER ::csiga(:,:,:)
+		COMPLEX(REALPARM),POINTER ::csigb(:)
 		LOGICAL::real_space
 		LOGICAL::fftw_threads_ok
 		TYPE(DistributedFourierData)::DFD_Current
@@ -138,9 +137,8 @@ CONTAINS
 				CALL MPI_FINALIZE(IERROR)
 				STOP
 		ENDIF
-		rc_op%siga=>NULL()
-		rc_op%sigb=>NULL()
-		rc_op%dsig=>NULL()
+		rc_op%csiga=>NULL()
+		rc_op%csigb=>NULL()
 		anomaly%Ny_loc=rc_op%Ny_loc
 	ENDSUBROUTINE
 #define no_compile	
@@ -150,6 +148,7 @@ CONTAINS
 		COMPLEX(REALPARM),POINTER,INTENT(OUT)::Ea(:,:,:,:)
 		COMPLEX(REALPARM),POINTER,INTENT(OUT)::Ha(:,:,:,:)
 		INTEGER(MPI_CTL_KIND)::IERROR
+		COMPLEX(REALPARM)::dsig
 		INTEGER::Nx
 		CHARACTER(LEN=*), PARAMETER  :: info_fmt = "(A, ES10.2E3)"
 		REAL(8)::time1,time2
@@ -162,45 +161,27 @@ CONTAINS
 		ENDIF
 		time1=GetTime()
 		Nx=rc_op%Nx
-		IF (rc_op%real_space) THEN
-			!$OMP PARALLEL	DEFAULT(SHARED)
-			!$OMP WORKSHARE
-					rc_op%dsig=(rc_op%siga-rc_op%sigb)
-					rc_op%field_in4(:,EX,1:Nx,:)=rc_op%dsig*Eint(:,EX,:,:)
-					rc_op%field_in4(:,EY,1:Nx,:)=rc_op%dsig*Eint(:,EY,:,:)
-					rc_op%field_in4(:,EZ,1:Nx,:)=rc_op%dsig*Eint(:,EZ,:,:)
-					rc_op%field_in4(:,:,Nx+1:,:)=C_ZERO
-			!$OMP END WORKSHARE
-			!$OMP END PARALLEL
-		ELSE
-					rc_op%field_in4=C_ZERO
-		ENDIF
+		CALL LoadEint(rc_op,Eint)
 		CALL APPLY_RC_E_OP(rc_op)
 		IF (rc_op%real_space) THEN
-
 			!$OMP PARALLEL	DEFAULT(SHARED)
 			!$OMP WORKSHARE
-					Ea=rc_op%field_out4(:,:,1:Nx,:)
-					rc_op%field_in4(:,EX,1:Nx,:)=rc_op%dsig*Eint(:,EX,:,:)
-					rc_op%field_in4(:,EY,1:Nx,:)=rc_op%dsig*Eint(:,EY,:,:)
-					rc_op%field_in4(:,EZ,1:Nx,:)=rc_op%dsig*Eint(:,EZ,:,:)
-					rc_op%field_in4(:,:,Nx+1:,:)=C_ZERO
-				!$OMP END WORKSHARE
+				Ea=rc_op%field_out4(:,:,1:Nx,:)
+			!$OMP END WORKSHARE
 			!$OMP END PARALLEL
-		ELSE
-					rc_op%field_in4=C_ZERO
 		ENDIF
 
+		CALL LoadEint(rc_op,Eint)
 		CALL APPLY_RC_H_OP(rc_op)
 		IF (rc_op%real_space) THEN
 			!$OMP PARALLEL	DEFAULT(SHARED)
 			!$OMP WORKSHARE
-					Ha=rc_op%field_out4(:,:,1:Nx,:)
-				!$OMP END WORKSHARE
+				Ha=rc_op%field_out4(:,:,1:Nx,:)
+			!$OMP END WORKSHARE
 			!$OMP END PARALLEL
 		ELSE
-					Ea=>NULL()
-					Ha=>NULL()
+			Ea=>NULL()
+			Ha=>NULL()
 		ENDIF
 		time2=GetTime()
 		IF (VERBOSE) THEN
@@ -212,7 +193,31 @@ CONTAINS
 		ENDIF
 				
 	END SUBROUTINE
-
+	SUBROUTINE LoadEint(rc_op,Eint)
+		TYPE(RC_Operator),INTENT(INOUT)::rc_op
+		COMPLEX(REALPARM),POINTER,INTENT(IN)::Eint(:,:,:,:)
+		INTEGER::Nz,Nx,Ny_loc
+		INTEGER::Iz,Ix,Iy,Ic
+		COMPLEX(REALPARM)::dsig
+		Nx=rc_op%Nx
+		Ny_loc=rc_op%Ny_loc
+		Nz=rc_op%Nz
+		IF (rc_op%real_space) THEN
+			DO Iy=1,Ny_loc
+				DO Ix=1,Nx
+					DO Ic=1,3
+						DO Iz=1,Nz
+							dsig=(rc_op%csiga(Iz,Ix,Iy)-rc_op%csigb(Iz))
+							rc_op%field_in4(Iz,Ic,Ix,Iy)=dsig*Eint(Iz,Ic,Ix,Iy)
+						ENDDO
+					ENDDO
+				ENDDO
+			ENDDO
+			rc_op%field_in4(:,:,Nx+1:,:)=C_ZERO
+		ELSE
+			rc_op%field_in4=C_ZERO
+		ENDIF
+	ENDSUBROUTINE
 	SUBROUTINE CalcSizesForRC_OP(rc_op) 
 		TYPE(RC_Operator),INTENT(INOUT)::rc_op
 		INTEGER(C_INTPTR_T)::tsize8(2)
@@ -359,41 +364,6 @@ CONTAINS
 		CALL DeleteDistributedFourierData(rc_op%DFD_Result)
 	ENDSUBROUTINE
 
-	SUBROUTINE SetSigbRC(rc_op,anomaly,bkg)
-		TYPE(rc_operator),INTENT(INOUT)::rc_op
-		TYPE (BKG_DATA_TYPE),TARGET,INTENT(INOUT)::bkg
-		TYPE (ANOMALY_TYPE),TARGET,INTENT(INOUT)::anomaly
-		INTEGER::anom_shape(3),tmp_shape(3)
-		INTEGER::Iz,Nx,Nz,Ny_loc
-		Nx=rc_op%Nx
-		Nz=rc_op%Nz
-		Ny_loc=rc_op%Ny_loc
-		IF (rc_op%real_space) THEN
-			IF (ASSOCIATED(rc_op%sigb))	THEN
-				anom_shape=(/Nz,Nx,Ny_loc/)
-				tmp_shape=SHAPE(rc_op%sigb)
-				IF ((tmp_shape(1)/=anom_shape(1)).OR.&
-					&(tmp_shape(2)/=anom_shape(2)).OR.&
-					&(tmp_shape(3)/=anom_shape(3))) THEN
-					DEALLOCATE(rc_op%sigb)
-					IF(ASSOCIATED(rc_op%dsig))DEALLOCATE(rc_op%dsig)
-					ALLOCATE(rc_op%sigb(Nz,Nx,Ny_loc))
-					ALLOCATE(rc_op%dsig(Nz,Nx,Ny_loc))
-				ENDIF
-			ELSE
-				IF(ASSOCIATED(rc_op%dsig))DEALLOCATE(rc_op%dsig)
-				ALLOCATE(rc_op%sigb(Nz,Nx,Ny_loc))
-				ALLOCATE(rc_op%dsig(Nz,Nx,Ny_loc))
-			ENDIF
-			!!$OMP PARALLEL	DEFAULT(SHARED) PRIVATE(Iz)
-			!!$OMP DO SCHEDULE(GUIDED)
-			DO Iz=1,rc_op%Nz
-					rc_op%sigb(Iz,:,:)=bkg%sigma(anomaly%Lnumber(Iz))
-			ENDDO
-			!!$OMP ENDDO
-			!!$OMP END PARALLEL
-		ENDIF
-	ENDSUBROUTINE
 
 	SUBROUTINE APPLY_RC_E_OP(rc_op)
 		TYPE(RC_OPERATOR),INTENT(INOUT)::rc_op

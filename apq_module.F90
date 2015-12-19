@@ -1,17 +1,14 @@
 MODULE APQ_Module
 	USE Const_module
 	USE DATA_TYPES_MODULE
-		IMPLICIT NONE
-		
-		
-		
-		INTERFACE Calc_pexpz
-			MODULE PROCEDURE Calc_pexpz_All,Calc_pexpz_Seg
-		END INTERFACE
-		INTERFACE Calc_qexpz
-			MODULE PROCEDURE Calc_qexpz_All,Calc_qexpz_Seg
-		END INTERFACE
-   CONTAINS
+	IMPLICIT NONE
+	INTERFACE Calc_pexpz
+		MODULE PROCEDURE Calc_pexpz_All,Calc_pexpz_Seg
+	END INTERFACE
+	INTERFACE Calc_qexpz
+		MODULE PROCEDURE Calc_qexpz_All,Calc_qexpz_Seg
+	END INTERFACE
+CONTAINS
 
 	SUBROUTINE Calc_FtFb(bkg,anomaly,dz,expz,pexpz,qexpz,eta,Arr,Ft,Fb,GII)
 		TYPE (BKG_DATA_TYPE),INTENT(IN)::bkg
@@ -56,7 +53,7 @@ MODULE APQ_Module
 			GII(2,I)=Fb3(2)-Ft(2,I)
 
 
-			GII(3,I)=(w(2)+2e0_REALPARM/eta2*dz(I))*bkg%iwm+eta2/bkg%sigma(l)*w(2)
+			GII(3,I)=(w(2)+2e0_REALPARM/eta2*dz(I))*bkg%iwm+eta2/bkg%csigma(l)*w(2)
 
 			GII(4,I)=Fb3(3)-Ft(3,I)-eta2*w(1)
 			Fb(I)=Fb3(2)
@@ -90,7 +87,7 @@ MODULE APQ_Module
 			t_frame(1,I)=w*b(1)/c(1)
 			t_frame(2,I)=C_ONE-fcont(2,I)
 			t_frame(3,I)=w*b(2)/c(2)
-			t_frame(2:3,I)=t_frame(2:3,I)/bkg%sigma(l)
+			t_frame(2:3,I)=t_frame(2:3,I)/bkg%csigma(l)
 		ENDDO
 	ENDSUBROUTINE
 
@@ -133,7 +130,7 @@ MODULE APQ_Module
 			d=C_ONE+a*expz(I)*expz(I)
 			a=C_ONE+a
 			fcont(I)=expz(I)*a/d
-			b_frame(I)=(fcont(I)-C_ONE)/bkg%sigma(l)
+			b_frame(I)=(fcont(I)-C_ONE)/bkg%csigma(l)
 		ENDDO
 	ENDSUBROUTINE
 
@@ -213,59 +210,62 @@ MODULE APQ_Module
 		ENDDO
 	ENDSUBROUTINE
 	SUBROUTINE Calc_Apq(bkg,lms,Arr,p,q,eta,A)
-						TYPE (BKG_DATA_TYPE),INTENT(IN)::bkg
-			COMPLEX(REALPARM),INTENT(INOUT)::p(bkg%Nl,2),q(bkg%Nl,2)
-						COMPLEX(REALPARM),INTENT(INOUT)::eta(bkg%Nl),Arr(bkg%Nl,2)
-			COMPLEX(REALPARM),OPTIONAL,INTENT(INOUT)::A(bkg%Nl,bkg%Nl,2)
-			REAL(REALPARM),INTENT(IN)::lms
-			COMPLEX(REALPARM)::eta0,el(bkg%Nl),w(bkg%Nl,2),tmp
-			INTEGER:: I,J
-			DO I=1,bkg%Nl
-				eta(I)=SQRT(lms*lms-bkg%k2(I))
-			ENDDO
+		TYPE (BKG_DATA_TYPE),INTENT(IN)::bkg
+		COMPLEX(REALPARM),INTENT(INOUT)::p(bkg%Nl,2),q(bkg%Nl,2)
+		COMPLEX(REALPARM),INTENT(INOUT)::eta(bkg%Nl),Arr(bkg%Nl,2)
+		COMPLEX(REALPARM),OPTIONAL,INTENT(INOUT)::A(bkg%Nl,bkg%Nl,2)
+		REAL(REALPARM),INTENT(IN)::lms
+		COMPLEX(REALPARM)::eta0,el(bkg%Nl),w(bkg%Nl,2),tmp
+		INTEGER:: I,J
+		DO I=1,bkg%Nl
+			eta(I)=SQRT(lms*lms-bkg%k2(I))
+		ENDDO
+		DO I=1,bkg%Nl-1
+			el(I)=EXP(-2*eta(I)*bkg%thick(I))
+		ENDDO
+		el(bkg%Nl)=C_ZERO
+		p=Calc_p(bkg,eta,el,lms)
+		q=Calc_q(bkg,eta,el)
+		DO I=1,bkg%Nl
+			Arr(I,:)=C_ONE/eta(I)/(C_ONE-p(I,:)*q(I,:)*el(I))
+		ENDDO
+		IF (PRESENT(A))THEN
 			DO I=1,bkg%Nl-1
-				el(I)=EXP(-2*eta(I)*bkg%thick(I))
+				tmp=(bkg%k2(I)-bkg%k2(I+1))
+				tmp=bkg%depth(I)*tmp
+				tmp=tmp/(eta(I+1)+eta(I))
+				w(I,:)=(C_ONE+p(I+1,:))/(C_ONE+p(I,:)*el(I))*EXP(tmp)
 			ENDDO
-			el(bkg%Nl)=C_ZERO
-			p=Calc_p(bkg,eta,el,lms)
-			q=Calc_q(bkg,eta,el)
 			DO I=1,bkg%Nl
-				Arr(I,:)=C_ONE/eta(I)/(C_ONE-p(I,:)*q(I,:)*el(I))
+				A(I,I,:)=Arr(I,:)
+				DO J=I-1,1,-1
+					A(J,I,:)=A(J+1,I,:)*w(J,:)
+					A(I,J,1)=A(J,I,1)
+					A(I,J,2)=A(J,I,2)*bkg%csigma(I)/bkg%csigma(J)
+				ENDDO
 			ENDDO
-			IF (PRESENT(A))THEN
-				DO I=1,bkg%Nl-1
-					tmp=(bkg%k2(I)-bkg%k2(I+1))
-					tmp=bkg%depth(I)*tmp
-					tmp=tmp/(eta(I+1)+eta(I))
-					w(I,:)=(C_ONE+p(I+1,:))/(C_ONE+p(I,:)*el(I))*EXP(tmp)
-				ENDDO
-				DO I=1,bkg%Nl
-					A(I,I,:)=Arr(I,:)
-					DO J=I-1,1,-1
-						A(J,I,:)=A(J+1,I,:)*w(J,:)
-						A(I,J,1)=A(J,I,1)
-						A(I,J,2)=A(J,I,2)*bkg%sigma(I)/bkg%sigma(J)
-					ENDDO
-				ENDDO
-			ENDIF
+		ENDIF
 	ENDSUBROUTINE
 	FUNCTION Calc_p(bkg,eta,el,lms) RESULT(p)
 			TYPE (BKG_DATA_TYPE),INTENT(IN)::bkg
 			COMPLEX(REALPARM),INTENT(IN)::eta(bkg%Nl),el(bkg%Nl)
 			REAL(REALPARM),INTENT(IN)::lms
 			COMPLEX(REALPARM)::p(bkg%Nl,2)
-			COMPLEX(REALPARM)::eta0,w(2),a(2)
+			COMPLEX(REALPARM)::eta0,w(2),a(2),cgamma,ceta
 			INTEGER:: I
-			eta0=lms! change for displacement currents in future
+			eta0=sqrt(lms*lms-bkg%k2(0))
+			ceta=eta0/eta(1)
+			p(1,1)=(C_ONE-ceta)/(C_ONE+ceta)
+			cgamma=bkg%csigma(0)/bkg%csigma(1)
 
-			p(1,1)=(eta(1)-eta0)/(eta(1)+eta0)
-			p(1,2)=-1! change for displacement currents in future
+			p(1,2)=(cgamma-ceta)/(cgamma+ceta)
+
 			DO I=2,bkg%Nl
 				w(1)=el(I-1)*p(I-1,1)
 				w(2)=el(I-1)*p(I-1,2)
 				w=(w-1)/(w+1)
 				a(1)=eta(I-1)/eta(I)
-				a(2)=a(1)*bkg%sigma(I)/bkg%sigma(I-1)
+				a(2)=a(1)*bkg%csigma(I)/bkg%csigma(I-1)
 				w=w*a
 				p(I,:)=(1+w)/(1-w)
 			ENDDO
@@ -279,14 +279,14 @@ MODULE APQ_Module
 			q(bkg%Nl,:)=C_ZERO
 			IF (bkg%Nl>1) THEN 
 				a(1)=eta(bkg%Nl)/eta(bkg%Nl-1)
-				a(2)=a(1)*bkg%sigma(bkg%Nl-1)/bkg%sigma(bkg%Nl)
+				a(2)=a(1)*bkg%csigma(bkg%Nl-1)/bkg%csigma(bkg%Nl)
 				q(bkg%Nl-1,:)=(1-a)/(1+a)
 				DO I=bkg%Nl-2,1,-1
 					w(1)=el(I+1)*q(I+1,1)
 					w(2)=el(I+1)*q(I+1,2)
 					w=(w-1)/(w+1)
 					a(1)=eta(I+1)/eta(I)
-					a(2)=a(1)*bkg%sigma(I)/bkg%sigma(I+1)
+					a(2)=a(1)*bkg%csigma(I)/bkg%csigma(I+1)
 					w=w*a
 					q(I,:)=(1+w)/(1-w)
 				ENDDO

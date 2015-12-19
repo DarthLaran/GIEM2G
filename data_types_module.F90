@@ -5,7 +5,7 @@ MODULE Data_Types_Module
 	TYPE BKG_DATA_TYPE
 		INTEGER :: Nl
 		REAL (REALPARM),POINTER:: sigma(:), thick(:), depth(:)
-		COMPLEX(REALPARM),POINTER::csig(:)
+		COMPLEX(REALPARM),POINTER::csigma(:)
 		REAL (REALPARM) :: freq,omega
 		COMPLEX (RealParm),POINTER :: k(:),k2(:)
 		COMPLEX(REALPARM)::iwm
@@ -17,8 +17,8 @@ MODULE Data_Types_Module
 		REAL(REALPARM)::dx,dy
 		REAL(REALPARM),POINTER::z(:)
 		INTEGER,POINTER::Lnumber(:)
-		COMPLEX(REALPARM),POINTER::csiga(:,:,:)
 		REAL(REALPARM),POINTER::siga(:,:,:)
+		REAL(REALPARM),POINTER::epsa(:,:,:)
 	ENDTYPE
 
 	TYPE RECEIVER_TYPE
@@ -88,10 +88,17 @@ MODULE Data_Types_Module
 		TYPE (BKG_DATA_TYPE),INTENT(INOUT)::bkg
 		REAL(KIND=RealParm),INTENT(IN)::f
 		bkg%freq=f
-				bkg%omega=f*2D0*PI
-		bkg%k2=(0D0,1D0)*bkg%sigma*MU0*bkg%omega
-				bkg%k=SQRT(bkg%k2)
-				bkg%iwm=(0D0,1D0)*MU0*bkg%omega
+		bkg%omega=f*2D0*PI
+#ifndef NO_DISPLACEMENT_CURRENTS
+		bkg%csigma(0)=AIR_CONDUCTIVITY-C_IONE*bkg%omega*EPS0
+		bkg%csigma(1:)=bkg%sigma-C_IONE*bkg%omega*EPS0
+#else
+		bkg%csigma(0)=0!AIR_CONDUCTIVITY
+		bkg%csigma(1:)=bkg%sigma
+#endif
+		bkg%k2=C_IONE*bkg%csigma*MU0*bkg%omega
+		bkg%k=SQRT(bkg%k2)
+		bkg%iwm=C_IONE*MU0*bkg%omega
 	END SUBROUTINE
 	SUBROUTINE AllocateSiga(anomaly)
 			TYPE (ANOMALY_TYPE),INTENT(INOUT)::anomaly
