@@ -35,7 +35,7 @@ endif
 zfgmres:
 	$(MAKE) -C ZFGMRES FC=$(F77)  FOPTS='$(OPTS)' AR=$(AR) FGMRES_PATH='$(FGMRES_PATH)'
 
-giem2g_lib: $(ALL_O)  $(MAKECMDGOALS).make Makefile	
+giem2g_lib: $(ALL_O)  make.inc  Makefile	
 	$(AR) rcs libgiem2g.a $(ALL_O)
 
 

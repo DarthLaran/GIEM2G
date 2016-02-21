@@ -22,8 +22,45 @@ INSTALL_PATH=./
 
 endif
 
-ifeq ($(PLATFORM), BGP)
+ifeq ($(PLATFORM), BGP_FAST)
 
+FC= mpixlf2003_r
+F77= mpixlf77_r
+FC_Link=mpixlf2003_r
+AR=ar
+
+FFLAGS= -qessl -g -O5   -qsmp=omp   -qalias=std -qarch=450d -qhot -qmaxmem=-1  -qipa=partition=large -qunroll=yes -qipa=level=2
+FDEFS=-WF,-DLEGACY_MPI -WF,-DIBM_Bluegene  -WF,-DMPI_TIMER 
+FOPTS=$(FFLAGS) $(FDEFS)
+
+LIB_FFTW=-L/gpfs/opt/bgp/fftw/3.3.3-fast/lib -lfftw3_mpi  -lfftw3_omp   -lfftw3
+FGMRES_PATH=/gpfs/data/kruglyakov/lib/src/FGMRES_original
+LIB_BLAS=-L/opt/ibmmath/lib  -lesslsmpbg 
+LIB_ADD=-L$(HOME)/lib/lib/lib -lzspmv -L/opt/ibmcmp/xlmass/bg/4.4/bglib -lmass -lmassv
+
+INCLUDE= -I/opt/ibmmath/include -I/opt/ibmcmp/xlmass/bg/4.4/include -I/gpfs/opt/bgp/fftw/3.3.3-fast/include
+INSTALL_PATH=~/bin/fast/giem2g_master
+
+endif
+
+ifeq ($(PLATFORM), BGP_TEST)
+
+FC= mpixlf2003_r
+F77= mpixlf77_r
+FC_Link=mpixlf2003_r
+AR=ar
+
+FFLAGS= -qessl -g -O0  -qsmp=omp   -qalias=std  -qmaxmem=-1 -qcheck 
+FDEFS=-WF,-DLEGACY_MPI -WF,-DIBM_Bluegene  -WF,-DMPI_TIMER  -WF,-Dinternal_timer  # -WF,-DVOLUME_WEIGHT_QUAD  #  -WF,-DNO_DISPLACEMENT_CURRENTS # 
+FOPTS=$(FFLAGS) $(FDEFS)
+
+LIB_FFTW=-L/gpfs/opt/bgp/fftw/3.3.3-stable/lib -lfftw3_mpi  -lfftw3_omp   -lfftw3
+FGMRES_PATH=/gpfs/data/kruglyakov/lib/src/FGMRES_original
+LIB_BLAS=-L/opt/ibmmath/lib  -lesslsmpbg 
+LIB_ADD=-L$(HOME)/lib/lib/lib -lzspmv 
+
+INCLUDE= -I/opt/ibmmath/include  -I/gpfs/opt/bgp/fftw/3.3.3-stable/include
+INSTALL_PATH=~/bin/test/giem2g_test
 
 endif
 ifeq ($(PLATFORM), LOMONOSOV)
