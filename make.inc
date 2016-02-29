@@ -39,7 +39,11 @@ LIB_BLAS=-L/opt/ibmmath/lib  -lesslsmpbg
 LIB_ADD=-L$(HOME)/lib/lib/lib -lzspmv -L/opt/ibmcmp/xlmass/bg/4.4/bglib -lmass -lmassv
 
 INCLUDE= -I/opt/ibmmath/include -I/opt/ibmcmp/xlmass/bg/4.4/include -I/gpfs/opt/bgp/fftw/3.3.3-fast/include
-INSTALL_PATH=~/bin/fast/giem2g_master
+ifdef RECALC_ONLY
+INSTALL_PATH=~/bin/fast/giem2g_master_rc
+else
+INSTALL_PATH=~/bin/fast/giem2g_master_mf
+endif
 
 endif
 
@@ -60,8 +64,12 @@ LIB_BLAS=-L/opt/ibmmath/lib  -lesslsmpbg
 LIB_ADD=-L$(HOME)/lib/lib/lib -lzspmv 
 
 INCLUDE= -I/opt/ibmmath/include  -I/gpfs/opt/bgp/fftw/3.3.3-stable/include
-INSTALL_PATH=~/bin/test/giem2g_test
 
+ifdef RECALC_ONLY
+INSTALL_PATH=~/bin/test/giem2g_test_rc
+else
+INSTALL_PATH=~/bin/test/giem2g_test
+endif
 endif
 ifeq ($(PLATFORM), LOMONOSOV)
 
