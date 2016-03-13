@@ -10,15 +10,16 @@ MODULE Calc_RC_Tensor_Module
 
 	USE IntegralCodes 
 	USE VolumeBesselTransforms
+        USE LOGGER_MODULE
 	IMPLICIT NONE
 	REAL(REALPARM)::lms(Nfirst:Nlast)
+	REAL(REALPARM),PARAMETER::Wt_Threshold=1d-12
 	PUBLIC::CalcRecalculationGreenTensor
 CONTAINS
-	SUBROUTINE CalcRecalculationGreenTensor(matrix,bkg,anomaly,Wt_Threshold)
+	SUBROUTINE CalcRecalculationGreenTensor(matrix,bkg,anomaly)
 		TYPE(RC_OPERATOR),INTENT(INOUT)::matrix
 		TYPE (BKG_DATA_TYPE),TARGET,INTENT(INOUT)::bkg
 		TYPE (ANOMALY_TYPE),TARGET,INTENT(INOUT)::anomaly
-		REAL(REALPARM),INTENT(IN)::Wt_Threshold
 		COMPLEX(REALPARM),POINTER::G_E(:,:,:,:,:)
 		COMPLEX(REALPARM),POINTER::G_H(:,:,:,:,:)
 		INTEGER::Ix,Iy,ly,Ic
@@ -29,14 +30,9 @@ CONTAINS
 		REAL(8)::time(4),time_all
 		REAL(8)::time_max(4),time_min(4)
 		REAL(8)::time1,time2,time3,time4
-!		CALL MPI_BARRIER(matrix%matrix_comm,IERROR)
 		time_all=GetTime()
-		IF (VERBOSE) THEN
-			IF (matrix%master) THEN
-				PRINT'(A80)','***********************************************************************************'
-				PRINT*, '  RC kernel with threshold', WT_Threshold, 'start'
-			ENDIF
-		ENDIF
+		CALL PRINT_BORDER
+		CALL LOGGER('Start RC kernel calculation')
 		time=0d0
 		Nx=matrix%Nx 
 		Nx2=Nx/2
@@ -79,7 +75,7 @@ CONTAINS
 #endif
 				DO Ix=0,Nx-1
 					CALL CalcRecalculationGreenTensor3dElement(Ix,ly,G_H(:,:,:,Ix,Iy),&
-					&G_E(:,:,:,Ix,Iy),Wt_Threshold,time,anomaly,bkg,matrix%recvs,matrix%Nr)
+					&G_E(:,:,:,Ix,Iy),time,anomaly,bkg,matrix%recvs,matrix%Nr)
 				ENDDO
 				!$OMP ENDDO
 #ifdef internal_timer
@@ -90,7 +86,7 @@ CONTAINS
 #endif
 				DO Ix=Nx+1,2*Nx-1
 					CALL CalcRecalculationGreenTensor3dElement(Ix-2*Nx,ly,G_H(:,:,:,Ix,Iy),&
-					&G_E(:,:,:,Ix,Iy),Wt_Threshold,time,anomaly,bkg,matrix%recvs,matrix%Nr)
+					&G_E(:,:,:,Ix,Iy),time,anomaly,bkg,matrix%recvs,matrix%Nr)
 				ENDDO
 				!$OMP ENDDO
 				!$OMP WORKSHARE
@@ -139,21 +135,15 @@ CONTAINS
 			matrix%counter%tensor_calc(COUNTER_SQR)=time(4) 
 			matrix%counter%tensor_calc(COUNTER_OTHER)=time_all-time(2)-time(1)	
 		ENDIF
+		matrix%counter%tensor_calc(COUNTER_ALL)=time_all	
 #else
-		IF (matrix%master) THEN
-			matrix%counter%tensor_calc(COUNTER_ALL)=time_all	
-			IF (VERBOSE) THEN
-				PRINT *,'Recalculation Green Tensor has been computed.'
-				PRINT '(A14, 1ES10.2E2, A3)','in:     ',time_all,'s'
-				PRINT '(A80)','***********************************************************************************'
-			ENDIF
-		ELSE
-			matrix%counter%tensor_calc(COUNTER_ALL)=time_all	
-		ENDIF
+	        CALL LOGGER('RC kernel has been computed.')
+                CALL PRINT_CALC_TIME(CALC_IE_FULL_TIME,time_all)
+                CALL PRINT_BORDER
 #endif
 	END SUBROUTINE
 !---------------------------------------------------------------------------------------------------------------------------------------------!
-	SUBROUTINE CalcRecalculationGreenTensor3dElement(lx,ly,G_H,G_E,Wt_Threshold,calc_time,anomaly,bkg,recvs,Nr)
+	SUBROUTINE CalcRecalculationGreenTensor3dElement(lx,ly,G_H,G_E,calc_time,anomaly,bkg,recvs,Nr)
 		IMPLICIT NONE
 		INTEGER, INTENT(IN)::lx,ly
 		TYPE (BKG_DATA_TYPE),INTENT(IN)::bkg
@@ -162,7 +152,6 @@ CONTAINS
 		INTEGER,INTENT(IN)::Nr
 		COMPLEX(REALPARM),INTENT(OUT)::G_H(anomaly%Nz,Nr,RHXX:RHZY)
 		COMPLEX(REALPARM),INTENT(OUT)::G_E(anomaly%Nz,Nr,REXX:REZZ)
-		REAL(REALPARM),INTENT(IN)::Wt_Threshold
 		REAL(REALPARM),INTENT(INOUT)::calc_time(4)
 		COMPLEX(REALPARM)::G_E1(REXX:REZZ,anomaly%Nz)
 		COMPLEX(REALPARM)::G_H1(RHXX:RHZY,anomaly%Nz)

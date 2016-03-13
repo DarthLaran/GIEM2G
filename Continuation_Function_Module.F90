@@ -1,10 +1,12 @@
 MODULE CONTINUATION_FUNCTION_MODULE
+
 	USE CONST_MODULE
 	USE FFTW3
 	USE MPI_MODULE
 	USE Timer_Module 
 	USE DATA_TYPES_MODULE
 	USE DISTRIBUTED_FFT_MODULE
+	USE LOGGER_MODULE
 	IMPLICIT NONE
 	INTEGER,PARAMETER::COUNTER_ALL=1
 	INTEGER,PARAMETER::COUNTER_WT=2
@@ -69,7 +71,9 @@ CONTAINS
 		INTEGER::Nx,Ny,Nz
 		INTEGER::Nx2,Ny2,Nc,Nr3,Nopt
 		INTEGER(MPI_CTL_KIND)::comm_size,IERROR,me
-		INTEGER::NT,OMP_GET_MAX_THREADS
+       		INTEGER(C_LONG_LONG)::tensor_size,buff_len,fft_len
+		TYPE(C_PTR)::p1,p2
+		INTEGER::NT
 		Nx=anomaly%Nx
 		Ny=anomaly%Ny
 		Nz=anomaly%Nz
@@ -107,24 +111,26 @@ CONTAINS
 		IF (rc_op%fftw_threads_ok) THEN
 			NT=OMP_GET_MAX_THREADS()
 			CALL FFTW_PLAN_WITH_NTHREADS(NT)
-			IF (rc_op%master) PRINT* ,'MULTITHREADED FFTW'
 		ENDIF
 		IF (PRESENT(DFD)) THEN
-			rc_op%DFD_Current=DFD
-			Nopt=DFD%Nb
+			CALL PrepareDistributedFourierData(rc_op%DFD_Current,Nx2,Ny2,Nc,mcomm,&
+                                &DFD%p_in,DFD%p_out)
 		ELSE
-#ifdef LEGACY_MPI
-		Nopt=1
-#else
-!		CALL TestBlocksNumber(rc_op%DFD,Nx2,Ny2,Nc,comm,Nb,Nopt)
-		Nopt=1
-#endif
-			CALL PrepareDistributedFourierData(rc_op%DFD_Current,Nx2,Ny2,Nc,mcomm,Nopt)
+                	fft_len=CalcLocalFFTSize(Nx2,Ny2,Nc,comm_size) 
+			p1=ALLOCATE_BUFF(fft_len)
+			p2=ALLOCATE_BUFF(fft_len)
+			CALL PrepareDistributedFourierData(rc_op%DFD_Current,Nx2,Ny2,Nc,mcomm,&
+                                &p1,p2,fft_len)
 		ENDIF
-		CALL PrepareDistributedFourierData(rc_op%DFD_Result,Nx2,Ny2,Nr3,mcomm,Nopt)
 
+                fft_len=CalcLocalFFTSize(Nx2,Ny2,Nr3,comm_size) 
+		p1=ALLOCATE_BUFF(fft_len)
+		p2=ALLOCATE_BUFF(fft_len)
+		CALL PrepareDistributedFourierData(rc_op%DFD_Result,Nx2,Ny2,Nr3,mcomm,&
+                               &p1,p2,fft_len)
 		CALL CalcSizesForRC_OP(rc_op)
 		CALL AllocateRC_OP(rc_op)
+
 		IF (rc_op%Ny_offset >= Ny) THEN	  
 			rc_op%real_space=.FALSE.
 		ELSE
@@ -153,12 +159,8 @@ CONTAINS
 		CHARACTER(LEN=*), PARAMETER  :: info_fmt = "(A, ES10.2E3)"
 		REAL(8)::time1,time2
 !		CALL MPI_BARRIER(rc_op%matrix_comm,IERROR)
-		IF (VERBOSE) THEN
-			IF (rc_op%master) THEN
-				PRINT'(A80)','***********************************************************************************'
-				PRINT*, 'Recalculation started'
-			ENDIF
-		ENDIF
+		CALL PRINT_BORDER
+		CALL LOGGER('Recalculation started')
 		time1=GetTime()
 		Nx=rc_op%Nx
 		CALL LoadEint(rc_op,Eint)
@@ -184,13 +186,9 @@ CONTAINS
 			Ha=>NULL()
 		ENDIF
 		time2=GetTime()
-		IF (VERBOSE) THEN
-			IF (rc_op%master) THEN
-				PRINT*,'Recalculation finished'
-				PRINT info_fmt, 'Total time:							',time2-time1
-				PRINT'(A80)','***********************************************************************************'
-			ENDIF
-		ENDIF
+		CALL LOGGER('Recalculation finished')
+		CALL PRINT_CALC_TIME('Total tine: ',time2-time1)
+		CALL PRINT_BORDER
 				
 	END SUBROUTINE
 	SUBROUTINE LoadEint(rc_op,Eint)
@@ -241,11 +239,7 @@ CONTAINS
 		Nr3=rc_op%Nr*3
 
 		size_g=rc_op%Nx2Ny_loc*rc_op%Nz*rc_op%Nr*15.0*2*REALPARM/1024/1024/1024
-		IF (VERBOSE) THEN
-			IF (rc_op%master) THEN
-				PRINT*,'RC matricies needs', size_g, 'Gb per process'
-			 ENDIF
-		 ENDIF
+		CALL PRINT_STORAGE_SIZE("RC matricies needs", size_g)
 	ENDSUBROUTINE
 	SUBROUTINE AllocateRCMatrix(matrix)
 		TYPE(RC_OPERATOR),INTENT(INOUT)::matrix
@@ -274,6 +268,11 @@ CONTAINS
 		matrix%G_H4(1:Nz,1:Nr,RHXX:RHZY,1:matrix%Nx2Ny_loc)=>tmp
 	END SUBROUTINE
 
+	FUNCTION ALLOCATE_BUFF(length) RESULT(buff_ptr)
+		INTEGER(C_INTPTR_T)::length
+		TYPE(C_PTR)::buff_ptr
+		buff_ptr=fftw_alloc_complex(length)
+	    END FUNCTION
 	SUBROUTINE AllocateRC_OP(rc_op)
 		TYPE(rc_operator),INTENT(INOUT)::rc_op
 		INTEGER::shape4(4),shape3(3)
@@ -332,11 +331,7 @@ CONTAINS
 			rc_op%G_H_fftw(:,5:7,Ir,:,:)=rc_op%field_in4
 		ENDDO
 		time2=GetTime()
-		IF (VERBOSE) THEN
-			IF (rc_op%master) THEN
-				PRINT*, 'FFT of tensor has been computed: ',time2-time1 ,' s'
-			ENDIF
-		ENDIF
+                CALL PRINT_CALC_TIME('FFT of RC tensor has been computed: ',time2-time1)
 		rc_op%counter%tensor_fft=time2-time1
 	ENDSUBROUTINE
 

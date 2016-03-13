@@ -16,9 +16,10 @@ MODULE Data_Types_Module
 		INTEGER::Ny_loc
 		REAL(REALPARM)::dx,dy
 		REAL(REALPARM),POINTER::z(:)
-		INTEGER,POINTER::Lnumber(:)
 		REAL(REALPARM),POINTER::siga(:,:,:)
 		REAL(REALPARM),POINTER::epsa(:,:,:)
+		REAL(REALPARM),POINTER::dz(:)
+		INTEGER,POINTER::Lnumber(:)
 	ENDTYPE
 
 	TYPE RECEIVER_TYPE
@@ -42,8 +43,7 @@ MODULE Data_Types_Module
 	PUBLIC:: BKG_DATA_TYPE,ANOMALY_TYPE, RECEIVER_TYPE,FGMRES_CTL_TYPE
 
 	PUBLIC::GetLayer,SET_FREQ
-	PUBLIC::AllocateSiga,SliceAnomaly
-	PUBLIC::PrepareRecvs
+	PUBLIC::PrepareRecvs, AllocateSiga
 	CONTAINS
 	FUNCTION GetLayerArray(z,bkg) RESULT(lnum)
 		REAL (KIND = RealParm), INTENT(IN) ::z(:)
@@ -100,27 +100,8 @@ MODULE Data_Types_Module
 		bkg%k=SQRT(bkg%k2)
 		bkg%iwm=C_IONE*MU0*bkg%omega
 	END SUBROUTINE
-	SUBROUTINE AllocateSiga(anomaly)
-			TYPE (ANOMALY_TYPE),INTENT(INOUT)::anomaly
-				IF (ASSOCIATED(anomaly%siga)) DEALLOCATE(anomaly%siga)
-				ALLOCATE(anomaly%siga(anomaly%Nz,anomaly%Nx,anomaly%Ny_loc))
-	ENDSUBROUTINE 
 
 
-	SUBROUTINE SliceAnomaly(anomaly,bkg,top,thick,N)
-			TYPE (ANOMALY_TYPE),INTENT(INOUT)::anomaly
-			TYPE (BKG_DATA_TYPE),TARGET,INTENT(IN)::bkg
-			INTEGER,INTENT(IN)::N
-			REAL(REALPARM),INTENT(IN)::top,thick
-			INTEGER::I
-			anomaly%Nz=N
-			IF (ASSOCIATED(anomaly%z))	DEALLOCATE(anomaly%z)
-			IF (ASSOCIATED(anomaly%Lnumber)) DEALLOCATE(anomaly%Lnumber)
-			ALLOCATE(anomaly%z(0:N),anomaly%Lnumber(0:N))
-			anomaly%z=(/(top+I*thick/N,I=0,N)/)
-			anomaly%Lnumber(1:N)=GetLayer((anomaly%z(0:N-1)+anomaly%z(1:N))/2d0,bkg)
-			anomaly%Lnumber(0)=GetLayer(anomaly%z(0)*(1d0-1d-4),bkg)
-	ENDSUBROUTINE
 
 	SUBROUTINE PrepareRecvs(recvs,anomaly,bkg)
 			TYPE (RECEIVER_TYPE),POINTER,INTENT(INOUT)::recvs(:)
@@ -146,5 +127,12 @@ MODULE Data_Types_Module
 				ENDIF
 			ENDDO
 	END SUBROUTINE
-ENDMODULE
+
+	SUBROUTINE AllocateSiga(anomaly)
+		TYPE (ANOMALY_TYPE),INTENT(INOUT)::anomaly
+		IF (ASSOCIATED(anomaly%siga))	DEALLOCATE(anomaly%siga)
+			ALLOCATE(anomaly%siga(anomaly%Nz,anomaly%Nx,anomaly%Ny_loc))
+	ENDSUBROUTINE
+
+	ENDMODULE
 

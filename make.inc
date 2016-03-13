@@ -1,9 +1,14 @@
 
 
 
-ifeq ($(PLATFORM), LAPTOP)
+ifeq ($(PLATFORM), GNU)
+FC=mpifort
+F77=mpifort
+FC_Link=mpifort
 
+FOPTS= -g    -fopenmp  -O3   -mtune=native -D LEGACY_MPI
 
+Ar=ar
 endif
 
 ifeq ($(PLATFORM), DAINT) 
@@ -16,8 +21,10 @@ FFLAGS= -O 3 -O aggress  -O cache3 -O inlinelib  -O vector3 -O scalar3   -O ipa4
 
 ifdef QUAD
 	FDEFS=-D FFTW_SIZE_32=1 -D MEMORY_CHECKING  -D VOLUME_WEIGHT_QUAD 
+
 else
 	FDEFS=-D FFTW_SIZE_32=1 -D MEMORY_CHECKING  
+
 endif
 
 FOPTS=$(FFLAGS) $(FDEFS)
@@ -29,9 +36,41 @@ LIB_ADD= -lgfortran
 INCLUDE=  # -I$(HOME)/Soft/lib/include
 
 ifdef QUAD
-	INSTALL_PATH=~/bin/GIEM2G/giem2g_quad
+	INSTALL_PATH=~/bin/GIEM2G/giem2g_quad_fast
 else
-	#INSTALL_PATH=
+	INSTALL_PATH=~/bin/GIEM2G/giem2g_fast
+endif
+
+endif
+
+ifeq ($(PLATFORM), DAINT_TEST) 
+
+FC=ftn
+F77=ftn
+FC_Link=ftn
+AR=ar
+FFLAGS= -O 0 
+
+ifdef QUAD
+	FDEFS=-D FFTW_SIZE_32=1 -D MEMORY_CHECKING  -D VOLUME_WEIGHT_QUAD 
+
+else
+	FDEFS=-D FFTW_SIZE_32=1 -D MEMORY_CHECKING  
+
+endif
+
+FOPTS=$(FFLAGS) $(FDEFS)
+FFT_QUAD_OOURA=1
+LIB_FFTW=   -lfftw3_omp -lfftw3_mpi  -lfftw3 
+FGMRES_PATH=~/src/FGMRES/
+LIB_BLAS= -L ~/lib/lib/ -lopenblas_omp
+LIB_ADD= -lgfortran
+INCLUDE=  # -I$(HOME)/Soft/lib/include
+
+ifdef QUAD
+	INSTALL_PATH=~/bin/GIEM2G/giem2g_quad_test
+else
+	INSTALL_PATH=~/bin/GIEM2G/giem2g_test
 endif
 
 endif

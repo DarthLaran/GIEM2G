@@ -10,15 +10,20 @@ else
 	FILTER_WEIGHTS_O=IntegralCodes.o   VolumeBesselTransforms.o  
 	OPTS=$(FOPTS)
 endif
-MISC_O=const_module.o  mpi_module.o timer_module.o fftw3_mod.o check_memory_module.o Distributed_FFT.o
-MODEL_O=data_types_module.o  mpi_saveload_module.o
-IMAGE_O= apq_module.o  ie_kernel_hankel_module.o  rc_kernel_hankel_module.o 
-IE_O=Integral_Equation_Module.o calc_ie_tensor_module.o ie_solver_module.o   
+MISC_O=const_module.o  mpi_module.o Logger_Module.o timer_module.o fftw3_mod.o check_memory_module.o Distributed_FFT.o
+SAVE_LOAD_O=mpi_saveload_module.o
+MODEL_O=data_types_module.o 
+IE_IMAGE= apq_module.o  ie_kernel_hankel_module.o 
+RC_IMAGE=rc_kernel_hankel_module.o 
+IE_O=Integral_Equation_Module.o calc_ie_tensor_module.o apply_ie_operator_module.o
+IE_SOLVER=ie_solver_module.o   
 RC_O=Continuation_Function_Module.o calc_rc_tensor_module.o
 SRC_O=sources_module.o
-API_O=#giem2g_c_api.o
+API_O=giem2g_interfaces.o
 
-ALL_O=$(MISC_O) $(FILTER_WEIGHTS_O) $(MODEL_O) $(IMAGE_O) $(IE_O) $(RC_O) $(SRC_O) $(API_O)
+ALL_O=$(MISC_O) $(FILTER_WEIGHTS_O) $(MODEL_O) $(SAVE_LOAD_O) $(IE_IMAGE) $(IE_O) $(IE_SOLVER) $(RC_IMAGE)  $(RC_O) $(SRC_O) 
+ENGINE_O=$(MISC_O) $(FILTER_WEIGHTS_O) $(MODEL_O)  $(IE_IMAGE) $(IE_O)  $(API_O) 
+
 
 LIB_ZFGMRES=-L./ZFGMRES -lzfgmres
 
@@ -32,10 +37,16 @@ ifdef INSTALL_PATH
 	cp giem2g $(INSTALL_PATH)
 endif
 
+giem2g_lib_shared: $(ENGINE_O)
+	$(FC_Link)   $(ENGINE_O) -shared   -L$(SHARED_BLAS) -L$(SHARED_FFTW)  -o $(DST)/libgiem2g.so  
+
+#	$(SHARED_Link) -fPIC  -shared   -L$(SHARED_BLAS) -L$(SHARED_FFTW) $(ENGINE_O)   -o $(DST)/lib_giem2g.so 
+
+
 zfgmres:
 	$(MAKE) -C ZFGMRES FC=$(F77)  FOPTS='$(OPTS)' AR=$(AR) FGMRES_PATH='$(FGMRES_PATH)'
 
-giem2g_lib: $(ALL_O)  make.inc  Makefile	
+giem2g_lib: $(ALL_O)   Makefile	
 	$(AR) rcs libgiem2g.a $(ALL_O)
 
 
@@ -43,7 +54,11 @@ giem2g_lib: $(ALL_O)  make.inc  Makefile
 	$(FC) $(OPTS) -c $*.f90 -o $*.o $(INCLUDE)
 
 %.o:%.F90
+ifneq ($(SHARED_LIB),1)
 	$(FC) $(OPTS) -c $*.F90 -o $*.o $(INCLUDE)
+else
+	$(FC) $(OPTS) -fPIC -D ExtrEMe   -c $*.F90 -o $*.o -I$(SHARED_BLAS_INC)  -I$(SHARED_FFTW_INC) 
+endif
 clean:
 	rm $(ALL_O)   *.mod  
 	$(MAKE) -C ZFGMRES clean

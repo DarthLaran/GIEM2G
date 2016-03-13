@@ -1,13 +1,13 @@
 MODULE SOURCES_MODULE
 	USE CONST_MODULE
 	USE APQ_MODULE
-
+        USE LOGGER_MODULE
 	USE DATA_TYPES_MODULE
 	IMPLICIT NONE
 CONTAINS
-	SUBROUTINE PlaneWave(pol,bkg,zrecv,F0)  !ATTENTION NAIVE FORMAT!!
+	SUBROUTINE PlaneWave(pol,bkg,zrecv,F0)  
 		INTEGER,INTENT(IN)::pol
-        TYPE (BKG_DATA_TYPE),TARGET,INTENT(IN)::bkg
+	        TYPE (BKG_DATA_TYPE),TARGET,INTENT(IN)::bkg
 		REAL(REALPARM),INTENT(IN)::zrecv(:)
 		COMPLEX(REALPARM),INTENT(OUT)::F0(:,:,:,:)
 		COMPLEX(REALPARM)::G(2)
@@ -36,13 +36,13 @@ CONTAINS
 			G(1)=t2*(e1+e2)
 			G(2)=-t2*(e1-e2)*eta(l)/bkg%iwm
 			IF (pol==EX) THEN
-				F0(:,:,Ir,EX)=G(1)
-				F0(:,:,Ir,HY)=G(2)
+				F0(Ir,:,:,EX)=G(1)
+				F0(Ir,:,:,HY)=G(2)
 			ELSEIF (pol==EY) THEN
-				F0(:,:,Ir,EY)=G(1)
-				F0(:,:,Ir,HX)=-G(2)
+				F0(Ir,:,:,EY)=G(1)
+				F0(Ir,:,:,HX)=-G(2)
 			ELSE
-				PRINT*, 'INCORRECT POLARIZATION'
+				CALL LOGGER('INCORRECT POLARIZATION')
 			ENDIF
 		ENDDO
 	END SUBROUTINE

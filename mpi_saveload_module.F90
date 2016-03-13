@@ -2,6 +2,7 @@ MODULE MPI_SAVELOAD_MODULE
 	USE CONST_MODULE
 	USE DATA_TYPES_MODULE
 	USE MPI_MODULE
+	USE LOGGER_MODULE
 	IMPLICIT NONE
 CONTAINS
 	SUBROUTINE LoadBackground(bkg,comm,background)
@@ -10,6 +11,7 @@ CONTAINS
 		CHARACTER(*),INTENT(IN)::background
 		INTEGER(MPI_CTL_KIND)::me,IERROR
 		INTEGER::N,I
+		CHARACTER(LEN=2048)::message 
 		CALL MPI_COMM_RANK(comm, me, IERROR)
 		IF (me==0) THEN
 			OPEN(077,file=background)
@@ -34,13 +36,15 @@ CONTAINS
 				bkg%depth(I)=bkg%depth(I-1)+bkg%thick(I)
 			END DO
 		ENDIF
-		IF (me==0) THEN
-			PRINT*,"Background has been loaded"
-			PRINT*, "Number of layers:    ", N
-			PRINT*, "Layers conductivity: ", bkg%sigma
-			IF (N/=1) THEN
-				PRINT*, "Layers thickness:    ", bkg%thick
-			ENDIF
+		CALL LOGGER("Background has been loaded")
+
+		WRITE(message,*) "Number of layers:    ", N
+		CALL LOGGER(message)
+		WRITE(message,*) "Layers conductivity: ", bkg%sigma
+		CALL LOGGER(message)
+		IF (N/=1) THEN
+			WRITE(message,*)  "Layers thickness:    ", bkg%thick
+			CALL LOGGER(message)
 		ENDIF
 	ENDSUBROUTINE
 	SUBROUTINE LoadAnomalyShape(anomaly,bkg,comm,anomaly_shape,loadz)
@@ -74,49 +78,50 @@ CONTAINS
 		anomaly%z=>NULL()
 		anomaly%Lnumber=>NULL()
 		IF (lz) THEN
-			ALLOCATE(anomaly%z(0:Nz),anomaly%Lnumber(0:Nz))
+			ALLOCATE(anomaly%z(0:Nz),anomaly%Lnumber(0:Nz),anomaly%dz(Nz))
 			IF (me==0) THEN
 				READ(078,*) anomaly%z
 			ENDIF
 			CALL MPI_BCAST(anomaly%z,Nz+1,MPI_DOUBLE_PRECISION, 0, comm, IERROR)
 			anomaly%Lnumber(1:Nz)=GetLayer((anomaly%z(0:Nz-1)+anomaly%z(1:Nz))/2d0,bkg)
 			anomaly%Lnumber(0)=GetLayer(anomaly%z(0)*(1d0-1d-7),bkg)
+                        anomaly%dz=anomaly%z(1:Nz)-anomaly%z(0:Nz-1)
 			IF (me==0) THEN
 				IF  (GetLayer(anomaly%z(0)*(1d0-1d-7),bkg)/=GetLayer(anomaly%z(0)*(1d0+1d-7),bkg)) THEN
-					PRINT*, 'z(0) is on layers border, is not it?'
+					CALL LOGGER('z(0) is on layers border, is not it?')
 				ENDIF
 			ENDIF
 
 		ENDIF
 		IF (me==0) CLOSE(078)
 	ENDSUBROUTINE
-        SUBROUTINE LoadAnomalySigmaList(fname,comm,anom_list,Na)
+	SUBROUTINE LoadAnomalySigmaList(fname,comm,anom_list,Na)
 		INTEGER(MPI_CTL_KIND),INTENT(IN)::comm
 		CHARACTER(*),INTENT(IN)::fname
-        CHARACTER(*),POINTER,INTENT(INOUT)::anom_list(:)
-        CHARACTER(len=1024)::tmp
-        INTEGER,INTENT(OUT)::Na
+		CHARACTER(*),POINTER,INTENT(INOUT)::anom_list(:)
+		CHARACTER(len=1024)::tmp
+		INTEGER,INTENT(OUT)::Na
 		INTEGER(MPI_CTL_KIND)::IERROR,me
 		INTEGER::I,l,io,Nl
 		CALL MPI_COMM_RANK(comm, me, IERROR)
-		
-        IF (me==0) THEN
-				OPEN(078,file=fname)
-                READ(078,*) Na
-				PRINT*, 'Number of anomalies:', Na
-               ALLOCATE(anom_list(Na))
-               DO I=1,Na
-                    READ(078,'(A)',SIZE=l,advance='NO',IOSTAT=io) tmp
-                    anom_list(I)=tmp(1:l)
-                   PRINT*,trim(anom_list(I))
-		       ENDDO
-					CLOSE(078)
-	       ENDIF
-			CALL MPI_BCAST(Na,1,MPI_INTEGER, 0, comm, IERROR)
-		    IF (me/=0) 	ALLOCATE(anom_list(Na))
-			Nl=Na*LEN(anom_list(1))
-			CALL MPI_BCAST(anom_list,Nl,MPI_CHARACTER, 0, comm, IERROR)
-        ENDSUBROUTINE
+
+		IF (me==0) THEN
+			OPEN(078,file=fname)
+			READ(078,*) Na
+			CALL PRINT_CALC_NUMBER('Number of anomalies:', Na)
+			ALLOCATE(anom_list(Na))
+			DO I=1,Na
+				READ(078,'(A)',SIZE=l,advance='NO',IOSTAT=io) tmp
+				anom_list(I)=tmp(1:l)
+				CALL LOGGER(trim(anom_list(I)))
+			ENDDO
+			CLOSE(078)
+		ENDIF
+		CALL MPI_BCAST(Na,1,MPI_INTEGER, 0, comm, IERROR)
+		IF (me/=0) 	ALLOCATE(anom_list(Na))
+		Nl=Na*LEN(anom_list(1))
+		CALL MPI_BCAST(anom_list,Nl,MPI_CHARACTER, 0, comm, IERROR)
+	ENDSUBROUTINE
 
 	SUBROUTINE LoadAnomalySigma(anomaly,comm,anomaly_sig)
 		TYPE (ANOMALY_TYPE),INTENT(INOUT)::anomaly
@@ -132,7 +137,7 @@ CONTAINS
 		CALL MPI_COMM_SIZE(comm, csize, IERROR)
 		Nc=anomaly%Nx*anomaly%Nz*anomaly%Ny_loc
 		IF (me==0) THEN
-			PRINT*,'Loading sigma from ', anomaly_sig
+			CALL LOGGER('Loading sigma from '//anomaly_sig)
 			OPEN(078,file=anomaly_sig)
 			ALLOCATE(siga1(anomaly%Nz,anomaly%Nx,anomaly%Ny_loc))
 			READ(078,*) anomaly%siga
@@ -148,7 +153,7 @@ CONTAINS
 		time2=MPI_WTIME()
 		IF (me==0) THEN
 			DEALLOCATE(siga1)
-			PRINT "(A, ES10.2E3, A)", 'Sigma loaded in' ,time2-time1, 's' 
+			CALL PRINT_CALC_TIME('Conductivity is  loaded in' ,time2-time1)
 		ENDIF
 	ENDSUBROUTINE
 	SUBROUTINE LoadFrequencies(freq,comm,frequencies)
@@ -265,23 +270,23 @@ CONTAINS
 		ELSE
 			t1=-1
 		ENDIF
-			IF (t1>0) THEN
-				OPEN(UNIT = 11, STATUS='replace',FILE=fname//trim(fnum)//'.dat')
-				WRITE (UNIT =11,FMT='(E25.16E3, E25.16E3)') E 
-				CLOSE(11) 
+		IF (t1>0) THEN
+			OPEN(UNIT = 11, STATUS='replace',FILE=fname//trim(fnum)//'.dat')
+			WRITE (UNIT =11,FMT='(E25.16E3, E25.16E3)') E 
+			CLOSE(11) 
 
-				OPEN(UNIT = 11, STATUS='replace',FILE=fname//trim(fnum)//'.bin', form='unformatted')  
-				WRITE (UNIT =11) E 
-				CLOSE(11) !FMT='(E25.16E3 E25.16E3)'
+			OPEN(UNIT = 11, STATUS='replace',FILE=fname//trim(fnum)//'.bin', form='unformatted')  
+			WRITE (UNIT =11) E 
+			CLOSE(11) !FMT='(E25.16E3 E25.16E3)'
 			ELSEIF (t1==0)THEN
-				OPEN(UNIT = 11, STATUS='replace',FILE=fname//trim(fnum)//'.dat')  
-				WRITE (UNIT =11,FMT='(E25.16E3, E25.16E3)') E 
-				CLOSE(11) 
-			ELSE
-				OPEN(UNIT = 11, STATUS='replace',FILE=fname//trim(fnum)//'.bin', form='unformatted')  
-				WRITE (UNIT =11) E 
-				CLOSE(11) !FMT='(E25.16E3 E25.16E3)'
-			ENDIF
+			OPEN(UNIT = 11, STATUS='replace',FILE=fname//trim(fnum)//'.dat')  
+			WRITE (UNIT =11,FMT='(E25.16E3, E25.16E3)') E 
+			CLOSE(11) 
+		ELSE
+			OPEN(UNIT = 11, STATUS='replace',FILE=fname//trim(fnum)//'.bin', form='unformatted')  
+			WRITE (UNIT =11) E 
+			CLOSE(11) !FMT='(E25.16E3 E25.16E3)'
+		ENDIF
 	END SUBROUTINE
 	SUBROUTINE LoadField(E,me,fname)
 		COMPLEX(REALPARM),INTENT(INOUT)::E(:,:,:,:)
@@ -289,9 +294,9 @@ CONTAINS
 		INTEGER,INTENT(IN)::me
 		CHARACTER(len=6)::fnum
 		WRITE (fnum,'(I5.5)') me
-			OPEN(UNIT = 11, STATUS='old',FILE=fname//trim(fnum)//'.bin', form='unformatted')  
-			READ (UNIT =11) E 
-			CLOSE(11) 
+		OPEN(UNIT = 11, STATUS='old',FILE=fname//trim(fnum)//'.bin', form='unformatted')  
+		READ (UNIT =11) E 
+		CLOSE(11) 
 	END SUBROUTINE
 
 	SUBROUTINE SaveFieldOneFile(E,fname,t,convert,comm)
@@ -310,37 +315,37 @@ CONTAINS
 		CALL MPI_COMM_SIZE(comm, csize, IERROR)
 
 		IF (me==0) THEN
-		     IF (t==0) THEN
+			IF (t==0) THEN
 				ftype='.dat'
 				OPEN(UNIT = 11,STATUS='replace',FILE=fname//ftype)
-		     ELSE
+			ELSE
 				ftype='.bin'
 				OPEN(UNIT = 11,STATUS='replace',FILE=fname//ftype,form='unformatted')
-		     ENDIF
-		     SH=SHAPE(E)
-			 Ny=SH(4)*csize
-		     ALLOCATE(Etmp1(SH(1),3,SH(3),Ny),Etmp2(SH(3),Ny,SH(1),3))
+			ENDIF
+			SH=SHAPE(E)
+			Ny=SH(4)*csize
+			ALLOCATE(Etmp1(SH(1),3,SH(3),Ny),Etmp2(SH(3),Ny,SH(1),3))
 		ENDIF
-		
+
 		CALL  MPI_GATHER(E, SIZE(E), MPI_DOUBLE_COMPLEX, Etmp1,	SIZE(E), MPI_DOUBLE_COMPLEX,0, comm, IERROR)
 		IF (me==0)	THEN
-				IF (convert) THEN
-					CALL  ConvertInNa(Etmp1,Etmp2)
-					IF (t==0) THEN
-					       WRITE (UNIT =11,FMT='(E25.16E3, E25.16E3)') Etmp2 
-					ELSE
-						WRITE(UNIT=11) Etmp2
-					ENDIF
+			IF (convert) THEN
+				CALL  ConvertInNa(Etmp1,Etmp2)
+				IF (t==0) THEN
+					WRITE (UNIT =11,FMT='(E25.16E3, E25.16E3)') Etmp2 
 				ELSE
-					IF (t==0) THEN
-					       WRITE (UNIT =11,FMT='(E25.16E3, E25.16E3)') Etmp1 
-					ELSE
-						WRITE(UNIT=11) Etmp1
-					ENDIF
+					WRITE(UNIT=11) Etmp2
 				ENDIF
+			ELSE
+				IF (t==0) THEN
+					WRITE (UNIT =11,FMT='(E25.16E3, E25.16E3)') Etmp1 
+				ELSE
+					WRITE(UNIT=11) Etmp1
+				ENDIF
+			ENDIF
 			CLOSE(11)
 		ENDIF	
-			
+
 	END SUBROUTINE
 
 #ifdef old_output
@@ -375,12 +380,12 @@ CONTAINS
 		ENDIF
 		OPEN(UNIT = 77,STATUS='replace',FILE=fname//'.dat')
 		WRITE (UNIT =77,FMT=title_fmt) "%","x_recv","y_recv","z_recv","frequency",&
-											&"Re Ex^a","Im Ex^a", "Re Ey^a", "Im Ey^a",&
-											&"Re Ez^a","Im Ez^a", "Re Hx^a", "Im Hx^a",&
-											&"Re Hy^a","Im Hy^a", "Re Hz^a", "Im Hz^a",&
-											&"Re Ex^t","Im Ex^t", "Re Ey^t", "Im Ey^t",&
-											&"Re Ez^t","Im Ez^t", "Re Hx^t", "Im Hx^t",&
-											&"Re Hy^t","Im Hy^t", "Re Hz^t", "Im Hz^t"
+			&"Re Ex^a","Im Ex^a", "Re Ey^a", "Im Ey^a",&
+			&"Re Ez^a","Im Ez^a", "Re Hx^a", "Im Hx^a",&
+			&"Re Hy^a","Im Hy^a", "Re Hz^a", "Im Hz^a",&
+			&"Re Ex^t","Im Ex^t", "Re Ey^t", "Im Ey^t",&
+			&"Re Ez^t","Im Ez^t", "Re Hx^t", "Im Hx^t",&
+			&"Re Hy^t","Im Hy^t", "Re Hz^t", "Im Hz^t"
 
 		DO Ir=1,Nr
 			DO Iy=1,anomaly%Ny
@@ -388,12 +393,12 @@ CONTAINS
 				DO Ix=1,anomaly%Nx
 					x=Ix*anomaly%dx-anomaly%dx/2d0+recvs(Ir)%x_shift
 					WRITE (UNIT =77,FMT=output_fmt) " ",x,y,recvs(Ir)%zrecv,freq,&
-														& Ea1(Ir,EX,Ix,Iy),Ea1(Ir,EY,Ix,Iy),&
-														& Ea1(Ir,EZ,Ix,Iy),Ha1(Ir,HX,Ix,Iy),&
-														& Ha1(Ir,HY,Ix,Iy),Ha1(Ir,HZ,Ix,Iy),&
-														& Et1(Ir,EX,Ix,Iy),Et1(Ir,EY,Ix,Iy),&
-														& Et1(Ir,EZ,Ix,Iy),Ht1(Ir,HX,Ix,Iy),&
-														& Ht1(Ir,HY,Ix,Iy),Ht1(Ir,HZ,Ix,Iy)
+						& Ea1(Ir,EX,Ix,Iy),Ea1(Ir,EY,Ix,Iy),&
+						& Ea1(Ir,EZ,Ix,Iy),Ha1(Ir,HX,Ix,Iy),&
+						& Ha1(Ir,HY,Ix,Iy),Ha1(Ir,HZ,Ix,Iy),&
+						& Et1(Ir,EX,Ix,Iy),Et1(Ir,EY,Ix,Iy),&
+						& Et1(Ir,EZ,Ix,Iy),Ht1(Ir,HX,Ix,Iy),&
+						& Ht1(Ir,HY,Ix,Iy),Ht1(Ir,HZ,Ix,Iy)
 				ENDDO
 			ENDDO
 		ENDDO
@@ -421,7 +426,7 @@ CONTAINS
 		COMPLEX(REALPARM),POINTER::Ea1(:,:,:,:),Et1(:,:,:,:)
 		COMPLEX(REALPARM),POINTER::Ha1(:,:,:,:),Ht1(:,:,:,:)
 		REAL(REALPARM)::x,y
-		
+
 		CALL MPI_COMM_RANK(comm, me, IERROR)
 		CALL MPI_COMM_SIZE(comm, csize, IERROR)
 		Nr=SIZE(recvs)
@@ -435,27 +440,27 @@ CONTAINS
 			ALLOCATE(Ht1(fshape(1),HX:HZ,fshape(3),fshape(4)))
 			OPEN(UNIT = 77,STATUS='replace',FILE=fname//'.dat')
 			WRITE (UNIT =77,FMT=title_fmt) "%","x_recv","y_recv","z_recv","frequency",&
-							&"Re Ex^a","Im Ex^a", "Re Ey^a", "Im Ey^a",&
-							&"Re Ez^a","Im Ez^a", "Re Hx^a", "Im Hx^a",&
-							&"Re Hy^a","Im Hy^a", "Re Hz^a", "Im Hz^a",&
-							&"Re Ex^t","Im Ex^t", "Re Ey^t", "Im Ey^t",&
-							&"Re Ez^t","Im Ez^t", "Re Hx^t", "Im Hx^t",&
-							&"Re Hy^t","Im Hy^t", "Re Hz^t", "Im Hz^t"
+				&"Re Ex^a","Im Ex^a", "Re Ey^a", "Im Ey^a",&
+				&"Re Ez^a","Im Ez^a", "Re Hx^a", "Im Hx^a",&
+				&"Re Hy^a","Im Hy^a", "Re Hz^a", "Im Hz^a",&
+				&"Re Ex^t","Im Ex^t", "Re Ey^t", "Im Ey^t",&
+				&"Re Ez^t","Im Ez^t", "Re Hx^t", "Im Hx^t",&
+				&"Re Hy^t","Im Hy^t", "Re Hz^t", "Im Hz^t"
 
 			DO Ir=1,Nr
 				DO Iy=1,anomaly%Ny_loc
 					y=Iy*anomaly%dy-anomaly%dy/2d0+recvs(Ir)%y_shift
-						DO Ix=1,anomaly%Nx
-							x=Ix*anomaly%dx-anomaly%dx/2d0+recvs(Ir)%x_shift
-							WRITE (UNIT =77,FMT=output_fmt) " ",x,y,recvs(Ir)%zrecv,freq,&
-											& Ea(Ir,EX,Ix,Iy),Ea(Ir,EY,Ix,Iy),&
-											& Ea(Ir,EZ,Ix,Iy),Ha(Ir,HX,Ix,Iy),&
-											& Ha(Ir,HY,Ix,Iy),Ha(Ir,HZ,Ix,Iy),&
-											& Et(Ir,EX,Ix,Iy),Et(Ir,EY,Ix,Iy),&
-											& Et(Ir,EZ,Ix,Iy),Ht(Ir,HX,Ix,Iy),&
-											& Ht(Ir,HY,Ix,Iy),Ht(Ir,HZ,Ix,Iy)
-							Ic=Ic+1
-						ENDDO
+					DO Ix=1,anomaly%Nx
+						x=Ix*anomaly%dx-anomaly%dx/2d0+recvs(Ir)%x_shift
+						WRITE (UNIT =77,FMT=output_fmt) " ",x,y,recvs(Ir)%zrecv,freq,&
+							& Ea(Ir,EX,Ix,Iy),Ea(Ir,EY,Ix,Iy),&
+							& Ea(Ir,EZ,Ix,Iy),Ha(Ir,HX,Ix,Iy),&
+							& Ha(Ir,HY,Ix,Iy),Ha(Ir,HZ,Ix,Iy),&
+							& Et(Ir,EX,Ix,Iy),Et(Ir,EY,Ix,Iy),&
+							& Et(Ir,EZ,Ix,Iy),Ht(Ir,HX,Ix,Iy),&
+							& Ht(Ir,HY,Ix,Iy),Ht(Ir,HZ,Ix,Iy)
+						Ic=Ic+1
+					ENDDO
 				ENDDO
 			ENDDO
 		ENDIF
@@ -479,12 +484,12 @@ CONTAINS
 					DO Ix=1,anomaly%Nx
 						x=Ix*anomaly%dx-anomaly%dx/2d0+recvs(Ir)%x_shift
 						WRITE (UNIT =77,FMT=output_fmt) " ",x,y,recvs(Ir)%zrecv,freq,&
-										& Ea1(Ir,EX,Ix,Iy),Ea1(Ir,EY,Ix,Iy),&
-										& Ea1(Ir,EZ,Ix,Iy),Ha1(Ir,HX,Ix,Iy),&
-										& Ha1(Ir,HY,Ix,Iy),Ha1(Ir,HZ,Ix,Iy),&
-										& Et1(Ir,EX,Ix,Iy),Et1(Ir,EY,Ix,Iy),&
-										& Et1(Ir,EZ,Ix,Iy),Ht1(Ir,HX,Ix,Iy),&
-										& Ht1(Ir,HY,Ix,Iy),Ht1(Ir,HZ,Ix,Iy)
+							& Ea1(Ir,EX,Ix,Iy),Ea1(Ir,EY,Ix,Iy),&
+							& Ea1(Ir,EZ,Ix,Iy),Ha1(Ir,HX,Ix,Iy),&
+							& Ha1(Ir,HY,Ix,Iy),Ha1(Ir,HZ,Ix,Iy),&
+							& Et1(Ir,EX,Ix,Iy),Et1(Ir,EY,Ix,Iy),&
+							& Et1(Ir,EZ,Ix,Iy),Ht1(Ir,HX,Ix,Iy),&
+							& Ht1(Ir,HY,Ix,Iy),Ht1(Ir,HZ,Ix,Iy)
 						Ic=Ic+1
 					ENDDO
 				ENDDO
@@ -518,12 +523,12 @@ CONTAINS
 		WRITE (ftag,'(I5.5)') tag
 		OPEN(UNIT = 277,STATUS='replace',FILE=fname//trim(ftag)//'.dat')
 		WRITE (UNIT =277,FMT=title_fmt) "%","x_recv","y_recv","z_recv","frequency",&
-											&"Re Ex^a","Im Ex^a", "Re Ey^a", "Im Ey^a",&
-											&"Re Ez^a","Im Ez^a", "Re Hx^a", "Im Hx^a",&
-											&"Re Hy^a","Im Hy^a", "Re Hz^a", "Im Hz^a",&
-											&"Re Ex^t","Im Ex^t", "Re Ey^t", "Im Ey^t",&
-											&"Re Ez^t","Im Ez^t", "Re Hx^t", "Im Hx^t",&
-											&"Re Hy^t","Im Hy^t", "Re Hz^t", "Im Hz^t"
+			&"Re Ex^a","Im Ex^a", "Re Ey^a", "Im Ey^a",&
+			&"Re Ez^a","Im Ez^a", "Re Hx^a", "Im Hx^a",&
+			&"Re Hy^a","Im Hy^a", "Re Hz^a", "Im Hz^a",&
+			&"Re Ex^t","Im Ex^t", "Re Ey^t", "Im Ey^t",&
+			&"Re Ez^t","Im Ez^t", "Re Hx^t", "Im Hx^t",&
+			&"Re Hy^t","Im Hy^t", "Re Hz^t", "Im Hz^t"
 
 		DO Ir=1,Nr
 			DO Iy=1,Nyloc
@@ -531,12 +536,12 @@ CONTAINS
 				DO Ix=1,anomaly%Nx
 					x=Ix*anomaly%dx-anomaly%dx/2d0+recvs(Ir)%x_shift
 					WRITE (UNIT =277,FMT=output_fmt) " ",x,y,recvs(Ir)%zrecv,freq,&
-														& Ea(Ir,EX,Ix,Iy),Ea(Ir,EY,Ix,Iy),&
-														& Ea(Ir,EZ,Ix,Iy),Ha(Ir,HX,Ix,Iy),&
-														& Ha(Ir,HY,Ix,Iy),Ha(Ir,HZ,Ix,Iy),&
-														& Et(Ir,EX,Ix,Iy),Et(Ir,EY,Ix,Iy),&
-														& Et(Ir,EZ,Ix,Iy),Ht(Ir,HX,Ix,Iy),&
-														& Ht(Ir,HY,Ix,Iy),Ht(Ir,HZ,Ix,Iy)
+						& Ea(Ir,EX,Ix,Iy),Ea(Ir,EY,Ix,Iy),&
+						& Ea(Ir,EZ,Ix,Iy),Ha(Ir,HX,Ix,Iy),&
+						& Ha(Ir,HY,Ix,Iy),Ha(Ir,HZ,Ix,Iy),&
+						& Et(Ir,EX,Ix,Iy),Et(Ir,EY,Ix,Iy),&
+						& Et(Ir,EZ,Ix,Iy),Ht(Ir,HX,Ix,Iy),&
+						& Ht(Ir,HY,Ix,Iy),Ht(Ir,HZ,Ix,Iy)
 				ENDDO
 			ENDDO
 		ENDDO
@@ -561,18 +566,18 @@ CONTAINS
 		WRITE (ftag,'(I5.5)') tag
 		OPEN(UNIT = 277,STATUS='replace',FILE=fname//trim(ftag)//'.dat')
 		WRITE (UNIT =277,FMT=title_fmt) "%","x_c","y_c","z_c","frequency",&
-						&"Re Ex","Im Ex", "Re Ey", "Im Ey",&
-						&"Re Ez","Im Ez"
+			&"Re Ex","Im Ex", "Re Ey", "Im Ey",&
+			&"Re Ez","Im Ez"
 		Nx=anomaly%Nx
 		DO Iy=1,Nyloc
 			y=(Iy+offset)*anomaly%dy-anomaly%dy/2d0
 			DO Ix=1,Nx
 				x=Ix*anomaly%dx-anomaly%dx/2d0
 				DO Iz=1,anomaly%Nz
-				z=(anomaly%z(Iz)+anomaly%z(Iz-1))/2;
-				WRITE (UNIT =277,FMT=output_fmt) " ",x,y,z,freq,&
-								& Eint(Iz,EX,Ix,Iy),Eint(Iz,EY,Ix,Iy),&
-								& Eint(Iz,EZ,Ix,Iy)
+					z=(anomaly%z(Iz)+anomaly%z(Iz-1))/2;
+					WRITE (UNIT =277,FMT=output_fmt) " ",x,y,z,freq,&
+						& Eint(Iz,EX,Ix,Iy),Eint(Iz,EY,Ix,Iy),&
+						& Eint(Iz,EZ,Ix,Iy)
 				ENDDO
 			ENDDO
 		ENDDO
@@ -588,7 +593,7 @@ CONTAINS
 		INTEGER::Ix,Iy,Iz,Nyloc,s(4)
 		REAL(REALPARM)::x,y,z
 		WRITE (ftag,'(I5.5)') tag
-!		OPEN(UNIT = 277,STATUS='replace',FILE=fname//trim(ftag)//'.bin',form='binary',access="stream")
+		!		OPEN(UNIT = 277,STATUS='replace',FILE=fname//trim(ftag)//'.bin',form='binary',access="stream")
 		OPEN(UNIT = 277,STATUS='replace',FILE=fname//trim(ftag)//'.bin',form='unformatted',access="stream")
 		WRITE (UNIT =277) Eint
 		CLOSE(277)
@@ -603,14 +608,14 @@ CONTAINS
 		INTEGER::Ix,Iy,I
 		COMPLEX(REALPARM),POINTER::Eint1(:,:,:,:)
 		REAL(REALPARM)::x,y
-		
+
 		CALL MPI_COMM_RANK(comm, me, IERROR)
 		CALL MPI_COMM_SIZE(comm, csize, IERROR)
 		fsize=SIZE(Eint)
 		IF (me==0) THEN
 			fshape=SHAPE(Eint)
 			ALLOCATE(Eint1(fshape(1),fshape(2),fshape(3),fshape(4)))
-!			OPEN(UNIT = 77,STATUS='replace',FILE=fname//'.bin',form='binary',access="stream")
+			!			OPEN(UNIT = 77,STATUS='replace',FILE=fname//'.bin',form='binary',access="stream")
 			OPEN(UNIT = 77,STATUS='replace',FILE=fname//'.bin',form='unformatted',access="stream")
 			WRITE (UNIT =77) Eint
 		ENDIF
@@ -638,7 +643,7 @@ CONTAINS
 		INTEGER::Ix,Iy,Iz,Nyloc,s(4)
 		REAL(REALPARM)::x,y,z
 		WRITE (ftag,'(I5.5)') tag
-!		OPEN(UNIT = 277,STATUS='old',FILE=fname//trim(ftag)//'.bin',form='binary',access="stream")
+		!		OPEN(UNIT = 277,STATUS='old',FILE=fname//trim(ftag)//'.bin',form='binary',access="stream")
 		OPEN(UNIT = 277,STATUS='old',FILE=fname//trim(ftag)//'.bin',form='unformatted',access="stream")
 		READ (UNIT =277) Eint
 		CLOSE(277)
@@ -651,18 +656,18 @@ CONTAINS
 		S2=SHAPE(E2)
 		IF (S1(3)==S2(1)) THEN
 			!$OMP PARALLEL PRIVATE(Iz,Ic) DEFAULT(SHARED)
-        			!$OMP DO  SCHEDULE (GUIDED)!COLLAPSE(2) 
-				DO Ic=EX,EZ
-					DO Iz=1,S2(1)
-						E2(Iz,Ic,:,:)=E1(:,:,Iz,Ic)
-					ENDDO
+			!$OMP DO  SCHEDULE (GUIDED)!COLLAPSE(2) 
+			DO Ic=EX,EZ
+				DO Iz=1,S2(1)
+					E2(Iz,Ic,:,:)=E1(:,:,Iz,Ic)
 				ENDDO
-	       		!$OMP END DO
+			ENDDO
+			!$OMP END DO
 			!$OMP END PARALLEL
 		ELSE
 			PRINT*, 'CONVERT ERROR'
 		ENDIF
-	
+
 	END SUBROUTINE
 	SUBROUTINE ConvertInNa(E1,E2) !Convert EM field array E1 from internal format E1(z,c,x,y) to "naive" E2(x,y,z,c)
 		COMPLEX(REALPARM),INTENT(IN)::E1(:,:,:,:)
@@ -672,17 +677,17 @@ CONTAINS
 		S2=SHAPE(E2)
 		IF (S1(1)==S2(3)) THEN
 			!$OMP PARALLEL PRIVATE(Iz,Ic) DEFAULT(SHARED)
-		        	!$OMP DO   SCHEDULE (GUIDED) !COLLAPSE(2)
-				DO Ic=EX,EZ
-					DO Iz=1,S1(1)
-						E2(:,:,Iz,Ic)=E1(Iz,Ic,:,:)
-					ENDDO
+			!$OMP DO   SCHEDULE (GUIDED) !COLLAPSE(2)
+			DO Ic=EX,EZ
+				DO Iz=1,S1(1)
+					E2(:,:,Iz,Ic)=E1(Iz,Ic,:,:)
 				ENDDO
-			        !$OMP END DO
+			ENDDO
+			!$OMP END DO
 			!$OMP END PARALLEL
 		ELSE
 			PRINT*, 'CONVERT ERROR'
 		ENDIF
-	
+
 	END SUBROUTINE
-END MODULE
+	END MODULE
