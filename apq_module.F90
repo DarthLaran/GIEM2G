@@ -16,7 +16,7 @@ CONTAINS
 		REAL(REALPARM),INTENT(IN)::dz(anomaly%Nz)
 		COMPLEX(REALPARM),INTENT(IN)::expz(anomaly%Nz),pexpz(2,anomaly%Nz),qexpz(2,anomaly%Nz)
 		COMPLEX(REALPARM),INTENT(IN)::eta(bkg%Nl),Arr(bkg%Nl,2)
-		COMPLEX(REALPARM),INTENT(INOUT)::Ft(3,anomaly%Nz),Fb(anomaly%Nz),GII(4,anomaly%Nz)
+		COMPLEX(REALPARM),INTENT(INOUT)::Ft(3,anomaly%Nz),Fb(3,anomaly%Nz),GII(4,anomaly%Nz)
 		COMPLEX(REALPARM)::Fb3(3)
 		COMPLEX(REALPARM)::p1(2),p2(2),q1(2),q2(2)
 		COMPLEX(REALPARM)::pe1(2),pe2(2),qe1(2),qe2(2)
@@ -56,7 +56,7 @@ CONTAINS
 			GII(3,I)=(w(2)+2e0_REALPARM/eta2*dz(I))*bkg%iwm+eta2/bkg%csigma(l)*w(2)
 
 			GII(4,I)=Fb3(3)-Ft(3,I)-eta2*w(1)
-			Fb(I)=Fb3(2)
+			Fb(:,I)=Fb3(:)
 		ENDDO
 	ENDSUBROUTINE
 
@@ -134,6 +134,34 @@ CONTAINS
 		ENDDO
 	ENDSUBROUTINE
 
+	SUBROUTINE Calc_bframe_q_all(bkg,anomaly,expz,eta,q,qexpz,fcont,b_frame)
+		TYPE (ANOMALY_TYPE),INTENT(IN)::anomaly
+		TYPE (BKG_DATA_TYPE),INTENT(IN)::bkg
+		COMPLEX(REALPARM),INTENT(IN)::expz(anomaly%Nz),q(bkg%Nl,2),eta(bkg%Nl),qexpz(2,anomaly%Nz)
+		COMPLEX(REALPARM),INTENT(INOUT)::fcont(2,anomaly%Nz),b_frame(3,anomaly%Nz)
+		COMPLEX(REALPARM)::e,e1,e2,w,a(2),b(2),c(2),d(2)
+		INTEGER::I,l
+		DO I=anomaly%Nz,2,-1
+			l=anomaly%Lnumber(I)
+			a=qexpz(:,I)
+			b=a*expz(I)
+			c=b*expz(I)
+			
+			b=C_ONE+b
+			c=C_ONE+c
+
+			w=-(C_ONE-expz(I))/eta(l)
+			d=C_ONE+a*expz(I)*expz(I)
+			a=C_ONE+a
+			fcont(:,I)=expz(I)*a/d
+
+			b_frame(1,I)=w*b(1)/c(1)
+                        b_frame(2,I)=(fcont(2,I)-C_ONE)
+			b_frame(3,I)=w*b(2)/c(2)
+
+			b_frame(2:3,I)=b_frame(2:3,I)/bkg%csigma(l)
+		ENDDO
+	ENDSUBROUTINE
 	SUBROUTINE Calc_qexpz_All(bkg,anomaly,expz,eta,q,qexpz)
 		TYPE (BKG_DATA_TYPE),INTENT(IN)::bkg
 		TYPE (ANOMALY_TYPE),INTENT(IN)::anomaly

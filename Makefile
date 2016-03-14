@@ -10,7 +10,8 @@ else
 	FILTER_WEIGHTS_O=IntegralCodes.o   VolumeBesselTransforms.o  
 	OPTS=$(FOPTS)
 endif
-MISC_O=const_module.o  mpi_module.o Logger_Module.o timer_module.o fftw3_mod.o check_memory_module.o Distributed_FFT.o
+MISC_O=const_module.o  mpi_module.o Logger_Module.o timer_module.o  check_memory_module.o
+FFT_O=fftw3_mod.o Distributed_FFT.o Local_OMP_FFT_module.o
 SAVE_LOAD_O=mpi_saveload_module.o
 MODEL_O=data_types_module.o 
 IE_IMAGE= apq_module.o  ie_kernel_hankel_module.o 
@@ -21,8 +22,8 @@ RC_O=Continuation_Function_Module.o calc_rc_tensor_module.o
 SRC_O=sources_module.o
 API_O=giem2g_interfaces.o
 
-ALL_O=$(MISC_O) $(FILTER_WEIGHTS_O) $(MODEL_O) $(SAVE_LOAD_O) $(IE_IMAGE) $(IE_O) $(IE_SOLVER) $(RC_IMAGE)  $(RC_O) $(SRC_O) 
-ENGINE_O=$(MISC_O) $(FILTER_WEIGHTS_O) $(MODEL_O)  $(IE_IMAGE) $(IE_O)  $(API_O) 
+ALL_O=$(MISC_O) $(FILTER_WEIGHTS_O) $(MODEL_O) $(SAVE_LOAD_O) $(FFT_O) $(IE_IMAGE) $(IE_O) $(IE_SOLVER) $(RC_IMAGE)  $(RC_O) $(SRC_O) 
+ENGINE_O=$(MISC_O) $(FILTER_WEIGHTS_O) $(MODEL_O) $(FFT_O)  $(IE_IMAGE) $(IE_O)  $(API_O) 
 
 
 LIB_ZFGMRES=-L./ZFGMRES -lzfgmres

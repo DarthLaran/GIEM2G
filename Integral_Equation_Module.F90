@@ -8,9 +8,13 @@ MODULE INTEGRAL_EQUATION_MODULE
 	USE DISTRIBUTED_FFT_MODULE
 
         USE LOGGER_MODULE
+        USE LOCAL_OMP_FFT_MODULE
 	IMPLICIT NONE
 
 	PUBLIC
+
+        INTEGER,PARAMETER::GENERAL_MATRIX=1
+        INTEGER,PARAMETER::UNIFORM_MATRIX=2
 
 	INTEGER,PARAMETER::COUNTER_ALL=1
 	INTEGER,PARAMETER::COUNTER_WT=2
@@ -18,7 +22,7 @@ MODULE INTEGRAL_EQUATION_MODULE
 	INTEGER,PARAMETER::COUNTER_SQR=4
 	INTEGER,PARAMETER::COUNTER_OTHER=5
 	INTEGER(LONG_INT),PARAMETER::THREE_64=3
-
+        
 	TYPE TypeCounter
 		REAL(8)::plans
 		REAL(8)::tensor_calc(5)
@@ -50,6 +54,10 @@ MODULE INTEGRAL_EQUATION_MODULE
 		COMPLEX(REALPARM),POINTER:: G_symm(:,:,:,:)!G(Nz*(Nz+1)/2,EXX:EZZ,Nx_loc,Ny_loc)
 		COMPLEX(REALPARM),POINTER:: G_symm_fftw(:,:,:,:,:)! for fft(G)
 		COMPLEX(REALPARM),POINTER:: G_symm4(:,:,:) !for distribudted calc
+
+
+                INTEGER::matrix_kind
+                TYPE(LOCAL_OMP_FFT_DATA),POINTER::LFFT
 !---------------------------------------------------------------------------------------------------!
 
 		INTEGER(MPI_CTL_KIND)::ie_comm
@@ -177,7 +185,7 @@ CONTAINS
 			CALL MPI_COMM_RANK(ie_op%fgmres_comm, ie_op%fgmres_me, IERROR)
 		ENDIF
 		CALL MPI_COMM_RANK(ie_op%fgmres_comm, ie_op%fgmres_me, IERROR)
-
+                ie_op%matrix_kind=GENERAL_MATRIX
 
 	ENDSUBROUTINE
 !--------------------------------------------------------------------------------------------------------------------!	
