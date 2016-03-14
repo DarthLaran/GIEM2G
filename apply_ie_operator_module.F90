@@ -96,7 +96,24 @@ MODULE APPLY_IE_OPERATOR_MODULE
 		time1=GetTime()
 		CALL IE_OP_FFTW_FWD(ie_op)
 		time2=GetTime()
+		IF (ie_op%matrix_kind==GENERAL_MATRIX) THEN
+                        CALL VERTICAL_MULT_GENERAL(ie_op)
+		ELSEIF (ie_op%matrix_kind==UNIFORM_MATRIX) THEN
+                        CALL VERTICAL_MULT_UNIFORM(ie_op)
+                ELSE
+                ENDIF
+
 		ie_op%counter%mult_fftw=ie_op%counter%mult_fftw+time2-time1
+		time3=GetTime()
+		CALL IE_OP_FFTW_BWD(ie_op)
+		time4=GetTime()
+		ie_op%counter%mult_fftw_b=ie_op%counter%mult_fftw_b+time4-time3
+		ie_op%counter%mult_zgemv=ie_op%counter%mult_zgemv+time3-time2
+	ENDSUBROUTINE
+!----------------------------------------------------------------------------------------------------------------!
+        SUBROUTINE VERTICAL_MULT_GENERAL(ie_op)
+		TYPE(IntegralEquationOperator),INTENT(INOUT)::ie_op
+                INTEGER::Ixy
 		!$OMP PARALLEL	PRIVATE(Ixy) DEFAULT(SHARED)
 		!$OMP DO SCHEDULE(GUIDED) 
 		DO Ixy=1,ie_op%NxNy_loc
@@ -117,12 +134,9 @@ MODULE APPLY_IE_OPERATOR_MODULE
 		ENDDO
 		!$OMP END DO
 		!$OMP END  PARALLEL
-		time3=GetTime()
-		CALL IE_OP_FFTW_BWD(ie_op)
-		time4=GetTime()
-		ie_op%counter%mult_fftw_b=ie_op%counter%mult_fftw_b+time4-time3
-		ie_op%counter%mult_zgemv=ie_op%counter%mult_zgemv+time3-time2
-	ENDSUBROUTINE
+        ENDSUBROUTINE
+
+
 	SUBROUTINE IE_OP_ZGEMV_SYMM(ie_op,Tc,c_in,c_out,I,ALPHA,BETA)
 			TYPE(IntegralEquationOperator),INTENT(INOUT)::ie_op
 			INTEGER,INTENT(IN)::Tc,c_in,c_out,I
@@ -138,4 +152,20 @@ MODULE APPLY_IE_OPERATOR_MODULE
 			CALL ZGEMV(TRANS,ie_op%Nz,ie_op%Nz,ALPHA,ie_op%G_asym4(:,:,Tc,I),ie_op%Nz,&
 			&ie_op%field_in3(:,c_in,I),ONE,BETA,ie_op%field_out3(:,c_out,I),ONE)
 	END SUBROUTINE
+!--------------------------------------------------------------------------------------------------------------------!        
+        SUBROUTINE VERTICAL_MULT_UNIFORM(ie_op)
+		TYPE(IntegralEquationOperator),INTENT(INOUT)::ie_op
+                TYPE(LOCAL_OMP_FFT_DATA),POINTER::LFFT
+                INTEGER::Ixy,TN
+                LFFT=>ie_op%LFFT
+		!$OMP PARALLEL	PRIVATE(Ixy,TN) DEFAULT(SHARED)
+                TN=OMP_GET_THREAD_NUM()
+		!$OMP DO SCHEDULE(GUIDED) 
+		DO Ixy=1,ie_op%NxNy_loc
+                        CALL CALCULATE_FORWARD_AT_THREAD(LFFT,TN)
+                        CALL CALCULATE_BACKWARD_AT_THREAD(LFFT,TN)
+		ENDDO
+		!$OMP END DO
+		!$OMP END  PARALLEL
+        ENDSUBROUTINE
 END MODULE  
