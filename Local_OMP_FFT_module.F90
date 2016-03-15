@@ -10,8 +10,8 @@ MODULE LOCAL_OMP_FFT_MODULE
         TYPE LOCAL_OMP_FFT_DATA
                 TYPE(C_PTR)::plan_fwd
                 TYPE(C_PTR)::plan_bwd
-                COMPLEX(REALPARM),POINTER::data_in(:,:,:)
-                COMPLEX(REALPARM),POINTER::data_out(:,:,:)
+                COMPLEX(REALPARM),POINTER::data_in(:,:)
+                COMPLEX(REALPARM),POINTER::data_out(:,:)
                 INTEGER::Nc,NT
         ENDTYPE
 	INTEGER(KIND=KIND(FFTW_PATIENT)), PARAMETER  :: FFT_PAT=IOR(FFTW_PATIENT,FFTW_DESTROY_INPUT )
@@ -22,7 +22,7 @@ CONTAINS
                 INTEGER::R
                 INTEGER::NT
                 NT=OMP_GET_NUM_THREADS()
-                R=(Nc+4)*NT*2
+                R=(Nc*6+4)*NT
         ENDFUNCTION
 
         SUBROUTINE PREPARE_LOCAL_OMP_FFT(LFFT,Nc,buff_in,buff_out)
@@ -31,18 +31,27 @@ CONTAINS
                 TYPE(C_PTR),INTENT(IN)::buff_in,buff_out
                 COMPLEX(REALPARM),POINTER::ptr(:)
                 INTEGER::NT,N
+                INTEGER::pN(1)
+                INTEGER::M4,M6
                 NT=OMP_GET_NUM_THREADS()
                 LFFT%NT=NT
-                N=(Nc+4)*NT
+                N=(Nc*6+4)*NT
                 CALL C_F_POINTER(buff_in,ptr,(/N/))
-                LFFT%data_in(1:Nc+4,1:2,0:NT-1)=>ptr
+                LFFT%data_in(1:Nc*6+4,0:NT-1)=>ptr
                 CALL C_F_POINTER(buff_out,ptr,(/N/))
-                LFFT%data_out(1:Nc+4,1:2,0:NT-1)=>ptr
+                LFFT%data_out(1:Nc*6+4,0:NT-1)=>ptr
 
 		CALL FFTW_PLAN_WITH_NTHREADS(1)
+                pN=Nc
+                M4=4
+                M6=6
+		LFFT%plan_fwd=fftw_plan_many_dft(ONE,pN,M4,LFFT%data_in(:,0),pN,ONE,Nc,&
+                                                        &LFFT%data_out(:,0),pN,ONE,Nc&
+                                                        &,FFTW_FORWARD, FFT_MEA)
 
-!		LFFT%plan_fwd=fftw_plan_dft_1d(Nc,LFFT%data_in(:,1,0),LFFT%data_out(:,1,0),FFTW_FORWARD, FFT_MEA)
-!		LFFT%plan_bwd=fftw_plan_dft_1d(Nc,LFFT%data_in(:,1,0),LFFT%data_out(:,0),FFTW_BACKWARD, FFT_MEA)
+		LFFT%plan_bwd=fftw_plan_many_dft(ONE,pN,M6,LFFT%data_in(:,0),pN,ONE,Nc,&
+                                                        &LFFT%data_out(:,0),pN,ONE,Nc&
+                                                        &,FFTW_BACKWARD, FFT_MEA)
 
 		CALL FFTW_PLAN_WITH_NTHREADS(NT)
 

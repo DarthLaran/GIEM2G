@@ -150,8 +150,10 @@ CONTAINS
 
 		IF (Ny_offset>=Ny) THEN
 			CALL MirroringAdditionalSpace(Ny_offset,Ny_loc,Ny,Nx, G_symm,G_asym)
+!			G_symm(:,S_EXY,:,:)=-G_symm(:,S_EXY,:,:)
+!			G_asym(:,:,A_EYZ,:,:)=-G_asym(:,:,A_EYZ,:,:)
 		ELSE
-			CALL MirroringRealSpace(Ny_offset,Ny_loc,Ny,Nx, G_symm,G_asym)
+!			CALL MirroringRealSpace(Ny_offset,Ny_loc,Ny,Nx, G_symm,G_asym)
 		ENDIF
 
 #ifdef internal_timer
@@ -374,30 +376,14 @@ CONTAINS
 				CALL Calc_Double_Integral_Uniform(anomaly,bkg,dz,lm,W,G1,calc_time(3:4))
 			ENDIF
 		ENDDO
-		CALL FinalizeUniformTensor(G1,anomaly%Nz,TN,G_symm,G_asym)
+		CALL SEPARATE_MATRIX(G1,anomaly%Nz)
+                CALL EXTRACT_MATRIX(G1,G_symm,G_asym,anomaly%Nz,TN)
 #ifdef internal_timer
 		time2=GetTime()
 		calc_time(2)=calc_time(2)+time2-time1
 #endif
 	END SUBROUTINE
 
-	SUBROUTINE FinalizeUniformTensor(G,Nz,TN,G_symm,G_asym)
-		COMPLEX(REALPARM),INTENT(INOUT)::G(Nz,4,EXX:EZZ)
-		INTEGER,INTENT(IN)::Nz,TN
-		COMPLEX(REALPARM),INTENT(OUT)::G_symm(2*Nz,2,S_EXX:S_EZZ)
-		COMPLEX(REALPARM),INTENT(OUT)::G_asym(2*Nz,2,A_EXZ:A_EYZ)
-
-		CALL SEPARATE_MATRIX(G,Nz)
-
-		CALL EXTRACT_MATRIX(G(:,:,EXX),G_symm(:,:,S_EXX),Nz,TN)
-		CALL EXTRACT_MATRIX(G(:,:,EXY),G_symm(:,:,S_EXY),Nz,TN)
-		CALL EXTRACT_MATRIX(G(:,:,EYY),G_symm(:,:,S_EYY),Nz,TN)
-		CALL EXTRACT_MATRIX(G(:,:,EZZ),G_symm(:,:,S_EZZ),Nz,TN)
-		CALL EXTRACT_MATRIX(G(:,:,EXZ),G_asym(:,:,A_EXZ),Nz,TN)
-		CALL EXTRACT_MATRIX(G(:,:,EYZ),G_asym(:,:,A_EYZ),Nz,TN)
-
-
-	ENDSUBROUTINE
 	
 	SUBROUTINE SEPARATE_MATRIX(G,N)
 		COMPLEX(REALPARM),INTENT(INOUT)::G(N,4,EXX:EZZ)
@@ -445,26 +431,33 @@ CONTAINS
 		ENDDO
 	ENDSUBROUTINE
 
-	SUBROUTINE EXTRACT_MATRIX(G_in,G_out,Nz,TN)
-		COMPLEX(REALPARM),INTENT(IN)::G_in(Nz,4)
-		COMPLEX(REALPARM),INTENT(OUT)::G_out(2*Nz,2)
+	SUBROUTINE EXTRACT_MATRIX(G_in,G_symm,G_asym,Nz,TN)
+		COMPLEX(REALPARM),INTENT(IN)::G_in(Nz,4,EXX:EZZ)
+		COMPLEX(REALPARM),INTENT(OUT)::G_symm(2*Nz,2,S_EXX:S_EZZ)
+		COMPLEX(REALPARM),INTENT(OUT)::G_asym(2*Nz,2,A_EXZ:A_EYZ)
 		INTEGER,INTENT(IN)::Nz,TN
-		COMPLEX(REALPARM),POINTER::data_in(:)
-		COMPLEX(REALPARM),POINTER::data_out(:)
+		COMPLEX(REALPARM),POINTER::data_in(:,:)
+		COMPLEX(REALPARM),POINTER::data_out(:,:)
 
-		data_in(1:2*Nz)=>LFFT%data_in(:,TN)
-		data_out(1:2*Nz)=>LFFT%data_out(:,TN)
+		data_in(1:2*Nz,1:4)=>LFFT%data_in(:,TN)
+		data_out(1:2*Nz,1:4)=>LFFT%data_out(:,TN)
 
-		data_in(1:Nz)=G_in(:,1)
-		data_in(Nz+1:2*Nz)=G_in(:,2)
+                CALL ZCOPY(8*Nz,G_in(:,:,EXX:EXY),ONE,data_in,ONE)
 		CALL CALCULATE_FORWARD_AT_THREAD(LFFT,TN)
-		G_out(:,1)=data_out
+                G_symm(:,:,S_EXX)=data_out(:,1:2)/PI/4.0_REALPARM
+                G_symm(:,:,S_EXY)=data_out(:,3:4)/PI/4.0_REALPARM
 
-		data_in(1:Nz)= G_in(:,3)
-		data_in(Nz+1:2*Nz)=G_in(:,4)
+
+                CALL ZCOPY(8*Nz,G_in(:,:,EXZ:EYY),ONE,data_in,ONE)
 		CALL CALCULATE_FORWARD_AT_THREAD(LFFT,TN)
-		G_out(:,2)=data_out
+                G_asym(:,:,A_EZX)=data_out(:,1:2)/PI/4.0_REALPARM
+                G_symm(:,:,S_EXY)=data_out(:,3:4)/PI/4.0_REALPARM
 
+                CALL ZCOPY(8*Nz,G_in(:,:,EYZ:EZZ),ONE,data_in,ONE)
+		CALL CALCULATE_FORWARD_AT_THREAD(LFFT,TN)
+
+                G_asym(:,:,A_EYZ)=data_out(:,1:2)/PI/4.0_REALPARM
+                G_symm(:,:,S_EZZ)=data_out(:,3:4)/PI/4.0_REALPARM
 	ENDSUBROUTINE
 
 	SUBROUTINE PreparePreconditioner(ie_op,bkg,anomaly)
@@ -543,24 +536,24 @@ CONTAINS
 				!$OMP PARALLEL PRIVATE(Ix), DEFAULT(SHARED)
 				!$OMP DO SCHEDULE(GUIDED)
 				DO Ix=1,Nx-1
-					G_symm(:,S_EXX,2*Nx-Ix,Iy)=G_symm(:,S_EXX,Ix,Iy)
-					G_symm(:,S_EXY,2*Nx-Ix,Iy)=G_symm(:,S_EXY,Ix,Iy)
+!					G_symm(:,S_EXX,2*Nx-Ix,Iy)=G_symm(:,S_EXX,Ix,Iy)
+!					G_symm(:,S_EXY,2*Nx-Ix,Iy)=G_symm(:,S_EXY,Ix,Iy)
 					G_symm(:,S_EXY,Ix,Iy)=-G_symm(:,S_EXY,Ix,Iy)
-					G_symm(:,S_EYY,2*Nx-Ix,Iy)=G_symm(:,S_EYY,Ix,Iy)
-					G_symm(:,S_EZZ,2*Nx-Ix,Iy)=G_symm(:,S_EZZ,Ix,Iy)
+!					G_symm(:,S_EYY,2*Nx-Ix,Iy)=G_symm(:,S_EYY,Ix,Iy)
+!					G_symm(:,S_EZZ,2*Nx-Ix,Iy)=G_symm(:,S_EZZ,Ix,Iy)
 				ENDDO
 				!$OMP ENDDO
 				!$OMP WORKSHARE
 				G_symm(:,S_EXY,0,Iy)=-G_symm(:,S_EXY,0,Iy)
-				G_symm(:,:,Nx,Iy)=C_ZERO
-				G_asym(:,:,:,Nx,Iy)=C_ZERO
+!				G_symm(:,:,Nx,Iy)=C_ZERO
+!				G_asym(:,:,:,Nx,Iy)=C_ZERO
 				!$OMP END WORKSHARE
 				!$OMP DO SCHEDULE(GUIDED)
 				DO Ix=1,Nx-1
-					G_asym(:,:,A_EXZ,2*Nx-Ix,Iy)=-G_asym(:,:,A_EXZ,Ix,Iy)
+!					G_asym(:,:,A_EXZ,2*Nx-Ix,Iy)=-G_asym(:,:,A_EXZ,Ix,Iy)
 
 					G_asym(:,:,A_EYZ,Ix,Iy)=-G_asym(:,:,A_EYZ,Ix,Iy)
-					G_asym(:,:,A_EYZ,2*Nx-Ix,Iy)=G_asym(:,:,A_EYZ,Ix,Iy)
+!					G_asym(:,:,A_EYZ,2*Nx-Ix,Iy)=G_asym(:,:,A_EYZ,Ix,Iy)
 				ENDDO
 				!$OMP ENDDO
 				!$OMP WORKSHARE

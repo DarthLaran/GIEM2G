@@ -7,14 +7,14 @@ MODULE INTEGRAL_EQUATION_MODULE
 	USE DATA_TYPES_MODULE
 	USE DISTRIBUTED_FFT_MODULE
 
-        USE LOGGER_MODULE
-        USE LOCAL_OMP_FFT_MODULE
+	USE LOGGER_MODULE
+	USE LOCAL_OMP_FFT_MODULE
 	IMPLICIT NONE
 
 	PUBLIC
 
-        INTEGER,PARAMETER::GENERAL_MATRIX=1
-        INTEGER,PARAMETER::UNIFORM_MATRIX=2
+	INTEGER,PARAMETER::GENERAL_MATRIX=1
+	INTEGER,PARAMETER::UNIFORM_MATRIX=2
 
 	INTEGER,PARAMETER::COUNTER_ALL=1
 	INTEGER,PARAMETER::COUNTER_WT=2
@@ -22,7 +22,7 @@ MODULE INTEGRAL_EQUATION_MODULE
 	INTEGER,PARAMETER::COUNTER_SQR=4
 	INTEGER,PARAMETER::COUNTER_OTHER=5
 	INTEGER(LONG_INT),PARAMETER::THREE_64=3
-        
+	
 	TYPE TypeCounter
 		REAL(8)::plans
 		REAL(8)::tensor_calc(5)
@@ -56,8 +56,8 @@ MODULE INTEGRAL_EQUATION_MODULE
 		COMPLEX(REALPARM),POINTER:: G_symm4(:,:,:) !for distribudted calc
 
 
-                INTEGER::matrix_kind
-                TYPE(LOCAL_OMP_FFT_DATA),POINTER::LFFT
+		INTEGER::matrix_kind
+		TYPE(LOCAL_OMP_FFT_DATA),POINTER::LFFT
 !---------------------------------------------------------------------------------------------------!
 
 		INTEGER(MPI_CTL_KIND)::ie_comm
@@ -105,7 +105,7 @@ CONTAINS
 			RETURN
 		ENDIF
 
-		NxNyloc=(4*Nx*Ny)/Np
+		NxNyloc=(2*Nx*Ny)/Np
 		symm_length=2*Nz*(Nz+1)*NxNyloc
 		asym_length=2*Nz*Nz*NxNyloc
 		local_length=symm_length+asym_length
@@ -117,12 +117,12 @@ CONTAINS
 		TYPE (ANOMALY_TYPE),INTENT(INOUT)::anomaly
 		INTEGER(MPI_CTL_KIND),INTENT(IN)::comm 
 		TYPE(C_PTR),INTENT(IN)::kernel_buff,fft_buff_in,fft_buff_out
-                INTEGER(C_INTPTR_T) ,INTENT(IN)::kernel_size,fft_size
+		INTEGER(C_INTPTR_T) ,INTENT(IN)::kernel_size,fft_size
 		LOGICAL,INTENT(IN)::fftw_threads_ok
-                INTEGER::Nz
+		INTEGER::Nz
 		CALL PrepareIntegralEquationKernel(ie_op,anomaly,comm,kernel_buff,kernel_size)
 		CALL PrepareIntegralEquationOperator(ie_op,comm,fftw_threads_ok,fft_buff_in,fft_buff_out,fft_size) 
-                Nz=ie_op%Nz
+		Nz=ie_op%Nz
 		IF (ie_op%real_space) THEN
 			ALLOCATE(ie_op%csigb(Nz))
 			ALLOCATE(ie_op%sqsigb(Nz))
@@ -152,7 +152,7 @@ CONTAINS
 		ie_op%Nz=anomaly%Nz
 		ie_op%ie_comm=comm
 
-                CALL MPI_BARRIER(comm,IERROR);
+		CALL MPI_BARRIER(comm,IERROR);
 		CALL MPI_COMM_RANK(comm, me, IERROR)
 		CALL MPI_COMM_SIZE(comm,comm_size,IERROR) 
 		ie_op%me=me
@@ -169,7 +169,7 @@ CONTAINS
 			STOP
 		ENDIF
 !---------------------------------------------------------------------------------------------!
-		ie_op%Nx_loc=2*Nx
+		ie_op%Nx_loc=Nx
 		ie_op%Ny_loc=2*Ny/comm_size
 		ie_op%Ny_offset=me*ie_op%Ny_loc
 		ie_op%NxNy_loc=ie_op%Nx_loc*ie_op%Ny_loc
@@ -185,7 +185,7 @@ CONTAINS
 			CALL MPI_COMM_RANK(ie_op%fgmres_comm, ie_op%fgmres_me, IERROR)
 		ENDIF
 		CALL MPI_COMM_RANK(ie_op%fgmres_comm, ie_op%fgmres_me, IERROR)
-                ie_op%matrix_kind=GENERAL_MATRIX
+		ie_op%matrix_kind=GENERAL_MATRIX
 
 	ENDSUBROUTINE
 !--------------------------------------------------------------------------------------------------------------------!	
@@ -198,6 +198,7 @@ CONTAINS
 		INTEGER::symm_length,asym_length,loc_length
 
 		CALL C_F_POINTER(buff_ptr,ptr,(/ie_op%local_length/))
+                ptr=C_ZERO
 		Nz=ie_op%Nz
 		Nx=ie_op%Nx
 		Ny=ie_op%Ny
@@ -222,7 +223,7 @@ CONTAINS
 		LOGICAL, INTENT(IN)::fftw_threads_ok
 		TYPE(C_PTR),INTENT(IN)::fft_buff_in
 		TYPE(C_PTR),INTENT(IN)::fft_buff_out
-                INTEGER(C_INTPTR_T),INTENT(IN)::buff_len
+		INTEGER(C_INTPTR_T),INTENT(IN)::buff_len
 		INTEGER::Nx2,Nz,Ny_loc,Nx2Ny_loc
 		INTEGER::NT
 
@@ -232,11 +233,11 @@ CONTAINS
 		ENDIF
 
 		Nz=ie_op%Nz
-		Nx2=ie_op%Nx_loc
+		Nx2=2*ie_op%Nx
 		Ny_loc=ie_op%Ny_loc
-		Nx2Ny_loc=ie_op%NxNy_loc
+		Nx2Ny_loc=Nx2*Ny_loc
 		CALL	PrepareDistributedFourierData(ie_op%DFD,Nx2,2*ie_op%Ny,3*Nz,comm,&
-                                &fft_buff_in,fft_buff_out,buff_len)
+				&fft_buff_in,fft_buff_out,buff_len)
 
 		ie_op%field_in4(1:Nz,1:3,1:Nx2,1:Ny_loc)=>ie_op%DFD%field_out
 		ie_op%field_out4(1:Nz,1:3,1:Nx2,1:Ny_loc)=>ie_op%DFD%field_in
@@ -254,7 +255,39 @@ CONTAINS
 		TYPE(IntegralEquationOperator),INTENT(INOUT)::ie_op
 		CALL	CalcDistributedFourier(ie_op%DFD,FFT_BWD)
 	ENDSUBROUTINE
+#define fft_new
 
+#ifdef fft_new
+	SUBROUTINE CalcFFTofIETensor(ie_op)
+		TYPE(IntegralEquationOperator),INTENT(INOUT)::ie_op
+		INTEGER::N,Nz
+		REAL(DOUBLEPARM)::time1,time2
+		COMPLEX(REALPARM),POINTER::G(:,:,:,:)
+		TYPE(C_PTR)::ptr
+		time1=GetTime()
+		ie_op%field_in4=C_ZERO
+		G=>ie_op%G_symm
+		Nz=ie_op%Nz
+		N=(Nz*(Nz+1))/2
+
+		CALL CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,S_EXX,.FALSE.)
+		CALL CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,S_EXY,.TRUE.)
+		CALL CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,S_EYY,.FALSE.)
+		CALL CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,S_EZZ,.FALSE.)
+
+		ptr=C_LOC(ie_op%G_asym4(1,1,1,1))
+		N=Nz*Nz
+		CALL C_F_POINTER(ptr,G,(/N,2,ie_op%Nx_loc,ie_op%Ny_loc/))
+
+
+		CALL CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,A_EXZ,.TRUE.)
+		CALL CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,A_EYZ,.FALSE.)
+
+		time2=GetTime()
+		CALL PRINT_CALC_TIME('FFT of  IE tensor has been computed: ',time2-time1)
+		ie_op%counter%tensor_fft=time2-time1
+	ENDSUBROUTINE
+#else
 	SUBROUTINE CalcFFTofIETensor(ie_op)
 		TYPE(IntegralEquationOperator),INTENT(INOUT)::ie_op
 		INTEGER::Iz,Is,Ia
@@ -342,9 +375,53 @@ CONTAINS
 			ie_op%G_symm_fftw(:,1:2,Is,:,:)=ie_op%field_out4(:,1:2,:,:)
 		ENDIF
 		time2=GetTime()
-                CALL PRINT_CALC_TIME('FFT of  IE tensor has been computed: ',time2-time1)
+
+		CALL PRINT_CALC_TIME('FFT of  IE tensor has been computed: ',time2-time1)
 		ie_op%counter%tensor_fft=time2-time1
 	ENDSUBROUTINE
+#endif
+	SUBROUTINE CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,comp,negative)
+		TYPE(IntegralEquationOperator),INTENT(INOUT)::ie_op
+		COMPLEX(REALPARM),INTENT(INOUT)::G(1:,1:,1:,1:)
+		INTEGER,INTENT(IN)::comp
+		LOGICAL,INTENT(IN)::negative
+		COMPLEX(REALPARM)::tmp(3*ie_op%Nz)
+		INTEGER::N,Nz,M,Nz3,Nx,l
+		INTEGER::Iz,Ix,Iy,s
+		Nx=ie_op%Nx
+		Nz=ie_op%Nz
+		Nz3=3*Nz
+		M=1
+		l=MIN(Nz3,N-M+1)
+		DO
+			DO Iy=1,ie_op%Ny_loc
+				DO Ix=1,Nx
+				      CALL ZCOPY(l,G(M:,comp,Ix,Iy),ONE,ie_op%field_in4(:,:,Ix,Iy),ONE)  
+				ENDDO
+				ie_op%field_in4(:,:,Nx+1,Iy)=C_ZERO
+				DO Ix=1,Nx-1
+				      CALL ZCOPY(l,G(M:,comp,Ix+1,Iy),ONE,ie_op%field_in4(:,:,2*Nx-Ix+1,Iy),ONE)  
+				ENDDO
+			ENDDO
+			IF (negative) THEN
+				ie_op%field_in4(:,:,Nx+2:,:)=-ie_op%field_in4(:,:,Nx+2:,:)
+			ENDIF
+			CALL IE_OP_FFTW_FWD(ie_op) 
+			DO Iy=1,ie_op%Ny_loc
+				CALL ZCOPY(l,ie_op%field_out4(:,:,Nx+1,Iy),ONE,tmp,ONE) 
+				s=1
+				DO Ix=1,Nx
+				      CALL ZCOPY(l,ie_op%field_out4(:,:,Ix,Iy),ONE,G(M:,comp,Ix,Iy),ONE) 
+				      G(M:M+l-1,comp,Ix,Iy)=G(M:M+l-1,comp,Ix,Iy)-tmp(1:l)*s
+				      s=-s
+				ENDDO
+			ENDDO
+			M=M+l
+			IF (M==N+1) EXIT
+			l=MIN(Nz3,N-M+1)
+		ENDDO
+	END SUBROUTINE
+
 
 	SUBROUTINE DeleteIE_OP(ie_op)
 		TYPE(IntegralEquationOperator),INTENT(INOUT)::ie_op
