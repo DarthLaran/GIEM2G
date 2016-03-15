@@ -157,15 +157,19 @@ MODULE APPLY_IE_OPERATOR_MODULE
                                 CALL IE_OP_ZGEMV_SYMM(ie_op,S_EXX,EX,EX,I,Ixy,C_ONE,C_ZERO)
                                 CALL IE_OP_ZGEMV_SYMM(ie_op,S_EXY,EY,EX,I,Ixy,C_ONE,C_ONE)
                                 CALL IE_OP_ZGEMV_SYMM(ie_op,S_EYX,EX,EY,I,Ixy,C_ONE,C_ZERO)
+
                                 CALL IE_OP_ZGEMV_SYMM(ie_op,S_EYY,EY,EY,I,Ixy,C_ONE,C_ONE)
                                 CALL IE_OP_ZGEMV_SYMM(ie_op,S_EZZ,EZ,EZ,I,Ixy,C_ONE,C_ZERO)
                                 CALL IE_OP_ZGEMV_ASYM(ie_op,'N',A_EXZ,EZ,EX,I,Ixy,C_ONE,C_ONE)
+
                                 CALL IE_OP_ZGEMV_ASYM(ie_op,'T',A_EZX,EX,EZ,I,Ixy,-C_ONE,C_ONE)
+
                                 CALL IE_OP_ZGEMV_ASYM(ie_op,'N',A_EYZ,EZ,EY,I,Ixy,C_ONE,C_ONE)
+
                                 CALL IE_OP_ZGEMV_ASYM(ie_op,'T',A_EZY,EY,EZ,I,Ixy,-C_ONE,C_ONE)
 
                                 Iy=(Ixy-Ix-1)/ie_op%Nx+1
-                                ie_op%field_out4(:,:,ie_op%Nx,Iy)=C_ZERO
+                                ie_op%field_out4(:,:,ie_op%Nx+1,Iy)=C_ZERO
                         ENDIF
 
 		ENDDO
