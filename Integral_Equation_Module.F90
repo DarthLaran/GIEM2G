@@ -174,8 +174,8 @@ CONTAINS
 		ie_op%NxNy_loc=ie_op%Nx_loc*ie_op%Ny_loc
 		ie_op%local_length=local_length
 !---------------------------------------------------------------------------------------------!
-		ie_op%matrix_kind=UNIFORM_MATRIX
-!		ie_op%matrix_kind=GENERAL_MATRIX
+!		ie_op%matrix_kind=UNIFORM_MATRIX
+		ie_op%matrix_kind=GENERAL_MATRIX
 		CALL SetTensorPointers(ie_op,buff_ptr)
 		IF (ie_op%Ny_offset >= Ny) THEN   
 			ie_op%real_space=.FALSE.
