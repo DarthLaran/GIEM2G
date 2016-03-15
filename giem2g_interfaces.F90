@@ -115,6 +115,7 @@ CONTAINS
  			ALLOCATE(ie_op%dz(Nz))	
 	        	ie_op%csiga=>NULL()
         		ie_op%dz=anomaly%dz
+!                        PRINT*,ie_op%me,ASSOCIATED(ie_op%csigb)
         ENDSUBROUTINE
        
 
