@@ -175,7 +175,7 @@ CONTAINS
 		ie_op%local_length=local_length
 !---------------------------------------------------------------------------------------------!
 		ie_op%matrix_kind=UNIFORM_MATRIX
-		ie_op%matrix_kind=GENERAL_MATRIX
+!		ie_op%matrix_kind=GENERAL_MATRIX
 		CALL SetTensorPointers(ie_op,buff_ptr)
 		IF (ie_op%Ny_offset >= Ny) THEN   
 			ie_op%real_space=.FALSE.
@@ -196,7 +196,8 @@ CONTAINS
 		INTEGER::Nx,Ny,Nz,Nx2
 		INTEGER::NxNy_loc,N1,N2
 		INTEGER::symm_length,asym_length,loc_length
-
+                INTEGER(C_INTPTR_T)::bl
+                TYPE(C_PTR)::pin,pout
 		CALL C_F_POINTER(buff_ptr,ptr,(/ie_op%local_length/))
                 ptr=C_ZERO
 		Nz=ie_op%Nz
@@ -226,6 +227,12 @@ CONTAINS
                         ie_op%G_symm4(1:4*Nz,S_EXX:S_EZZ,1:NxNy_loc)=>ptr
 
                         ie_op%G_symm5(1:2*Nz,1:2,S_EXX:S_EZZ,1:NxNy_loc)=>ptr
+                       ALLOCATE(ie_op%LFFT)
+                       bl=CALC_LOCAL_OMP_FFT_SIZE(2*Nz)
+                      pin=fftw_alloc_complex(bl) 
+                      pout=fftw_alloc_complex(bl) 
+                        CALL PREPARE_LOCAL_OMP_FFT(ie_op%LFFT,2*Nz,pin,pout)
+
                 ENDIF
 	ENDSUBROUTINE
 !--------------------------------------------------------------------------------------------------------------------!
