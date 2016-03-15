@@ -193,14 +193,90 @@ MODULE APPLY_IE_OPERATOR_MODULE
         SUBROUTINE VERTICAL_MULT_UNIFORM(ie_op)
 		TYPE(IntegralEquationOperator),INTENT(INOUT)::ie_op
                 TYPE(LOCAL_OMP_FFT_DATA),POINTER::LFFT
-                INTEGER::Ixy,TN
+                COMPLEX(REALPARM),POINTER::data_in(:,:),data_out(:,:)
+                INTEGER::Ixy,TN,Ix,M,I,J,Nz,Nz2,K
+                INTEGER,PARAMETER::REZ=EZ+1
+
+                INTEGER,PARAMETER::TEX=2*EX-1
+                INTEGER,PARAMETER::HEX=2*EX
+
+                INTEGER,PARAMETER::TEY=2*EY-1
+                INTEGER,PARAMETER::HEY=2*EY
+
+                INTEGER,PARAMETER::TEZ=2*EZ-1
+                INTEGER,PARAMETER::HEZ=2*EZ
+
+                INTEGER,PARAMETER::T=1
+                INTEGER,PARAMETER::H=2
                 LFFT=>ie_op%LFFT
-		!$OMP PARALLEL	PRIVATE(Ixy,TN) DEFAULT(SHARED)
+                Nz=ie_op%Nz
+                Nz2=2*Nz
+		!$OMP PARALLEL	PRIVATE(Ixy,Ix,M,I,J,TN,data_in,data_out) DEFAULT(SHARED)
                 TN=OMP_GET_THREAD_NUM()
+                data_in(1:2*Nz,1:6)=>LFFT%data_in(:,TN)
+                data_out(1:2*Nz,1:6)=>LFFT%data_out(:,TN)
 		!$OMP DO SCHEDULE(GUIDED) 
-		DO Ixy=1,ie_op%NxNy_loc
-                        CALL CALCULATE_FORWARD_AT_THREAD(LFFT,TN)
-                        CALL CALCULATE_BACKWARD_AT_THREAD(LFFT,TN)
+		DO I=1,2*ie_op%NxNy_loc
+                        Ix=MODULO(I-1,2*ie_op%Nx)
+                        M=(I-Ix-1)/2
+                        Ix=MIN(Ix,2*ie_op%Nx-Ix)
+                        IF (Ix==ie_op%Nx) THEN
+                                ie_op%field_out3(:,:,I)=C_ZERO
+                                CYCLE
+                        ENDIF
+
+                        Ixy=Ix+M+1
+
+                       data_in=C_ZERO
+                       data_in(1:Nz,EX)=ie_op%field_in3(:,EX,I)
+                       data_in(1:Nz,EY)=ie_op%field_in3(:,EY,I)
+                       data_in(1:Nz,EZ)=ie_op%field_in3(:,EZ,I)
+                       DO K=1,Nz
+                               data_in(K,REZ)=ie_op%field_in3(Nz-K+1,EZ,I)
+                       ENDDO
+                       CALL CALCULATE_FORWARD_AT_THREAD(LFFT,TN)
+
+!---------------------------------------------     EX  ----------------------------------------                               
+                       data_in(:,TEX)=ie_op%G_symm5(:,T,S_EXX,Ixy)*data_out(:,EX)
+                       data_in(:,TEX)=ie_op%G_symm5(:,T,S_EXY,Ixy)*data_out(:,EY)+data_in(:,TEX)
+
+                       data_in(:,HEX)=ie_op%G_symm5(:,H,S_EXX,Ixy)*data_out(:,EX)
+                       data_in(:,HEX)=ie_op%G_symm5(:,H,S_EXY,Ixy)*data_out(:,EY)+data_in(:,HEX)
+
+                       data_in(:,HEX)=ie_op%G_asym4(:,H,A_EXZ,Ixy)*data_out(:,EZ)+data_in(:,HEX)
+                       data_in(:,HEX)=-ie_op%G_asym4(:,T,A_EXZ,Ixy)*data_out(:,REZ)+data_in(:,HEX)
+!---------------------------------------------     EY  ----------------------------------------                               
+                       data_in(:,TEY)=ie_op%G_symm5(:,T,S_EXY,Ixy)*data_out(:,EX)
+                       data_in(:,TEY)=ie_op%G_symm5(:,T,S_EYY,Ixy)*data_out(:,EY)+data_in(:,TEY)
+
+                       data_in(:,HEY)=ie_op%G_symm5(:,H,S_EXY,Ixy)*data_out(:,EX)
+                       data_in(:,HEY)=ie_op%G_symm5(:,H,S_EYY,Ixy)*data_out(:,EY)+data_in(:,HEY)
+
+                       data_in(:,HEY)=ie_op%G_asym4(:,H,A_EYZ,Ixy)*data_out(:,EZ)+data_in(:,HEY)
+                       data_in(:,HEY)=-ie_op%G_asym4(:,T,A_EYZ,Ixy)*data_out(:,REZ)+data_in(:,HEY)
+
+!---------------------------------------------     EZ  ----------------------------------------                               
+                       data_in(:,TEZ)=ie_op%G_asym4(:,T,A_EZX,Ixy)*data_out(:,EX)
+                       data_in(:,TEZ)=ie_op%G_asym4(:,T,A_EZY,Ixy)*data_out(:,EY)+data_in(:,TEZ)
+                       data_in(:,TEZ)=ie_op%G_symm5(:,T,S_EZZ,Ixy)*data_out(:,EZ)+data_in(:,TEZ)
+
+                       data_in(:,HEZ)=ie_op%G_asym4(:,H,A_EZX,Ixy)*data_out(:,EX)
+                       data_in(:,HEZ)=ie_op%G_asym4(:,H,A_EZY,Ixy)*data_out(:,EY)+data_in(:,HEZ)
+                       data_in(:,HEZ)=ie_op%G_symm5(:,H,S_EZZ,Ixy)*data_out(:,EZ)+data_in(:,HEZ)
+
+!-----------------------------------------------------------------------------------------                               
+                       CALL CALCULATE_BACKWARD_AT_THREAD(LFFT,TN)
+
+                       DO K=1,Nz
+                                ie_op%field_out3(K,EX,I)=data_out(K,TEX)+data_out(Nz-K+1,HEX)
+                       ENDDO
+                       DO K=1,Nz
+                                ie_op%field_out3(K,EY,I)=data_out(K,TEY)+data_out(Nz-K+1,HEY)
+                       ENDDO
+                       DO K=1,Nz
+                                ie_op%field_out3(K,EZ,I)=data_out(K,TEZ)+data_out(Nz-K+1,HEZ)
+                       ENDDO
+ 
 		ENDDO
 		!$OMP END DO
 		!$OMP END  PARALLEL

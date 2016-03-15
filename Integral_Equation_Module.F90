@@ -58,6 +58,7 @@ MODULE INTEGRAL_EQUATION_MODULE
 
 		INTEGER::matrix_kind
 		TYPE(LOCAL_OMP_FFT_DATA),POINTER::LFFT
+		COMPLEX(REALPARM),POINTER:: G_symm5(:,:,:,:)!
 !---------------------------------------------------------------------------------------------------!
 
 		INTEGER(MPI_CTL_KIND)::ie_comm
@@ -175,6 +176,8 @@ CONTAINS
 		ie_op%NxNy_loc=ie_op%Nx_loc*ie_op%Ny_loc
 		ie_op%local_length=local_length
 !---------------------------------------------------------------------------------------------!
+		ie_op%matrix_kind=UNIFORM_MATRIX
+		ie_op%matrix_kind=GENERAL_MATRIX
 		CALL SetTensorPointers(ie_op,buff_ptr)
 		IF (ie_op%Ny_offset >= Ny) THEN   
 			ie_op%real_space=.FALSE.
@@ -185,7 +188,6 @@ CONTAINS
 			CALL MPI_COMM_RANK(ie_op%fgmres_comm, ie_op%fgmres_me, IERROR)
 		ENDIF
 		CALL MPI_COMM_RANK(ie_op%fgmres_comm, ie_op%fgmres_me, IERROR)
-		ie_op%matrix_kind=GENERAL_MATRIX
 
 	ENDSUBROUTINE
 !--------------------------------------------------------------------------------------------------------------------!	
@@ -207,14 +209,28 @@ CONTAINS
 		N1=ie_op%Ny_offset
 		N2=ie_op%Ny_offset+ie_op%Ny_loc-1
 
-		ie_op%G_asym(1:Nz,1:Nz,A_EXZ:A_EYZ,0:Nx2,N1:N2)=>ptr
-		ie_op%G_asym_fftw(1:Nz,1:2,1:Nz,0:Nx2,N1:N2)=>ptr
-		ie_op%G_asym4(1:Nz,1:Nz,A_EXZ:A_EYZ,1:NxNy_loc)=>ptr
+                IF (ie_op%matrix_kind==GENERAL_MATRIX) THEN
+                        ie_op%G_asym(1:Nz,1:Nz,A_EXZ:A_EYZ,0:Nx2,N1:N2)=>ptr
+                        ie_op%G_asym_fftw(1:Nz,1:2,1:Nz,0:Nx2,N1:N2)=>ptr
+                        ie_op%G_asym4(1:Nz,1:Nz,A_EXZ:A_EYZ,1:NxNy_loc)=>ptr
 
-		ptr=>ptr(SIZE(ie_op%G_asym)+1:)
-		ie_op%G_symm(1:Nz*(Nz+1)/2,S_EXX:S_EZZ,0:Nx2,N1:N2)=>ptr
-		ie_op%G_symm_fftw(1:Nz,1:2,1:Nz+1,0:Nx2,N1:N2)=>ptr
-		ie_op%G_symm4(1:Nz*(Nz+1)/2,S_EXX:S_EZZ,1:NxNy_loc)=>ptr
+                        ptr=>ptr(SIZE(ie_op%G_asym)+1:)
+                        ie_op%G_symm(1:Nz*(Nz+1)/2,S_EXX:S_EZZ,0:Nx2,N1:N2)=>ptr
+                        ie_op%G_symm_fftw(1:Nz,1:2,1:Nz+1,0:Nx2,N1:N2)=>ptr
+                        ie_op%G_symm4(1:Nz*(Nz+1)/2,S_EXX:S_EZZ,1:NxNy_loc)=>ptr
+                        ie_op%G_symm5=>NULL()
+                ELSEIF (ie_op%matrix_kind==UNIFORM_MATRIX) THEN
+
+                        ie_op%G_asym(1:2*Nz,1:2,A_EXZ:A_EYZ,0:Nx2,N1:N2)=>ptr
+!                        ie_op%G_asym_fftw(1:Nz,1:2,1:Nz,0:Nx2,N1:N2)=>ptr
+                        ie_op%G_asym4(1:2*Nz,1:2,A_EXZ:A_EYZ,1:NxNy_loc)=>ptr
+
+                        ptr=>ptr(SIZE(ie_op%G_asym)+1:)
+                        ie_op%G_symm(1:4*Nz,S_EXX:S_EZZ,0:Nx2,N1:N2)=>ptr
+!                        ie_op%G_symm_fftw(1:Nz,1:2,1:Nz+1,0:Nx2,N1:N2)=>ptr
+                        ie_op%G_symm4(1:4*Nz,S_EXX:S_EZZ,1:NxNy_loc)=>ptr
+                        ie_op%G_symm5(1:2*Nz,1:2,S_EXX:S_EZZ,1:NxNy_loc)=>ptr
+                ENDIF
 	ENDSUBROUTINE
 !--------------------------------------------------------------------------------------------------------------------!
 	 SUBROUTINE PrepareIntegralEquationOperator(ie_op,comm,fftw_threads_ok,fft_buff_in,fft_buff_out,buff_len) 

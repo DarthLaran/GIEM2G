@@ -149,9 +149,9 @@ CONTAINS
 		CALL MPI_WAITALL(Ny_loc*4, all_requests,  MPI_STATUSES_IGNORE, IERROR)
 
 		IF (Ny_offset>=Ny) THEN
-			CALL MirroringAdditionalSpace(Ny_offset,Ny_loc,Ny,Nx, G_symm,G_asym)
-!			G_symm(:,S_EXY,:,:)=-G_symm(:,S_EXY,:,:)
-!			G_asym(:,:,A_EYZ,:,:)=-G_asym(:,:,A_EYZ,:,:)
+!			CALL MirroringAdditionalSpace(Ny_offset,Ny_loc,Ny,Nx, G_symm,G_asym)
+			G_symm(:,S_EXY,:,:)=-G_symm(:,S_EXY,:,:)
+			G_asym(:,:,A_EYZ,:,:)=-G_asym(:,:,A_EYZ,:,:)
 		ELSE
 !			CALL MirroringRealSpace(Ny_offset,Ny_loc,Ny,Nx, G_symm,G_asym)
 		ENDIF

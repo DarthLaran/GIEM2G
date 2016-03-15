@@ -60,12 +60,12 @@ CONTAINS
         SUBROUTINE CALCULATE_FORWARD_AT_THREAD(LFFT,I)
                 TYPE(LOCAL_OMP_FFT_DATA),INTENT(INOUT)::LFFT
                 INTEGER,INTENT(IN)::I
-!		CALL fftw_execute_dft(LFFT%plan_fwd,LFFT%data_in(:,I),LFFT%data_out(:,I))
+		CALL fftw_execute_dft(LFFT%plan_fwd,LFFT%data_in(:,I),LFFT%data_out(:,I))
         ENDSUBROUTINE
 
         SUBROUTINE CALCULATE_BACKWARD_AT_THREAD(LFFT,I)
                 TYPE(LOCAL_OMP_FFT_DATA),INTENT(INOUT)::LFFT
                 INTEGER,INTENT(IN)::I
-!		CALL fftw_execute_dft(LFFT%plan_bwd,LFFT%data_in(:,I),LFFT%data_out(:,I))
+		CALL fftw_execute_dft(LFFT%plan_bwd,LFFT%data_in(:,I),LFFT%data_out(:,I))
         ENDSUBROUTINE
 ENDMODULE
