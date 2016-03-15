@@ -244,7 +244,7 @@ CONTAINS
 		TYPE(C_PTR),INTENT(IN)::fft_buff_out
 		INTEGER(C_INTPTR_T),INTENT(IN)::buff_len
 		INTEGER::Nx2,Nz,Ny_loc,Nx2Ny_loc
-		INTEGER::NT
+		INTEGER::NT,OMP_GET_MAX_THREADS
 
 		IF (fftw_threads_ok) THEN
 			NT=OMP_GET_MAX_THREADS()
