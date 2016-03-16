@@ -42,8 +42,8 @@ MODULE APPLY_IE_OPERATOR_MODULE
                 DO Iz=1,int_eq%Nz
                         DO Iy=1,int_eq%Ny_loc
                                 DO Ix=1,int_eq%Nx
-                                        asiga=C_TWO*int_eq%sqsigb(Iz)/(int_eq%csiga(Iz,Ix,Iy)+CONJG(int_eq%csigb(Iz)))
-                                        dsig=int_eq%csiga(Iz,Ix,Iy)-int_eq%csigb(Iz)
+                                        asiga=C_TWO*int_eq%sqsigb(Iz)/(int_eq%csiga(Ix,Iy,Iz)+CONJG(int_eq%csigb(Iz)))
+                                        dsig=int_eq%csiga(Ix,Iy,Iz)-int_eq%csigb(Iz)
                                         gsig=dsig*asiga
 
                                         fft_buff(Ix,Iy,Iz,EX)=&
@@ -56,8 +56,8 @@ MODULE APPLY_IE_OPERATOR_MODULE
                 DO Iz=1,int_eq%Nz
                         DO Iy=1,int_eq%Ny_loc
                                 DO Ix=1,int_eq%Nx
-                                        asiga=C_TWO*int_eq%sqsigb(Iz)/(int_eq%csiga(Iz,Ix,Iy)+CONJG(int_eq%csigb(Iz)))
-                                        dsig=int_eq%csiga(Iz,Ix,Iy)-int_eq%csigb(Iz)
+                                        asiga=C_TWO*int_eq%sqsigb(Iz)/(int_eq%csiga(Ix,Iy,Iz)+CONJG(int_eq%csigb(Iz)))
+                                        dsig=int_eq%csiga(Ix,Iy,Iz)-int_eq%csigb(Iz)
                                         gsig=dsig*asiga
 
                                         fft_buff(Ix,Iy,Iz,EY)=&
@@ -71,8 +71,8 @@ MODULE APPLY_IE_OPERATOR_MODULE
                 DO Iz=1,int_eq%Nz
                         DO Iy=1,int_eq%Ny_loc
                                 DO Ix=1,int_eq%Nx
-                                        asiga=C_TWO*int_eq%sqsigb(Iz)/(int_eq%csiga(Iz,Ix,Iy)+CONJG(int_eq%csigb(Iz)))
-                                        dsig=int_eq%csiga(Iz,Ix,Iy)-int_eq%csigb(Iz)
+                                        asiga=C_TWO*int_eq%sqsigb(Iz)/(int_eq%csiga(Ix,Iy,Iz)+CONJG(int_eq%csigb(Iz)))
+                                        dsig=int_eq%csiga(Ix,Iy,Iz)-int_eq%csigb(Iz)
                                         gsig=dsig*asiga
 
                                         fft_buff(Ix,Iy,Iz,EZ)=&
@@ -93,7 +93,7 @@ MODULE APPLY_IE_OPERATOR_MODULE
 			DO Ix=1,int_eq%Nx
 				DO Ic=1,3
 					DO Iz=1,int_eq%Nz
-						asiga=C_TWO*int_eq%sqsigb(Iz)/(int_eq%csiga(Iz,Ix,Iy)+CONJG(int_eq%csigb(Iz)))
+						asiga=C_TWO*int_eq%sqsigb(Iz)/(int_eq%csiga(Ix,Iy,Iz)+CONJG(int_eq%csigb(Iz)))
 						d1=field_in(Iz,Ic,Ix,Iy)*asiga
 						d2=d1-fft_buff(Ix,Iy,Iz,Ic)/(int_eq%dz(Iz))/N
 						field_out(Iz,Ic,Ix,Iy)=d2*int_eq%sqsigb(Iz)

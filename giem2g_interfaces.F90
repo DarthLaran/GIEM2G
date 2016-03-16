@@ -162,7 +162,7 @@ CONTAINS
         		TYPE(IntegralEquationOperator),POINTER::ie_op
                         INTEGER::localshape(3);
                         CALL C_F_POINTER(ie_op_ptr,ie_op)
-                        localshape=(/ie_op%Nz,ie_op%Nx,ie_op%Ny_loc/)
+                        localshape=(/ie_op%Nx,ie_op%Ny_loc,ie_op%Nz/)
         		IF (ie_op%real_space) THEN
                                 CALL C_F_POINTER(siga_ptr,ie_op%csiga,localshape)
                         ENDIF
