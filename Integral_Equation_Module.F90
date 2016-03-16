@@ -48,10 +48,10 @@ MODULE INTEGRAL_EQUATION_MODULE
 		TYPE(C_PTR)::buff_ptr
 
 		COMPLEX(REALPARM),POINTER:: G_asym(:,:,:,:,:)!G(Nz,Nz,EXZ:EYZ,Nx_loc,Ny_loc)
-		COMPLEX(REALPARM),POINTER:: G_asym4(:,:,:,:) !for distribudted calc
+		COMPLEX(REALPARM),POINTER:: G_asymT(:,:,:,:,:) !for distribudted calc
 
 		COMPLEX(REALPARM),POINTER:: G_symm(:,:,:,:)!G(Nz*(Nz+1)/2,EXX:EZZ,Nx_loc,Ny_loc)
-		COMPLEX(REALPARM),POINTER:: G_symm4(:,:,:) !for distribudted calc
+		COMPLEX(REALPARM),POINTER:: G_symmT(:,:,:,:)!for distribudted calc
 
 
 		INTEGER::matrix_kind
@@ -67,8 +67,8 @@ MODULE INTEGRAL_EQUATION_MODULE
 		LOGICAL::fftw_threads_ok
 		TYPE(DistributedFourierData)::DFD
 
-		COMPLEX(REALPARM),POINTER::field_in4(:,:,:,:),field_out4(:,:,:,:)
-		COMPLEX(REALPARM),POINTER::field_in3(:,:,:),field_out3(:,:,:)
+		COMPLEX(REALPARM),POINTER::field_in(:,:,:,:),field_out(:,:,:,:)
+		COMPLEX(REALPARM),POINTER::field_inT(:,:,:,:),field_outT(:,:,:,:)
 
 !---------------------------------------------------------------------------------------------------!
 		REAL(REALPARM),POINTER::dz(:)
@@ -210,23 +210,23 @@ CONTAINS
 
                 IF (ie_op%matrix_kind==GENERAL_MATRIX) THEN
                         ie_op%G_asym(1:Nz,1:Nz,A_EXZ:A_EYZ,0:Nx2,N1:N2)=>ptr
-                        ie_op%G_asym4(1:Nz,1:Nz,A_EXZ:A_EYZ,1:NxNy_loc)=>ptr
+                        ie_op%G_asymT(1:Nz,1:Nz,A_EXZ:A_EYZ,1:ie_op%Ny_loc,0:Nx2)=>ptr
 
                         ptr=>ptr(SIZE(ie_op%G_asym)+1:)
                         ie_op%G_symm(1:Nz*(Nz+1)/2,S_EXX:S_EZZ,0:Nx2,N1:N2)=>ptr
-                        ie_op%G_symm4(1:Nz*(Nz+1)/2,S_EXX:S_EZZ,1:NxNy_loc)=>ptr
+                        ie_op%G_symmT(1:Nz*(Nz+1)/2,S_EXX:S_EZZ,1:ie_op%Ny_loc,0:Nx2)=>ptr
                         ie_op%G_symm5=>NULL()
                 ELSEIF (ie_op%matrix_kind==UNIFORM_MATRIX) THEN
 
-                        ie_op%G_asym(1:2*Nz,1:2,A_EXZ:A_EYZ,0:Nx2,N1:N2)=>ptr
-                        ie_op%G_asym4(1:2*Nz,1:2,A_EXZ:A_EYZ,1:NxNy_loc)=>ptr
+!                        ie_op%G_asym(1:2*Nz,1:2,A_EXZ:A_EYZ,0:Nx2,N1:N2)=>ptr
+!                        ie_op%G_asym4(1:2*Nz,1:2,A_EXZ:A_EYZ,1:NxNy_loc)=>ptr
 
                         ptr=>ptr(SIZE(ie_op%G_asym)+1:)
 
-                        ie_op%G_symm(1:4*Nz,S_EXX:S_EZZ,0:Nx2,N1:N2)=>ptr
-                        ie_op%G_symm4(1:4*Nz,S_EXX:S_EZZ,1:NxNy_loc)=>ptr
+ !                       ie_op%G_symm(1:4*Nz,S_EXX:S_EZZ,0:Nx2,N1:N2)=>ptr
+ !                       ie_op%G_symm4(1:4*Nz,S_EXX:S_EZZ,1:NxNy_loc)=>ptr
 
-                        ie_op%G_symm5(1:2*Nz,1:2,S_EXX:S_EZZ,1:NxNy_loc)=>ptr
+ !                       ie_op%G_symm5(1:2*Nz,1:2,S_EXX:S_EZZ,1:NxNy_loc)=>ptr
                        ALLOCATE(ie_op%LFFT)
                        bl=CALC_LOCAL_OMP_FFT_SIZE(2*Nz)
                       pin=fftw_alloc_complex(bl) 
@@ -258,11 +258,12 @@ CONTAINS
 		CALL	PrepareDistributedFourierData(ie_op%DFD,Nx2,2*ie_op%Ny,3*Nz,comm,&
 				&fft_buff_in,fft_buff_out,buff_len)
 
-		ie_op%field_in4(1:Nz,1:3,1:Nx2,1:Ny_loc)=>ie_op%DFD%field_out
-		ie_op%field_out4(1:Nz,1:3,1:Nx2,1:Ny_loc)=>ie_op%DFD%field_in
+		ie_op%field_in(1:Nz,1:3,1:Nx2,1:Ny_loc)=>ie_op%DFD%field_out
+		ie_op%field_out(1:Nz,1:3,1:Nx2,1:Ny_loc)=>ie_op%DFD%field_in
 
-		ie_op%field_in3(1:Nz,1:3,1:Nx2Ny_loc)=>ie_op%DFD%field_in
-		ie_op%field_out3(1:Nz,1:3,1:Nx2Ny_loc)=>ie_op%DFD%field_out
+		ie_op%field_inT(1:Nz,1:3,1:Ny_loc,0:Nx2-1)=>ie_op%DFD%field_out
+		ie_op%field_outT(1:Nz,1:3,1:Ny_loc,0:Nx2-1)=>ie_op%DFD%field_in
+
 
 	ENDSUBROUTINE
 
@@ -278,6 +279,11 @@ CONTAINS
 	SUBROUTINE IE_OP_FFTW_FWD_PREPARED(ie_op)
 		TYPE(IntegralEquationOperator),INTENT(INOUT)::ie_op
                 CALL CalcPreparedForwardFFT(ie_op%DFD)
+
+	ENDSUBROUTINE
+	SUBROUTINE IE_OP_FFTW_FWD_FOR_TENSOR(ie_op)
+		TYPE(IntegralEquationOperator),INTENT(INOUT)::ie_op
+                CALL CalcForwardIETensorFFT(ie_op%DFD)
 
 	ENDSUBROUTINE
 	SUBROUTINE IE_OP_FFTW_BWD_PREPARED(ie_op)
@@ -301,25 +307,28 @@ CONTAINS
 		INTEGER::N,Nz
 		REAL(DOUBLEPARM)::time1,time2
 		COMPLEX(REALPARM),POINTER::G(:,:,:,:)
+		COMPLEX(REALPARM),POINTER::Gout(:,:,:,:)
 		TYPE(C_PTR)::ptr
 		time1=GetTime()
-		ie_op%field_in4=C_ZERO
+		ie_op%field_in=C_ZERO
 		G=>ie_op%G_symm
+		Gout=>ie_op%G_symmT
 		Nz=ie_op%Nz
 		N=(Nz*(Nz+1))/2
 
-		CALL CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,S_EXX,.FALSE.)
-		CALL CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,S_EXY,.TRUE.)
-		CALL CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,S_EYY,.FALSE.)
-		CALL CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,S_EZZ,.FALSE.)
+		CALL CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,S_EXX,.FALSE.,Gout)
+		CALL CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,S_EXY,.TRUE.,Gout)
+		CALL CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,S_EYY,.FALSE.,Gout)
+		CALL CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,S_EZZ,.FALSE.,Gout)
 
-		ptr=C_LOC(ie_op%G_asym4(1,1,1,1))
+		ptr=C_LOC(ie_op%G_asymT(1,1,1,1,0))
 		N=Nz*Nz
 		CALL C_F_POINTER(ptr,G,(/N,2,ie_op%Nx_loc,ie_op%Ny_loc/))
+		CALL C_F_POINTER(ptr,Gout,(/N,2,ie_op%Ny_loc,ie_op%Nx_loc/))
 
 
-		CALL CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,A_EXZ,.TRUE.)
-		CALL CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,A_EYZ,.FALSE.)
+		CALL CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,A_EXZ,.TRUE.,Gout)
+		CALL CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,A_EYZ,.FALSE.,Gout)
 
 		time2=GetTime()
 		CALL PRINT_CALC_TIME('FFT of  IE tensor has been computed: ',time2-time1)
@@ -333,7 +342,7 @@ CONTAINS
 		COMPLEX(REALPARM),POINTER::G(:,:,:,:)
 		TYPE(C_PTR)::ptr
 		time1=GetTime()
-		ie_op%field_in4=C_ZERO
+		ie_op%field_in=C_ZERO
 		Nz=ie_op%Nz
 		N=4*Nz
 
@@ -341,18 +350,18 @@ CONTAINS
 
 		CALL C_F_POINTER(ptr,G,(/N,4,ie_op%Nx_loc,ie_op%Ny_loc/))
 
-		CALL CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,S_EXX,.FALSE.)
-		CALL CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,S_EXY,.TRUE.)
-		CALL CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,S_EYY,.FALSE.)
-		CALL CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,S_EZZ,.FALSE.)
+!		CALL CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,S_EXX,.FALSE.)
+!		CALL CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,S_EXY,.TRUE.)
+!		CALL CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,S_EYY,.FALSE.)
+!		CALL CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,S_EZZ,.FALSE.)
 
-		ptr=C_LOC(ie_op%G_asym4(1,1,1,1))
+!		ptr=C_LOC(ie_op%G_asym4(1,1,1,1))
 
-		CALL C_F_POINTER(ptr,G,(/N,2,ie_op%Nx_loc,ie_op%Ny_loc/))
+!		CALL C_F_POINTER(ptr,G,(/N,2,ie_op%Nx_loc,ie_op%Ny_loc/))
 
 
-		CALL CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,A_EXZ,.TRUE.)
-		CALL CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,A_EYZ,.FALSE.)
+!		CALL CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,A_EXZ,.TRUE.)
+!		CALL CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,A_EYZ,.FALSE.)
 
 		time2=GetTime()
 		CALL PRINT_CALC_TIME('FFT of  IE tensor has been computed: ',time2-time1)
@@ -451,9 +460,10 @@ CONTAINS
 		ie_op%counter%tensor_fft=time2-time1
 	ENDSUBROUTINE
 #endif
-	SUBROUTINE CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,comp,negative)
+	SUBROUTINE CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,comp,negative,Gout)
 		TYPE(IntegralEquationOperator),INTENT(INOUT)::ie_op
 		COMPLEX(REALPARM),INTENT(INOUT)::G(1:,1:,1:,1:)
+		COMPLEX(REALPARM),INTENT(INOUT)::Gout(1:,1:,1:,1:)
 		INTEGER,INTENT(IN)::comp
 		LOGICAL,INTENT(IN)::negative
 		COMPLEX(REALPARM)::tmp(3*ie_op%Nz)
@@ -467,23 +477,31 @@ CONTAINS
 		DO
 			DO Iy=1,ie_op%Ny_loc
 				DO Ix=1,Nx
-				      CALL ZCOPY(l,G(M:,comp,Ix,Iy),ONE,ie_op%field_in4(:,:,Ix,Iy),ONE)  
+				      CALL ZCOPY(l,G(M:,comp,Ix,Iy),ONE,ie_op%field_in(:,:,Ix,Iy),ONE)  
 				ENDDO
-				ie_op%field_in4(:,:,Nx+1,Iy)=C_ZERO
+				ie_op%field_in(:,:,Nx+1,Iy)=C_ZERO
 				DO Ix=1,Nx-1
-				      CALL ZCOPY(l,G(M:,comp,Ix+1,Iy),ONE,ie_op%field_in4(:,:,2*Nx-Ix+1,Iy),ONE)  
+				      CALL ZCOPY(l,G(M:,comp,Ix+1,Iy),ONE,ie_op%field_in(:,:,2*Nx-Ix+1,Iy),ONE)  
 				ENDDO
 			ENDDO
 			IF (negative) THEN
-				ie_op%field_in4(:,:,Nx+2:,:)=-ie_op%field_in4(:,:,Nx+2:,:)
+				ie_op%field_in(:,:,Nx+2:,:)=-ie_op%field_in(:,:,Nx+2:,:)
 			ENDIF
-			CALL IE_OP_FFTW_FWD(ie_op) 
+			CALL IE_OP_FFTW_FWD_FOR_TENSOR(ie_op) 
+                        !$OMP PARALLEL DEFAULT(SHARED), PRIVATE(Ix,Iy)
+                        !$OMP DO SCHEDULE(GUIDED) 
+			DO Ix=1,Nx
+                                DO Iy=1,ie_op%Ny
+        			      CALL ZCOPY(l,ie_op%field_inT(:,:,Iy,Ix-1),ONE,Gout(M:,comp,Iy,Ix),ONE) 
+                                ENDDO
+			ENDDO
+                        !$OMP END DO
+        		!$OMP END PARALLEL
 			DO Iy=1,ie_op%Ny_loc
-				CALL ZCOPY(l,ie_op%field_out4(:,:,Nx+1,Iy),ONE,tmp,ONE) 
+				CALL ZCOPY(l,ie_op%field_inT(:,:,Iy,Nx),ONE,tmp,ONE) 
 				s=1
 				DO Ix=1,Nx
-				      CALL ZCOPY(l,ie_op%field_out4(:,:,Ix,Iy),ONE,G(M:,comp,Ix,Iy),ONE) 
-				      G(M:M+l-1,comp,Ix,Iy)=G(M:M+l-1,comp,Ix,Iy)-tmp(1:l)*s
+				      Gout(M:M+l-1,comp,Iy,Ix)=Gout(M:M+l-1,comp,Iy,Ix)-tmp(1:l)*s
 				      s=-s
 				ENDDO
 			ENDDO
@@ -497,13 +515,13 @@ CONTAINS
 	SUBROUTINE DeleteIE_OP(ie_op)
 		TYPE(IntegralEquationOperator),INTENT(INOUT)::ie_op
 		ie_op%G_symm=>NULL()
-		ie_op%G_symm4=>NULL()
+		ie_op%G_symmT=>NULL()
 		ie_op%G_asym=>NULL()
-		ie_op%G_asym4=>NULL()
-		ie_op%field_in4=>NULL()
-		ie_op%field_in3=>NULL()
-		ie_op%field_out4=>NULL()
-		ie_op%field_out3=>NULL()
+		ie_op%G_asymT=>NULL()
+		ie_op%field_in=>NULL()
+		ie_op%field_inT=>NULL()
+		ie_op%field_out=>NULL()
+		ie_op%field_outT=>NULL()
 		DEALLOCATE(ie_op%dz)
 		CALL DeleteDistributedFourierData(ie_op%DFD)
 		IF (ie_op%real_space )	DEALLOCATE(ie_op%csigb,ie_op%sqsigb)

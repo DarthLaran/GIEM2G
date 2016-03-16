@@ -87,7 +87,6 @@ CONTAINS
 		ELSE
 		ENDIF	
 
-
 		dx=anomaly%dx
 		dy=anomaly%dy
 		CALL	PreparePreconditioner(ie_op,bkg,anomaly)

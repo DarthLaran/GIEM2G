@@ -140,6 +140,7 @@ CONTAINS
                         ALLOCATE(anomaly%Lnumber(0:Nz));
 			anomaly%Lnumber(1:Nz)=GetLayer((anomaly%z(0:Nz-1)+anomaly%z(1:Nz))/2d0,bkg)
 			anomaly%Lnumber(0)=GetLayer(anomaly%z(0)*(1d0-1d-7),bkg)
+                        IF (ASSOCIATED(int_eq%csigb)) int_eq%csigb=C_ZERO
                         CALL CalcIntegralGreenTensor(int_eq,bkg,anomaly)
                         DEALLOCATE(anomaly%Lnumber)
                         CALL DELETE_BACKGROUND(bkg)

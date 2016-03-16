@@ -86,6 +86,7 @@ MODULE DISTRIBUTED_FFT_MODULE
 	PUBLIC:: PrepareDistributedFourierData,DeleteDistributedFourierData
         PUBLIC:: CalcPreparedForwardFFT
         PUBLIC:: CalcPreparedBackwardFFT
+        PUBLIC:: CalcForwardIETensorFFT
 	PUBLIC:: CalcLocalFFTSize,PrintTimings
 	CONTAINS
 	SUBROUTINE  PrepareDistributedFourierData(DFD,Nx,Ny,Nc,comm,fft_buff_in,fft_buff_out,buff_length)
@@ -221,13 +222,18 @@ MODULE DISTRIBUTED_FFT_MODULE
 	SUBROUTINE CalcPreparedForwardFFT(DFD)
 		TYPE (DistributedFourierData),INTENT(INOUT)::DFD
 		CALL ProcessDistributedFourierKernelSync(DFD,FFT_FWD)
-		CALL FinalTranspose(DFD)
-		DFD%field_load_out=DFD%field_load_in
+		CALL FinalTransposeRepack(DFD)
 	END SUBROUTINE
 	
-	SUBROUTINE CalcPreparedBackwardFFT(DFD)
+	SUBROUTINE CalcForwardIETensorFFT(DFD)
 		TYPE (DistributedFourierData),INTENT(INOUT)::DFD
 		CALL InitialTranspose(DFD)
+		CALL ProcessDistributedFourierKernelSync(DFD,FFT_FWD)
+		CALL FinalTransposeRepack(DFD)
+	END SUBROUTINE
+	SUBROUTINE CalcPreparedBackwardFFT(DFD)
+		TYPE (DistributedFourierData),INTENT(INOUT)::DFD
+		CALL InitialTransposeRepack(DFD)
 		CALL ProcessDistributedFourierKernelSync(DFD,FFT_BWD)
 	END SUBROUTINE
  
@@ -434,6 +440,72 @@ MODULE DISTRIBUTED_FFT_MODULE
 #endif
 	ENDSUBROUTINE
 
+	SUBROUTINE FinalTransposeRepack(DFD)
+		TYPE (DistributedFourierData),INTENT(INOUT)::DFD
+		INTEGER::Ix,Iy,Ic,l
+		INTEGER::Nx,Ny,Nc,Nt,M
+		COMPLEX(REALPARM),POINTER::p_in(:,:,:),p_out(:,:,:)
+		REAL(DOUBLEPARM)::time1,time2
+#ifndef performance_test
+		time1=GetTime()
+#endif
+		Nx=DFD%Nx
+		Ny=DFD%Ny_loc
+		Nc=DFD%Nc
+		p_in(1:Nx,1:Ny,1:Nc)=>DFD%field_in
+		p_out(1:Nc,1:Ny,1:Nx)=>DFD%field_out
+
+		!$OMP PARALLEL DEFAULT(SHARED), PRIVATE(Ix,Iy,Ic)
+		!$OMP DO SCHEDULE(GUIDED) 
+		DO Ix=1,Nx
+			DO Iy=1,Ny
+                                DO Ic=1,Nc
+					p_out(Ic,Iy,Ix)=p_in(Ix,Iy,Ic)
+                                ENDDO
+			ENDDO
+		ENDDO
+		!$OMP ENDDO
+		!$OMP END PARALLEL
+#ifndef performance_test
+		time2=GetTime()
+		DFD%timer(FFT_FWD)%local_transpose(2)=time2-time1+DFD%timer(FFT_FWD)%local_transpose(2)
+#endif
+	ENDSUBROUTINE
+
+	SUBROUTINE InitialTransposeRepack(DFD)
+		TYPE (DistributedFourierData),INTENT(INOUT)::DFD
+		INTEGER::Ix,Iy,Ic,l
+		INTEGER::Nx,Ny,Nc,Nt,M
+		COMPLEX(REALPARM),POINTER::p_in(:,:,:),p_out(:,:,:)
+		REAL(DOUBLEPARM)::time1,time2
+#ifndef performance_test
+		time1=GetTime()
+#endif
+		Nx=DFD%Nx
+		Ny=DFD%Ny_loc
+		Nc=DFD%Nc
+		p_in(1:Nc,1:Ny,1:Nx)=>DFD%field_in
+		p_out(1:Nx,1:Ny,1:Nc)=>DFD%field_out
+
+		!$OMP PARALLEL DEFAULT(SHARED), PRIVATE(Ix,Iy,Ic) 
+		!$OMP DO SCHEDULE(GUIDED) 
+		DO Ix=1,Nx
+			DO Iy=1,Ny
+                                DO Ic=1,Nc
+					p_out(Ix,Iy,Ic)=p_in(Ic,Iy,Ix)
+                                ENDDO
+			ENDDO
+		ENDDO
+		!$OMP ENDDO
+                !$OMP WORKSHARE
+                DFD%field_in=DFD%field_out
+                !$OMP END WORKSHARE
+		!$OMP END PARALLEL
+#ifndef performance_test
+		time2=GetTime()
+		DFD%timer(FFT_FWD)%local_transpose(2)=time2-time1+DFD%timer(FFT_FWD)%local_transpose(2)
+#endif
+	ENDSUBROUTINE
 	SUBROUTINE BlockTransposeXToY(DFD)
 		TYPE (DistributedFourierData),INTENT(INOUT)::DFD
 		INTEGER::Ip,Iy,Ik,K
