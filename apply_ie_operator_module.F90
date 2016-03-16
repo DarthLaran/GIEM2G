@@ -32,8 +32,10 @@ MODULE APPLY_IE_OPERATOR_MODULE
 		INTEGER::IERROR
 		INTEGER ::Ix,Iy,Iz,Ic,Ixy,N
 		time1=GetTime()
-		field_in(1:int_eq%Nz,1:3,1:int_eq%Nx,1:int_eq%Ny_loc)=>v_in
-		field_out(1:int_eq%Nz,1:3,1:int_eq%Nx,1:int_eq%Ny_loc)=>v_out
+		!field_in(1:int_eq%Nz,1:3,1:int_eq%Nx,1:int_eq%Ny_loc)=>v_in
+		!field_out(1:int_eq%Nz,1:3,1:int_eq%Nx,1:int_eq%Ny_loc)=>v_out
+		field_in(1:int_eq%Nx,1:int_eq%Ny_loc,1:int_eq%Nz,1:3)=>v_in
+		field_out(1:int_eq%Nx,1:int_eq%Ny_loc,1:int_eq%Nz,1:3)=>v_out
                 fft_buff(1:2*int_eq%Nx,1:int_eq%Ny_loc,1:int_eq%Nz,1:3)=>int_eq%DFD%field_in
                 N=4*int_eq%Nx*int_eq%Ny
 		!$OMP PARALLEL DEFAULT(SHARED),PRIVATE(Ix,Ic,Iz,Iy,asiga,dsig,gsig)
@@ -47,7 +49,7 @@ MODULE APPLY_IE_OPERATOR_MODULE
                                         gsig=dsig*asiga
 
                                         fft_buff(Ix,Iy,Iz,EX)=&
-                                        &field_in(Iz,EX,Ix,Iy)*gsig
+                                        &field_in(Ix,Iy,Iz,EX)*gsig
                                 ENDDO
                         ENDDO
                 ENDDO
@@ -61,7 +63,7 @@ MODULE APPLY_IE_OPERATOR_MODULE
                                         gsig=dsig*asiga
 
                                         fft_buff(Ix,Iy,Iz,EY)=&
-                                        &field_in(Iz,EY,Ix,Iy)*gsig
+                                        &field_in(Ix,Iy,Iz,EY)*gsig
                                 ENDDO
                         ENDDO
                 ENDDO
@@ -76,7 +78,7 @@ MODULE APPLY_IE_OPERATOR_MODULE
                                         gsig=dsig*asiga
 
                                         fft_buff(Ix,Iy,Iz,EZ)=&
-                                        &field_in(Iz,EZ,Ix,Iy)*gsig
+                                        &field_in(Ix,Iy,Iz,EZ)*gsig
                                 ENDDO
                         ENDDO
                 ENDDO
@@ -94,9 +96,9 @@ MODULE APPLY_IE_OPERATOR_MODULE
 				DO Ic=1,3
 					DO Iz=1,int_eq%Nz
 						asiga=C_TWO*int_eq%sqsigb(Iz)/(int_eq%csiga(Ix,Iy,Iz)+CONJG(int_eq%csigb(Iz)))
-						d1=field_in(Iz,Ic,Ix,Iy)*asiga
+						d1=field_in(Ix,Iy,Iz,Ic)*asiga
 						d2=d1-fft_buff(Ix,Iy,Iz,Ic)/(int_eq%dz(Iz))/N
-						field_out(Iz,Ic,Ix,Iy)=d2*int_eq%sqsigb(Iz)
+						field_out(Ix,Iy,Iz,Ic)=d2*int_eq%sqsigb(Iz)
 					ENDDO
 				ENDDO
 			ENDDO
