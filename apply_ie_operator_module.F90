@@ -19,62 +19,90 @@ MODULE APPLY_IE_OPERATOR_MODULE
 
 
 	SUBROUTINE APPLY_PRECOND(int_eq,v_in,v_out)
-		TYPE(IntegralEquationOperator),INTENT(INOUT)::int_eq
+		TYPE(IntegralEquationOperator),TARGET,INTENT(INOUT)::int_eq
 		COMPLEX(REALPARM),POINTER,INTENT(IN)::v_in(:)
 		COMPLEX(REALPARM),POINTER,INTENT(IN)::v_out(:)
 		COMPLEX(REALPARM),POINTER::field_in(:,:,:,:)
 		COMPLEX(REALPARM),POINTER::field_out(:,:,:,:)
+		COMPLEX(REALPARM),POINTER::fft_buff(:,:,:,:)
+
 		COMPLEX(REALPARM)::d1,d2
 		COMPLEX(REALPARM)::asiga,dsig,gsig
 		REAL(8)::time1,time2
 		INTEGER::IERROR
-		INTEGER ::Ix,Iy,Iz,Ic,Ixy
+		INTEGER ::Ix,Iy,Iz,Ic,Ixy,N
 		time1=GetTime()
 		field_in(1:int_eq%Nz,1:3,1:int_eq%Nx,1:int_eq%Ny_loc)=>v_in
 		field_out(1:int_eq%Nz,1:3,1:int_eq%Nx,1:int_eq%Ny_loc)=>v_out
-		DO Iy=1,int_eq%Ny_loc
-		!$OMP PARALLEL DEFAULT(SHARED),PRIVATE(Ix,Ic,Iz,asiga,dsig,gsig)
-			!$OMP DO SCHEDULE(GUIDED)
-			DO Ix=1,int_eq%Nx
-				DO Ic=1,3
-					DO Iz=1,int_eq%Nz
-						asiga=C_TWO*int_eq%sqsigb(Iz)/(int_eq%csiga(Iz,Ix,Iy)+CONJG(int_eq%csigb(Iz)))
-						dsig=int_eq%csiga(Iz,Ix,Iy)-int_eq%csigb(Iz)
-						gsig=dsig*asiga
-						int_eq%field_in4(Iz,Ic,Ix,Iy)=&
-						&field_in(Iz,Ic,Ix,Iy)*gsig
-					ENDDO
-				ENDDO
-			ENDDO
-			!$OMP END DO
-			!$OMP DO SCHEDULE(GUIDED)
-			DO Ix=int_eq%Nx+1,2*int_eq%Nx
-				DO Ic=1,3
-					DO Iz=1,int_eq%Nz
-						int_eq%field_in4(Iz,Ic,Ix,Iy)=C_ZERO
-					ENDDO
-				ENDDO
-			ENDDO
-			!$OMP END DO
+                fft_buff(1:2*int_eq%Nx,1:int_eq%Ny_loc,1:int_eq%Nz,1:3)=>int_eq%DFD%field_in
+                N=4*int_eq%Nx*int_eq%Ny
+		!$OMP PARALLEL DEFAULT(SHARED),PRIVATE(Ix,Ic,Iz,Iy,asiga,dsig,gsig)
+
+                !$OMP DO SCHEDULE(GUIDED) COLLAPSE(3)
+                DO Iz=1,int_eq%Nz
+                        DO Iy=1,int_eq%Ny_loc
+                                DO Ix=1,int_eq%Nx
+                                        asiga=C_TWO*int_eq%sqsigb(Iz)/(int_eq%csiga(Iz,Ix,Iy)+CONJG(int_eq%csigb(Iz)))
+                                        dsig=int_eq%csiga(Iz,Ix,Iy)-int_eq%csigb(Iz)
+                                        gsig=dsig*asiga
+
+                                        fft_buff(Ix,Iy,Iz,EX)=&
+                                        &field_in(Iz,EX,Ix,Iy)*gsig
+                                ENDDO
+                        ENDDO
+                ENDDO
+                !$OMP END DO
+                !$OMP DO SCHEDULE(GUIDED) COLLAPSE(3)
+                DO Iz=1,int_eq%Nz
+                        DO Iy=1,int_eq%Ny_loc
+                                DO Ix=1,int_eq%Nx
+                                        asiga=C_TWO*int_eq%sqsigb(Iz)/(int_eq%csiga(Iz,Ix,Iy)+CONJG(int_eq%csigb(Iz)))
+                                        dsig=int_eq%csiga(Iz,Ix,Iy)-int_eq%csigb(Iz)
+                                        gsig=dsig*asiga
+
+                                        fft_buff(Ix,Iy,Iz,EY)=&
+                                        &field_in(Iz,EY,Ix,Iy)*gsig
+                                ENDDO
+                        ENDDO
+                ENDDO
+                !$OMP END DO
+                !$OMP DO SCHEDULE(GUIDED) COLLAPSE(3)
+
+                DO Iz=1,int_eq%Nz
+                        DO Iy=1,int_eq%Ny_loc
+                                DO Ix=1,int_eq%Nx
+                                        asiga=C_TWO*int_eq%sqsigb(Iz)/(int_eq%csiga(Iz,Ix,Iy)+CONJG(int_eq%csigb(Iz)))
+                                        dsig=int_eq%csiga(Iz,Ix,Iy)-int_eq%csigb(Iz)
+                                        gsig=dsig*asiga
+
+                                        fft_buff(Ix,Iy,Iz,EZ)=&
+                                        &field_in(Iz,EZ,Ix,Iy)*gsig
+                                ENDDO
+                        ENDDO
+                ENDDO
+                !$OMP END DO
+                !$OMP WORKSHARE
+                fft_buff(int_eq%Nx+1:,:,:,:)=C_ZERO
+                !$OMP END WORKSHARE
 		!$OMP END PARALLEL
-		ENDDO
+
 		CALL	MULT_IE_OP(int_eq)
+		!$OMP PARALLEL DEFAULT(SHARED), PRIVATE(Iy,Ix,Ic,Iz,d1,d2,asiga)
+		!$OMP DO SCHEDULE(GUIDED) COLLAPSE(4)
 		DO Iy=1,int_eq%Ny_loc
-			!$OMP PARALLEL DEFAULT(SHARED), PRIVATE(Ix,Ic,Iz,d1,d2,asiga)
-			!$OMP DO SCHEDULE(GUIDED)
 			DO Ix=1,int_eq%Nx
 				DO Ic=1,3
 					DO Iz=1,int_eq%Nz
 						asiga=C_TWO*int_eq%sqsigb(Iz)/(int_eq%csiga(Iz,Ix,Iy)+CONJG(int_eq%csigb(Iz)))
 						d1=field_in(Iz,Ic,Ix,Iy)*asiga
-						d2=d1-int_eq%field_out4(Iz,Ic,Ix,Iy)/(int_eq%dz(Iz))
+						d2=d1-fft_buff(Ix,Iy,Iz,Ic)/(int_eq%dz(Iz))/N
 						field_out(Iz,Ic,Ix,Iy)=d2*int_eq%sqsigb(Iz)
 					ENDDO
 				ENDDO
 			ENDDO
-			!$OMP END DO
-			!$OMP END PARALLEL
 		ENDDO
+		!$OMP END DO
+		!$OMP END PARALLEL
 		time2=GetTime()
 		int_eq%counter%mult_num=int_eq%counter%mult_num+1
 		int_eq%counter%apply=int_eq%counter%apply+time2-time1
@@ -84,7 +112,7 @@ MODULE APPLY_IE_OPERATOR_MODULE
 
 		!$OMP PARALLEL	 DEFAULT(SHARED)
 		!$OMP WORKSHARE
-		int_eq%field_in4=C_ZERO
+                int_eq%DFD%field_in=C_ZERO
 		!$OMP END WORKSHARE
 		!$OMP ENDPARALLEL
 		CALL MULT_IE_OP(int_eq)
@@ -94,7 +122,8 @@ MODULE APPLY_IE_OPERATOR_MODULE
 		INTEGER::Ixy,Nz
 		REAL(8)::time1,time2,time3,time4
 		time1=GetTime()
-		CALL IE_OP_FFTW_FWD(ie_op)
+		CALL IE_OP_FFTW_FWD_PREPARED(ie_op)
+		!CALL IE_OP_FFTW_FWD(ie_op)
 		time2=GetTime()
 		IF (ie_op%matrix_kind==GENERAL_MATRIX) THEN
                         CALL VERTICAL_MULT_GENERAL(ie_op)
@@ -105,11 +134,10 @@ MODULE APPLY_IE_OPERATOR_MODULE
 
 		ie_op%counter%mult_fftw=ie_op%counter%mult_fftw+time2-time1
 		time3=GetTime()
-		CALL IE_OP_FFTW_BWD(ie_op)
+		CALL IE_OP_FFTW_BWD_PREPARED(ie_op)
 		time4=GetTime()
 		ie_op%counter%mult_fftw_b=ie_op%counter%mult_fftw_b+time4-time3
 		ie_op%counter%mult_zgemv=ie_op%counter%mult_zgemv+time3-time2
-!                STOP
 
 	ENDSUBROUTINE
 !----------------------------------------------------------------------------------------------------------------!

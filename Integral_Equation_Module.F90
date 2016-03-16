@@ -244,7 +244,7 @@ CONTAINS
 		TYPE(C_PTR),INTENT(IN)::fft_buff_out
 		INTEGER(C_INTPTR_T),INTENT(IN)::buff_len
 		INTEGER::Nx2,Nz,Ny_loc,Nx2Ny_loc
-		INTEGER::NT,OMP_GET_MAX_THREADS
+		INTEGER::NT!,OMP_GET_MAX_THREADS
 
 		IF (fftw_threads_ok) THEN
 			NT=OMP_GET_MAX_THREADS()
@@ -273,6 +273,16 @@ CONTAINS
 	SUBROUTINE IE_OP_FFTW_BWD(ie_op)
 		TYPE(IntegralEquationOperator),INTENT(INOUT)::ie_op
 		CALL	CalcDistributedFourier(ie_op%DFD,FFT_BWD)
+	ENDSUBROUTINE
+
+	SUBROUTINE IE_OP_FFTW_FWD_PREPARED(ie_op)
+		TYPE(IntegralEquationOperator),INTENT(INOUT)::ie_op
+                CALL CalcPreparedForwardFFT(ie_op%DFD)
+
+	ENDSUBROUTINE
+	SUBROUTINE IE_OP_FFTW_BWD_PREPARED(ie_op)
+		TYPE(IntegralEquationOperator),INTENT(INOUT)::ie_op
+                CALL CalcPreparedBackwardFFT(ie_op%DFD)
 	ENDSUBROUTINE
 #define fft_new
 

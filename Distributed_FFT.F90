@@ -84,6 +84,8 @@ MODULE DISTRIBUTED_FFT_MODULE
 
 	PUBLIC:: DistributedFourierData, CalcDistributedFourier
 	PUBLIC:: PrepareDistributedFourierData,DeleteDistributedFourierData
+        PUBLIC:: CalcPreparedForwardFFT
+        PUBLIC:: CalcPreparedBackwardFFT
 	PUBLIC:: CalcLocalFFTSize,PrintTimings
 	CONTAINS
 	SUBROUTINE  PrepareDistributedFourierData(DFD,Nx,Ny,Nc,comm,fft_buff_in,fft_buff_out,buff_length)
@@ -216,7 +218,18 @@ MODULE DISTRIBUTED_FFT_MODULE
 		ENDIF
 	END SUBROUTINE
 
+	SUBROUTINE CalcPreparedForwardFFT(DFD)
+		TYPE (DistributedFourierData),INTENT(INOUT)::DFD
+		CALL ProcessDistributedFourierKernelSync(DFD,FFT_FWD)
+		CALL FinalTranspose(DFD)
+		DFD%field_load_out=DFD%field_load_in
+	END SUBROUTINE
 	
+	SUBROUTINE CalcPreparedBackwardFFT(DFD)
+		TYPE (DistributedFourierData),INTENT(INOUT)::DFD
+		CALL InitialTranspose(DFD)
+		CALL ProcessDistributedFourierKernelSync(DFD,FFT_BWD)
+	END SUBROUTINE
  
 !----------------------------------------------------------------------------------------------------------------------------------!
 
@@ -577,8 +590,6 @@ MODULE DISTRIBUTED_FFT_MODULE
 
 		DFD%p_out=C_LOC(DFD%field_in(1))
 		DFD%p_in=C_LOC(DFD%field_out(1))
-		DFD%field_in=1.0
-		DFD%field_out=1.0
 		DFD%field_load_in(1:Nc,1:Nx,1:Ny_loc)=>DFD%field_out
 		DFD%field_load_out(1:Nc,1:Nx,1:Ny_loc)=>DFD%field_in
 

@@ -302,7 +302,7 @@ CONTAINS
 			TYPE(C_PTR)::ptr_c
 			COMPLEX(REALPARM),POINTER::ptr(:)
 			INTEGER::Ix,N,TN
-			G_symm1(1:,S_EXX:,0:)=>G_symm
+                        G_symm1(1:,S_EXX:,0:)=>G_symm
 			G_asym1(1:,1:,A_EXZ:,0:)=>G_asym
 			N=anomaly%Nz*4*2*anomaly%Nx
 			ptr_c=C_LOC(G_symm1(1,S_EXX,0))

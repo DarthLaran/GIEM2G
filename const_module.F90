@@ -1,7 +1,8 @@
 MODULE CONST_MODULE
-!	USE, INTRINSIC :: OMP_LIB
 	USE, INTRINSIC :: iso_c_binding
-	
+#ifndef NOT_USE_OMP_LIB
+	USE, INTRINSIC :: OMP_LIB
+#endif
 	INTEGER, PARAMETER ::REALPARM = SELECTED_REAL_KIND(15)
 	INTEGER, PARAMETER ::REALPARM2 = SELECTED_REAL_KIND(15)
 	INTEGER, PARAMETER  ::DOUBLEPARM=SELECTED_REAL_KIND(15)
@@ -33,7 +34,21 @@ MODULE CONST_MODULE
 	REAL(REALPARM)   ,PARAMETER ::	R_ZERO=0e0_REALPARM
 
 !-----------------------------------------------------------------------------!
-
+INTERFACE
+#ifdef NOT_USE_OMP_LIB
+        FUNCTION OMP_GET_NUM_THREADS() RESULT (NT)
+                   INTEGER:: NT
+        ENDFUNCTION
+        FUNCTION OMP_GET_MAX_THREADS() RESULT (NT)
+                   INTEGER:: NT
+        ENDFUNCTION
+        
+        FUNCTION OMP_GET_THREAD_NUM() RESULT (NT)
+                   INTEGER:: NT
+        ENDFUNCTION
+#endif
+ENDINTERFACE
+!-----------------------------------------------------------------------------!
 #ifndef ExtrEMe
 	INTEGER, PARAMETER :: EX=1
 	INTEGER, PARAMETER :: EY=2
