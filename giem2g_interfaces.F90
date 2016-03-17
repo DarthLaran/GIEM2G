@@ -109,13 +109,13 @@ CONTAINS
         		IF (ie_op%real_space) THEN
 				p1=giem2g_data%csigb
 				p3=giem2g_data%sqsigb
-                                CALL C_F_POINTER(p1,ie_op%csigb,(/Nz/));
-                                CALL C_F_POINTER(p3,ie_op%sqsigb,(/Nz/));
-!	 			ALLOCATE(ie_op%csigb(Nz),ie_op%sqsigb(Nz))	
+                        !        CALL C_F_POINTER(p1,ie_op%csigb,(/Nz/));
+                        !        CALL C_F_POINTER(p3,ie_op%sqsigb,(/Nz/));
+	 			ALLOCATE(ie_op%csigb(Nz),ie_op%sqsigb(Nz))	
         		ENDIF
 			p3=giem2g_data%dz
-                        CALL C_F_POINTER(p3,ie_op%dz,(/ie_op%Nz/));
-! 			ALLOCATE(ie_op%dz(Nz))	
+!                        CALL C_F_POINTER(p3,ie_op%dz,(/ie_op%Nz/));
+ 			ALLOCATE(ie_op%dz(Nz))	
 	        	ie_op%csiga=>NULL()
         		ie_op%dz=anomaly%dz
         ENDSUBROUTINE
@@ -157,8 +157,9 @@ CONTAINS
                                         & BIND(C,NAME='giem2g_calc_fft_of_ie_kernel')  
                         TYPE(C_PTR),VALUE,INTENT(IN)::ie_ptr
                 	TYPE(IntegralEquationOperator),POINTER::ie_op
-                        
+			                        
                         CALL C_F_POINTER(ie_ptr,ie_op)
+			IF (ASSOCIATED(ie_op%csigb))	ie_op%csigb(1:ie_op%Nz)=ie_op%csigb(1:ie_op%Nz)
                         CALL CalcFFTofIETensor(ie_op)
 !                        CALL PrintTimings(ie_op%DFD)
         ENDSUBROUTINE

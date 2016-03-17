@@ -494,7 +494,7 @@ CONTAINS
                         !$OMP PARALLEL DEFAULT(SHARED), PRIVATE(Ix,Iy)
                         !$OMP DO SCHEDULE(GUIDED) 
 			DO Ix=1,Nx
-                                DO Iy=1,ie_op%Ny
+                                DO Iy=1,ie_op%Ny_loc
         			      CALL ZCOPY(l,p_out(:,Iy,Ix),ONE,Gout(M:,comp,Iy,Ix),ONE) 
                                 ENDDO
 			ENDDO
