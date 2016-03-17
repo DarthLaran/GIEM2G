@@ -92,6 +92,9 @@ CONTAINS
 
                 	CALL MPI_COMM_SIZE(comm,comm_size,IERROR) 
                         CALL C_F_POINTER(giem2g_data%giem2g_tensor,ie_op);
+
+                        !ie_op=>tmp_ptr
+
                         CALL CREATE_ANOMALY(giem2g_anomaly,anomaly);
                         kernel_size=giem2g_data%ie_kernel_buffer_length
                         fft_size=giem2g_data%fft_buffers_length
@@ -106,16 +109,15 @@ CONTAINS
         		IF (ie_op%real_space) THEN
 				p1=giem2g_data%csigb
 				p3=giem2g_data%sqsigb
-        !                        CALL C_F_POINTER(p1,ie_op%csigb,(/Nz/));
-  !                              CALL C_F_POINTER(p3,ie_op%sqsigb,(/Nz/));
-	 			ALLOCATE(ie_op%csigb(Nz),ie_op%sqsigb(Nz))	
+                                CALL C_F_POINTER(p1,ie_op%csigb,(/Nz/));
+                                CALL C_F_POINTER(p3,ie_op%sqsigb,(/Nz/));
+!	 			ALLOCATE(ie_op%csigb(Nz),ie_op%sqsigb(Nz))	
         		ENDIF
 			p3=giem2g_data%dz
-!                        CALL C_F_POINTER(p3,ie_op%dz,(/ie_op%Nz/));
- 			ALLOCATE(ie_op%dz(Nz))	
+                        CALL C_F_POINTER(p3,ie_op%dz,(/ie_op%Nz/));
+! 			ALLOCATE(ie_op%dz(Nz))	
 	        	ie_op%csiga=>NULL()
         		ie_op%dz=anomaly%dz
-!                        PRINT*,ie_op%me,ASSOCIATED(ie_op%csigb)
         ENDSUBROUTINE
        
 
@@ -127,11 +129,12 @@ CONTAINS
                         REAL(C_DOUBLE),VALUE,INTENT(IN)::omega
                         TYPE(BKG_DATA_TYPE)::bkg
                         TYPE(ANOMALY_TYPE)::anomaly
-                	TYPE(IntegralEquationOperator),POINTER::int_eq
+                	TYPE(IntegralEquationOperator),POINTER::ie_op
                         INTEGER::Nz
                         
-                        CALL C_F_POINTER(ie_ptr,int_eq)
+                        CALL C_F_POINTER(ie_ptr,ie_op)
 
+                        !ie_op=>tmp_ptr
                         CALL CREATE_BACKGROUND(giem2g_bkg,bkg,omega);
 
 
@@ -140,8 +143,12 @@ CONTAINS
                         ALLOCATE(anomaly%Lnumber(0:Nz));
 			anomaly%Lnumber(1:Nz)=GetLayer((anomaly%z(0:Nz-1)+anomaly%z(1:Nz))/2d0,bkg)
 			anomaly%Lnumber(0)=GetLayer(anomaly%z(0)*(1d0-1d-7),bkg)
-                        IF (ASSOCIATED(int_eq%csigb)) int_eq%csigb=C_ZERO
-                        CALL CalcIntegralGreenTensor(int_eq,bkg,anomaly)
+                        ie_op%dz(1:Nz)=>ie_op%dz
+        		IF (ie_op%real_space) THEN
+                                ie_op%csigb(1:Nz)=>ie_op%csigb
+                                ie_op%sqsigb(1:Nz)=>ie_op%sqsigb
+        		ENDIF
+                        CALL CalcIntegralGreenTensor(ie_op,bkg,anomaly)
                         DEALLOCATE(anomaly%Lnumber)
                         CALL DELETE_BACKGROUND(bkg)
         ENDSUBROUTINE
@@ -149,11 +156,11 @@ CONTAINS
         SUBROUTINE  GIEM2G_CALC_FFT_OF_GREEN_TENSOR(ie_ptr)&
                                         & BIND(C,NAME='giem2g_calc_fft_of_ie_kernel')  
                         TYPE(C_PTR),VALUE,INTENT(IN)::ie_ptr
-                	TYPE(IntegralEquationOperator),POINTER::int_eq
+                	TYPE(IntegralEquationOperator),POINTER::ie_op
                         
-                        CALL C_F_POINTER(ie_ptr,int_eq)
-                        CALL CalcFFTofIETensor(int_eq)
-!                        CALL PrintTimings(int_eq%DFD)
+                        CALL C_F_POINTER(ie_ptr,ie_op)
+                        CALL CalcFFTofIETensor(ie_op)
+!                        CALL PrintTimings(ie_op%DFD)
         ENDSUBROUTINE
 
         SUBROUTINE GIEM2G_SET_ANOMALY_CONDUCTIVITY(ie_op_ptr,siga_ptr) &
@@ -162,6 +169,7 @@ CONTAINS
         		TYPE(IntegralEquationOperator),POINTER::ie_op
                         INTEGER::localshape(3);
                         CALL C_F_POINTER(ie_op_ptr,ie_op)
+                        ie_op=>tmp_ptr
                         localshape=(/ie_op%Nx,ie_op%Ny_loc,ie_op%Nz/)
         		IF (ie_op%real_space) THEN
                                 CALL C_F_POINTER(siga_ptr,ie_op%csiga,localshape)
@@ -175,9 +183,21 @@ CONTAINS
         		TYPE(IntegralEquationOperator),POINTER::ie_op
 	        	COMPLEX(REALPARM),POINTER ::v_in(:)
         		COMPLEX(REALPARM),POINTER ::v_out(:)
-        		INTEGER::localsize(1);
+        		INTEGER::localsize(1),Nz,Ny_loc,Nx
                         CALL C_F_POINTER(ie_op_ptr,ie_op)
+                        ie_op=>tmp_ptr
                         localsize=(/3*ie_op%Nz*ie_op%Nx*ie_op%Ny_loc/)
+                        Nz=ie_op%Nz
+                        Ny_loc=ie_op%Ny_loc
+                        Nx=ie_op%Nx
+        		ie_op%field_inT(1:Nz,1:2,1:3,1:Ny_loc,0:Nx-1)=>ie_op%DFD%field_out
+	        	ie_op%field_outT(1:Nz,1:2,1:3,1:Ny_loc,0:Nx-1)=>ie_op%DFD%field_in
+
+                        ie_op%dz(1:Nz)=>ie_op%dz
+        		IF (ie_op%real_space) THEN
+                                ie_op%csigb(1:Nz)=>ie_op%csigb
+                                ie_op%sqsigb(1:Nz)=>ie_op%sqsigb
+        		ENDIF
         		IF (ie_op%real_space) THEN
                                 CALL C_F_POINTER(in_ptr,v_in,localsize)
                                 CALL C_F_POINTER(out_ptr,v_out,localsize)

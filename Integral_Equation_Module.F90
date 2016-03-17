@@ -68,7 +68,7 @@ MODULE INTEGRAL_EQUATION_MODULE
 		TYPE(DistributedFourierData)::DFD
 
 		COMPLEX(REALPARM),POINTER::field_in(:,:,:,:),field_out(:,:,:,:)
-		COMPLEX(REALPARM),POINTER::field_inT(:,:,:,:),field_outT(:,:,:,:)
+		COMPLEX(REALPARM),POINTER::field_inT(:,:,:,:,:),field_outT(:,:,:,:,:)
 
 !---------------------------------------------------------------------------------------------------!
 		REAL(REALPARM),POINTER::dz(:)
@@ -261,9 +261,8 @@ CONTAINS
 		ie_op%field_in(1:Nz,1:3,1:Nx2,1:Ny_loc)=>ie_op%DFD%field_out
 		ie_op%field_out(1:Nz,1:3,1:Nx2,1:Ny_loc)=>ie_op%DFD%field_in
 
-		ie_op%field_inT(1:Nz,1:3,1:Ny_loc,0:Nx2-1)=>ie_op%DFD%field_out
-		ie_op%field_outT(1:Nz,1:3,1:Ny_loc,0:Nx2-1)=>ie_op%DFD%field_in
-
+		ie_op%field_inT(1:Nz,1:2,1:3,1:Ny_loc,0:Nx2/2-1)=>ie_op%DFD%field_out
+		ie_op%field_outT(1:Nz,1:2,1:3,1:Ny_loc,0:Nx2/2-1)=>ie_op%DFD%field_in
 
 	ENDSUBROUTINE
 
@@ -461,9 +460,11 @@ CONTAINS
 	ENDSUBROUTINE
 #endif
 	SUBROUTINE CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,comp,negative,Gout)
-		TYPE(IntegralEquationOperator),INTENT(INOUT)::ie_op
+		TYPE(IntegralEquationOperator),TARGET,INTENT(INOUT)::ie_op
 		COMPLEX(REALPARM),INTENT(INOUT)::G(1:,1:,1:,1:)
 		COMPLEX(REALPARM),INTENT(INOUT)::Gout(1:,1:,1:,1:)
+		COMPLEX(REALPARM),POINTER::p_in(:,:,:)
+		COMPLEX(REALPARM),POINTER::p_out(:,:,:)
 		INTEGER,INTENT(IN)::comp
 		LOGICAL,INTENT(IN)::negative
 		COMPLEX(REALPARM)::tmp(3*ie_op%Nz)
@@ -474,31 +475,33 @@ CONTAINS
 		Nz3=3*Nz
 		M=1
 		l=MIN(Nz3,N-M+1)
+                p_in(1:Nz3,1:2*Nx,1:ie_op%Ny_loc)=>ie_op%DFD%field_out
+                p_out(1:Nz3,1:ie_op%Ny_loc,1:2*Nx)=>ie_op%DFD%field_out
 		DO
 			DO Iy=1,ie_op%Ny_loc
 				DO Ix=1,Nx
-				      CALL ZCOPY(l,G(M:,comp,Ix,Iy),ONE,ie_op%field_in(:,:,Ix,Iy),ONE)  
+				      CALL ZCOPY(l,G(M:,comp,Ix,Iy),ONE,p_in(:,Ix,Iy),ONE)  
 				ENDDO
-				ie_op%field_in(:,:,Nx+1,Iy)=C_ZERO
+				p_in(:,Nx+1,Iy)=C_ZERO
 				DO Ix=1,Nx-1
-				      CALL ZCOPY(l,G(M:,comp,Ix+1,Iy),ONE,ie_op%field_in(:,:,2*Nx-Ix+1,Iy),ONE)  
+				      CALL ZCOPY(l,G(M:,comp,Ix+1,Iy),ONE,p_in(:,2*Nx-Ix+1,Iy),ONE)  
 				ENDDO
 			ENDDO
 			IF (negative) THEN
-				ie_op%field_in(:,:,Nx+2:,:)=-ie_op%field_in(:,:,Nx+2:,:)
+				p_in(:,Nx+2:,:)=-p_in(:,Nx+2:,:)
 			ENDIF
 			CALL IE_OP_FFTW_FWD_FOR_TENSOR(ie_op) 
                         !$OMP PARALLEL DEFAULT(SHARED), PRIVATE(Ix,Iy)
                         !$OMP DO SCHEDULE(GUIDED) 
 			DO Ix=1,Nx
                                 DO Iy=1,ie_op%Ny
-        			      CALL ZCOPY(l,ie_op%field_inT(:,:,Iy,Ix-1),ONE,Gout(M:,comp,Iy,Ix),ONE) 
+        			      CALL ZCOPY(l,p_out(:,Iy,Ix),ONE,Gout(M:,comp,Iy,Ix),ONE) 
                                 ENDDO
 			ENDDO
                         !$OMP END DO
         		!$OMP END PARALLEL
 			DO Iy=1,ie_op%Ny_loc
-				CALL ZCOPY(l,ie_op%field_inT(:,:,Iy,Nx),ONE,tmp,ONE) 
+				CALL ZCOPY(l,p_out(:,Iy,Nx+1),ONE,tmp,ONE) 
 				s=1
 				DO Ix=1,Nx
 				      Gout(M:M+l-1,comp,Iy,Ix)=Gout(M:M+l-1,comp,Iy,Ix)-tmp(1:l)*s

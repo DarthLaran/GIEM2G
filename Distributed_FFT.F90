@@ -229,7 +229,7 @@ MODULE DISTRIBUTED_FFT_MODULE
 		TYPE (DistributedFourierData),INTENT(INOUT)::DFD
 		CALL InitialTranspose(DFD)
 		CALL ProcessDistributedFourierKernelSync(DFD,FFT_FWD)
-		CALL FinalTransposeRepack(DFD)
+		CALL FinalTransposeRepackOld(DFD)
 	END SUBROUTINE
 	SUBROUTINE CalcPreparedBackwardFFT(DFD)
 		TYPE (DistributedFourierData),INTENT(INOUT)::DFD
@@ -440,7 +440,7 @@ MODULE DISTRIBUTED_FFT_MODULE
 #endif
 	ENDSUBROUTINE
 
-	SUBROUTINE FinalTransposeRepack(DFD)
+	SUBROUTINE FinalTransposeRepackOld(DFD)
 		TYPE (DistributedFourierData),INTENT(INOUT)::DFD
 		INTEGER::Ix,Iy,Ic,l
 		INTEGER::Nx,Ny,Nc,Nt,M
@@ -471,8 +471,54 @@ MODULE DISTRIBUTED_FFT_MODULE
 		DFD%timer(FFT_FWD)%local_transpose(2)=time2-time1+DFD%timer(FFT_FWD)%local_transpose(2)
 #endif
 	ENDSUBROUTINE
+	SUBROUTINE FinalTransposeRepack(DFD)
+		TYPE (DistributedFourierData),INTENT(INOUT)::DFD
+		INTEGER::Ix,Iy,Ic,l,Iz
+		INTEGER::Nx,Ny,Nc,Nt,M,Nz,Nx2
+		COMPLEX(REALPARM),POINTER::p_in(:,:,:,:),p_out(:,:,:,:,:)
+		REAL(DOUBLEPARM)::time1,time2
+#ifndef performance_test
+		time1=GetTime()
+#endif
+		Nx=DFD%Nx
+		Ny=DFD%Ny_loc
+		Nc=DFD%Nc
+                Nz=Nc/3
+                Nx2=Nx/2
+		p_in(0:Nx-1,1:Ny,1:Nz,1:3)=>DFD%field_in
+		p_out(1:Nz,1:2,1:3,1:Ny,0:Nx2-1)=>DFD%field_out
 
-	SUBROUTINE InitialTransposeRepack(DFD)
+		DO Iy=1,Ny
+                         DO Ic=1,3
+                                DO Iz=1,Nz
+        				p_out(Iz,1,Ic,Iy,0)=p_in(0,Iy,Iz,Ic)
+        				p_out(Iz,2,Ic,Iy,0)=p_in(Nx2,Iy,Iz,Ic)
+                                ENDDO
+                         ENDDO
+        	ENDDO
+		!$OMP PARALLEL DEFAULT(SHARED), PRIVATE(Ix,Iy,Iz,Ic)
+		!$OMP DO SCHEDULE(GUIDED) 
+		DO Ix=1,Nx2-1
+			DO Iy=1,Ny
+                                DO Ic=1,3
+                                        DO Iz=1,Nz
+                                                p_out(Iz,1,Ic,Iy,Ix)=p_in(Ix,Iy,Iz,Ic)
+                                        ENDDO
+                                        DO Iz=1,Nz
+                                                p_out(Iz,2,Ic,Iy,Ix)=p_in(Nx-Ix,Iy,Iz,Ic)
+                                        ENDDO
+                                ENDDO
+			ENDDO
+		ENDDO
+		!$OMP ENDDO
+		!$OMP END PARALLEL
+#ifndef performance_test
+		time2=GetTime()
+		DFD%timer(FFT_FWD)%local_transpose(2)=time2-time1+DFD%timer(FFT_FWD)%local_transpose(2)
+#endif
+	ENDSUBROUTINE
+
+	SUBROUTINE InitialTransposeRepack2(DFD)
 		TYPE (DistributedFourierData),INTENT(INOUT)::DFD
 		INTEGER::Ix,Iy,Ic,l
 		INTEGER::Nx,Ny,Nc,Nt,M
@@ -496,6 +542,77 @@ MODULE DISTRIBUTED_FFT_MODULE
                                 ENDDO
 			ENDDO
 		ENDDO
+		!$OMP ENDDO
+                !$OMP WORKSHARE
+                DFD%field_in=DFD%field_out
+                !$OMP END WORKSHARE
+		!$OMP END PARALLEL
+#ifndef performance_test
+		time2=GetTime()
+		DFD%timer(FFT_FWD)%local_transpose(2)=time2-time1+DFD%timer(FFT_FWD)%local_transpose(2)
+#endif
+	ENDSUBROUTINE
+	SUBROUTINE InitialTransposeRepack(DFD)
+		TYPE (DistributedFourierData),INTENT(INOUT)::DFD
+		INTEGER::Ix,Iy,Ic,l,Iz
+		INTEGER::Nx,Ny,Nc,Nt,M,Nz,Nx2
+		COMPLEX(REALPARM),POINTER::p_in(:,:,:,:,:),p_out(:,:,:,:)
+		REAL(DOUBLEPARM)::time1,time2
+#ifndef performance_test
+		time1=GetTime()
+#endif
+		Nx=DFD%Nx
+		Ny=DFD%Ny_loc
+		Nc=DFD%Nc
+                Nz=Nc/3
+                Nx2=Nx/2
+		p_in(1:Nz,1:2,1:3,1:Ny,0:Nx2-1)=>DFD%field_in
+		p_out(0:Nx-1,1:Ny,1:Nz,1:3)=>DFD%field_out
+
+                DO Ic=1,3
+                        DO Iz=1,Nz
+                                DO Iy=1,Ny
+                                        p_out(0,Iy,Iz,Ic)=p_in(Iz,1,Ic,Iy,0)
+                                        p_out(Nx2,Iy,Iz,Ic)=C_ZERO
+                                ENDDO
+                         ENDDO
+        	ENDDO
+		!$OMP PARALLEL DEFAULT(SHARED), PRIVATE(Ix,Iy,Iz,Ic)
+		!$OMP DO SCHEDULE(GUIDED) 
+                DO Iz=1,Nz
+                        DO Iy=1,Ny
+                                DO Ix=1,Nx2-1
+                                        p_out(Ix,Iy,Iz,1) =  p_in(Iz,1,1,Iy,Ix)
+                                ENDDO
+                                DO Ix=Nx2+1,Nx-1
+                                        p_out(Ix,Iy,Iz,1) =  p_in(Iz,2,1,Iy,Nx-Ix)
+                                ENDDO
+                        ENDDO
+                ENDDO
+		!$OMP ENDDO
+		!$OMP DO SCHEDULE(GUIDED) 
+                DO Iz=1,Nz
+                        DO Iy=1,Ny
+                                DO Ix=1,Nx2-1
+                                        p_out(Ix,Iy,Iz,2) =  p_in(Iz,1,2,Iy,Ix)
+                                ENDDO
+                                DO Ix=Nx2+1,Nx-1
+                                        p_out(Ix,Iy,Iz,2) =  p_in(Iz,2,2,Iy,Nx-Ix)
+                                ENDDO
+                        ENDDO
+                ENDDO
+		!$OMP ENDDO
+		!$OMP DO SCHEDULE(GUIDED) 
+                DO Iz=1,Nz
+                        DO Iy=1,Ny
+                                DO Ix=1,Nx2-1
+                                        p_out(Ix,Iy,Iz,3) =  p_in(Iz,1,3,Iy,Ix)
+                                ENDDO
+                                DO Ix=Nx2+1,Nx-1
+                                        p_out(Ix,Iy,Iz,3) =  p_in(Iz,2,3,Iy,Nx-Ix)
+                                ENDDO
+                        ENDDO
+                ENDDO
 		!$OMP ENDDO
                 !$OMP WORKSHARE
                 DFD%field_in=DFD%field_out
