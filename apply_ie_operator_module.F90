@@ -121,18 +121,68 @@ MODULE APPLY_IE_OPERATOR_MODULE
 		TYPE(IntegralEquationOperator),INTENT(INOUT)::ie_op
 		INTEGER::Ixy,Nz
 		REAL(8)::time1,time2,time3,time4
+		COMPLEX(REALPARM),POINTER::p_send(:,:,:,:,:)
+		COMPLEX(REALPARM),POINTER::p_recv(:,:,:,:,:)
+		COMPLEX(REALPARM),POINTER::p_in(:,:,:,:,:)
+		COMPLEX(REALPARM),POINTER::p_out(:,:,:,:,:)
+                INTEGER(MPI_CTL_KIND)::Nx2,xfirst,xlast,data_length
+                INTEGER(MPI_CTL_KIND)::proc,recv_start
+		INTEGER(MPI_CTL_KIND)::requests(2),IERROR
+		COMPLEX(REALPARM)::MirrorY
 		time1=GetTime()
 		CALL IE_OP_FFTW_FWD_PREPARED(ie_op)
-		!CALL IE_OP_FFTW_FWD(ie_op)
-		time2=GetTime()
-		IF (ie_op%matrix_kind==GENERAL_MATRIX) THEN
-                        CALL VERTICAL_MULT_GENERAL(ie_op)
-		ELSEIF (ie_op%matrix_kind==UNIFORM_MATRIX) THEN
-!                       CALL VERTICAL_MULT_UNIFORM(ie_op)
+                Nx2=ie_op%Nx/2
+                data_length=3*ie_op%Nz*ie_op%Ny_loc*ie_op%Nx
+
+                IF (ie_op%real_space) THEN
+                        p_send=>ie_op%field_inT(:,:,:,:,Nx2:)
+                        p_recv=>ie_op%field_outT(:,:,:,:,Nx2:)
+                        MirrorY=C_ONE
                 ELSE
+                        p_send=>ie_op%field_inT(:,:,:,:,0:)
+                        p_recv=>ie_op%field_outT(:,:,:,:,0:)
+                        MirrorY=-C_ONE
                 ENDIF
 
+                proc=MODULO((ie_op%me+ie_op%comm_size/2),ie_op%comm_size)
+
+                CALL  MPI_IRECV(p_recv,data_length,MPI_DOUBLE_COMPLEX,proc,proc,&
+                         &ie_op%ie_comm,requests(1),IERROR)
+                CALL  MPI_ISEND(p_send,data_length,MPI_DOUBLE_COMPLEX,proc,ie_op%me,&
+                         &ie_op%ie_comm,requests(2),IERROR)
+		time2=GetTime()
 		ie_op%counter%mult_fftw=ie_op%counter%mult_fftw+time2-time1
+                p_in=>ie_op%field_inT
+                p_out=>ie_op%field_outT
+
+
+                IF (ie_op%real_space) THEN
+                        CALL VERTICAL_MULT_GENERAL(ie_op,1,Nx2-1,MirrorY,p_in,p_out)
+                        CALL VERTICAL_MULT_GENERAL_ZERO(ie_op,MirrorY,p_in,p_out)
+                ELSE
+                        CALL VERTICAL_MULT_GENERAL(ie_op,Nx2,ie_op%Nx-1,MirrorY,p_in,p_out)
+                ENDIF
+
+                CALL MPI_WAITALL(2, requests,  MPI_STATUSES_IGNORE, IERROR)
+
+                MirrorY=-MirrorY
+                IF (ie_op%real_space) THEN
+                       p_in(1:,1:,1:,1:,0:)=>p_recv 
+                       p_out(1:,1:,1:,1:,0:)=>p_send 
+                        CALL VERTICAL_MULT_GENERAL(ie_op,1,Nx2-1,MirrorY,p_in,p_out)
+                        CALL VERTICAL_MULT_GENERAL_ZERO(ie_op,MirrorY,p_in,p_out)
+                ELSE
+                       p_in(1:,1:,1:,1:,Nx2:)=>p_recv 
+                       p_out(1:,1:,1:,1:,Nx2:)=>p_send 
+                        CALL VERTICAL_MULT_GENERAL(ie_op,Nx2,ie_op%Nx-1,MirrorY,p_in,p_out)
+                ENDIF
+                CALL  MPI_IRECV(p_recv,data_length,MPI_DOUBLE_COMPLEX,proc,proc,&
+                         &ie_op%ie_comm,requests(1),IERROR)
+                CALL  MPI_ISEND(p_send,data_length,MPI_DOUBLE_COMPLEX,proc,ie_op%me,&
+                         &ie_op%ie_comm,requests(2),IERROR)
+
+                CALL MPI_WAITALL(2, requests,  MPI_STATUSES_IGNORE, IERROR)
+
 		time3=GetTime()
 		CALL IE_OP_FFTW_BWD_PREPARED(ie_op)
 		time4=GetTime()
@@ -141,48 +191,64 @@ MODULE APPLY_IE_OPERATOR_MODULE
 
 	ENDSUBROUTINE
 !----------------------------------------------------------------------------------------------------------------!
-        SUBROUTINE VERTICAL_MULT_GENERAL(ie_op)
+        SUBROUTINE VERTICAL_MULT_GENERAL(ie_op,xfirst,xlast,MirrorY,p_in,p_out)
 		TYPE(IntegralEquationOperator),INTENT(INOUT)::ie_op
+		COMPLEX(REALPARM),POINTER,INTENT(IN)::p_in(:,:,:,:,:)
+		COMPLEX(REALPARM),POINTER,INTENT(IN)::p_out(:,:,:,:,:)
+                COMPLEX(REALPARM),INTENT(IN)::MirrorY
+                INTEGER,INTENT(IN)::xfirst,xlast
+
                 INTEGER::Ix,Iy
 
 		!$OMP PARALLEL	PRIVATE(Ix,Iy) DEFAULT(SHARED)
 		!$OMP DO SCHEDULE(GUIDED) 
-		DO Ix=1,ie_op%Nx-1
+		DO Ix=xfirst,xlast
                         DO Iy=1,ie_op%Ny_loc
-                                CALL IE_OP_ZGEMV_SYMM_DOUBLE(ie_op,S_EXX,EX,EX,Ix,Iy,C_ONE,C_ONE,C_ZERO)
+                                CALL IE_OP_ZGEMV_SYMM_DOUBLE(ie_op,S_EXX,EX,EX,Ix,Iy,C_ONE,C_ONE,C_ZERO,p_in,p_out)
 
-                                CALL IE_OP_ZGEMV_SYMM_DOUBLE(ie_op,S_EXY,EY,EX,Ix,Iy,C_ONE,-C_ONE,C_ONE)
-                                CALL IE_OP_ZGEMV_SYMM_DOUBLE(ie_op,S_EYX,EX,EY,Ix,Iy,C_ONE,-C_ONE,C_ZERO)
+                                CALL IE_OP_ZGEMV_SYMM_DOUBLE(ie_op,S_EXY,EY,EX,Ix,Iy,MirrorY,-MirrorY,C_ONE,p_in,p_out)
+                                CALL IE_OP_ZGEMV_SYMM_DOUBLE(ie_op,S_EYX,EX,EY,Ix,Iy,MirrorY,-MirrorY,C_ZERO,p_in,p_out)
 
-                                CALL IE_OP_ZGEMV_SYMM_DOUBLE(ie_op,S_EYY,EY,EY,Ix,Iy,C_ONE,C_ONE,C_ONE)
+                                CALL IE_OP_ZGEMV_SYMM_DOUBLE(ie_op,S_EYY,EY,EY,Ix,Iy,C_ONE,C_ONE,C_ONE,p_in,p_out)
 
-                                CALL IE_OP_ZGEMV_SYMM_DOUBLE(ie_op,S_EZZ,EZ,EZ,Ix,Iy,C_ONE,C_ONE,C_ZERO)
+                                CALL IE_OP_ZGEMV_SYMM_DOUBLE(ie_op,S_EZZ,EZ,EZ,Ix,Iy,C_ONE,C_ONE,C_ZERO,p_in,p_out)
 
-                                CALL IE_OP_ZGEMV_ASYM_DOUBLE(ie_op,'N',A_EXZ,EZ,EX,Ix,Iy,C_ONE,-C_ONE,C_ONE)
-                                CALL IE_OP_ZGEMV_ASYM_DOUBLE(ie_op,'T',A_EZX,EX,EZ,Ix,Iy,-C_ONE,C_ONE,C_ONE)
+                                CALL IE_OP_ZGEMV_ASYM_DOUBLE(ie_op,'N',A_EXZ,EZ,EX,Ix,Iy,C_ONE,-C_ONE,C_ONE,p_in,p_out)
+                                CALL IE_OP_ZGEMV_ASYM_DOUBLE(ie_op,'T',A_EZX,EX,EZ,Ix,Iy,-C_ONE,C_ONE,C_ONE,p_in,p_out)
 
-                                CALL IE_OP_ZGEMV_ASYM_DOUBLE(ie_op,'N',A_EYZ,EZ,EY,Ix,Iy,C_ONE,C_ONE,C_ONE)
-                                CALL IE_OP_ZGEMV_ASYM_DOUBLE(ie_op,'T',A_EZY,EY,EZ,Ix,Iy,-C_ONE,-C_ONE,C_ONE)
+                                CALL IE_OP_ZGEMV_ASYM_DOUBLE(ie_op,'N',A_EYZ,EZ,EY,Ix,Iy,MirrorY,MirrorY,C_ONE,p_in,p_out)
+                                CALL IE_OP_ZGEMV_ASYM_DOUBLE(ie_op,'T',A_EZY,EY,EZ,Ix,Iy,-MirrorY,-MirrorY,C_ONE,p_in,p_out)
                         ENDDO
                 ENDDO
                !$OMP END DO
+       	!$OMP END  PARALLEL
+        ENDSUBROUTINE
+
+        SUBROUTINE VERTICAL_MULT_GENERAL_ZERO(ie_op,MirrorY,p_in,p_out)
+		TYPE(IntegralEquationOperator),INTENT(INOUT)::ie_op
+		COMPLEX(REALPARM),POINTER,INTENT(IN)::p_in(:,:,:,:,:)
+		COMPLEX(REALPARM),POINTER,INTENT(IN)::p_out(:,:,:,:,:)
+                COMPLEX(REALPARM),INTENT(IN)::MirrorY
+                INTEGER::Iy
+
+		!$OMP PARALLEL	PRIVATE(Iy) DEFAULT(SHARED)
                 !$OMP DO SCHEDULE(GUIDED)
                 DO Iy=1,ie_op%Ny_loc
-                                CALL IE_OP_ZGEMV_SYMM_ZERO(ie_op,S_EXX,EX,EX,Iy,C_ONE,C_ZERO)
+                                CALL IE_OP_ZGEMV_SYMM_ZERO(ie_op,S_EXX,EX,EX,Iy,C_ONE,C_ZERO,p_in,p_out)
 
-                                CALL IE_OP_ZGEMV_SYMM_ZERO(ie_op,S_EXY,EY,EX,Iy,C_ONE,C_ONE)
-                                CALL IE_OP_ZGEMV_SYMM_ZERO(ie_op,S_EYX,EX,EY,Iy,C_ONE,C_ZERO)
+                                CALL IE_OP_ZGEMV_SYMM_ZERO(ie_op,S_EXY,EY,EX,Iy,MirrorY,C_ONE,p_in,p_out)
+                                CALL IE_OP_ZGEMV_SYMM_ZERO(ie_op,S_EYX,EX,EY,Iy,MirrorY,C_ZERO,p_in,p_out)
 
-                                CALL IE_OP_ZGEMV_SYMM_ZERO(ie_op,S_EYY,EY,EY,Iy,C_ONE,C_ONE)
+                                CALL IE_OP_ZGEMV_SYMM_ZERO(ie_op,S_EYY,EY,EY,Iy,C_ONE,C_ONE,p_in,p_out)
 
 
-                                CALL IE_OP_ZGEMV_SYMM_ZERO(ie_op,S_EZZ,EZ,EZ,Iy,C_ONE,C_ZERO)
+                                CALL IE_OP_ZGEMV_SYMM_ZERO(ie_op,S_EZZ,EZ,EZ,Iy,C_ONE,C_ZERO,p_in,p_out)
 
-                                CALL IE_OP_ZGEMV_ASYM_ZERO(ie_op,'N',A_EXZ,EZ,EX,Iy,C_ONE,C_ONE)
-                                CALL IE_OP_ZGEMV_ASYM_ZERO(ie_op,'T',A_EZX,EX,EZ,Iy,-C_ONE,C_ONE)
+                                CALL IE_OP_ZGEMV_ASYM_ZERO(ie_op,'N',A_EXZ,EZ,EX,Iy,C_ONE,C_ONE,p_in,p_out)
+                                CALL IE_OP_ZGEMV_ASYM_ZERO(ie_op,'T',A_EZX,EX,EZ,Iy,-C_ONE,C_ONE,p_in,p_out)
 
-                                CALL IE_OP_ZGEMV_ASYM_ZERO(ie_op,'N',A_EYZ,EZ,EY,Iy,C_ONE,C_ONE)
-                                CALL IE_OP_ZGEMV_ASYM_ZERO(ie_op,'T',A_EZY,EY,EZ,Iy,-C_ONE,C_ONE)
+                                CALL IE_OP_ZGEMV_ASYM_ZERO(ie_op,'N',A_EYZ,EZ,EY,Iy,MirrorY,C_ONE,p_in,p_out)
+                                CALL IE_OP_ZGEMV_ASYM_ZERO(ie_op,'T',A_EZY,EY,EZ,Iy,-MirrorY,C_ONE,p_in,p_out)
 
                 ENDDO
               !$OMP END DO
@@ -190,42 +256,50 @@ MODULE APPLY_IE_OPERATOR_MODULE
         ENDSUBROUTINE
 
 
-	SUBROUTINE IE_OP_ZGEMV_SYMM_ZERO(ie_op,Tc,c_in,c_out,Iy,ALPHA,BETA)
+	SUBROUTINE IE_OP_ZGEMV_SYMM_ZERO(ie_op,Tc,c_in,c_out,Iy,ALPHA,BETA,p_in,p_out)
 			TYPE(IntegralEquationOperator),INTENT(INOUT)::ie_op
+                        COMPLEX(REALPARM),POINTER,INTENT(IN)::p_in(:,:,:,:,:)
+                        COMPLEX(REALPARM),POINTER,INTENT(IN)::p_out(:,:,:,:,:)
 			INTEGER,INTENT(IN)::Tc,c_in,c_out,Iy
 			COMPLEX(REALPARM),INTENT(IN)::ALPHA,BETA
                         
 			CALL ZSPMV('U',ie_op%Nz,ALPHA,ie_op%G_symmT(:,Tc,Iy,ZERO),&
-			&ie_op%field_inT(:,1,c_in,Iy,ZERO),ONE,BETA,ie_op%field_outT(:,1,c_out,Iy,ZERO),ONE)
+			&p_in(:,1,c_in,Iy,ZERO),ONE,BETA,p_out(:,1,c_out,Iy,ZERO),ONE)
 	END SUBROUTINE
-	SUBROUTINE IE_OP_ZGEMV_ASYM_ZERO(ie_op,TRANS,Tc,c_in,c_out,Iy,ALPHA,BETA)
+	SUBROUTINE IE_OP_ZGEMV_ASYM_ZERO(ie_op,TRANS,Tc,c_in,c_out,Iy,ALPHA,BETA,p_in,p_out)
 			TYPE(IntegralEquationOperator),INTENT(INOUT)::ie_op
+                        COMPLEX(REALPARM),POINTER,INTENT(IN)::p_in(:,:,:,:,:)
+                        COMPLEX(REALPARM),POINTER,INTENT(IN)::p_out(:,:,:,:,:)
 			CHARACTER,INTENT(IN)::TRANS(*)
 			INTEGER,INTENT(IN)::Tc,c_in,c_out,Iy
 			COMPLEX(REALPARM),INTENT(IN)::ALPHA,BETA
 			CALL ZGEMV(TRANS,ie_op%Nz,ie_op%Nz,ALPHA,ie_op%G_asymT(:,:,Tc,Iy,ZERO),&
-                        &ie_op%Nz,ie_op%field_inT(:,1,c_in,Iy,ZERO),ONE,BETA,ie_op%field_outT(:,1,c_out,Iy,ZERO),ONE)
+                        &ie_op%Nz,p_in(:,1,c_in,Iy,ZERO),ONE,BETA,p_out(:,1,c_out,Iy,ZERO),ONE)
 	END SUBROUTINE
-	SUBROUTINE IE_OP_ZGEMV_SYMM_DOUBLE(ie_op,Tc,c_in,c_out,Ix,Iy,ALPHA1,ALPHA2,BETA)
+	SUBROUTINE IE_OP_ZGEMV_SYMM_DOUBLE(ie_op,Tc,c_in,c_out,Ix,Iy,ALPHA1,ALPHA2,BETA,p_in,p_out)
 			TYPE(IntegralEquationOperator),INTENT(INOUT)::ie_op
+                        COMPLEX(REALPARM),POINTER,INTENT(IN)::p_in(:,:,:,:,:)
+                        COMPLEX(REALPARM),POINTER,INTENT(IN)::p_out(:,:,:,:,:)
 			INTEGER,INTENT(IN)::Tc,c_in,c_out,Ix,Iy
 			COMPLEX(REALPARM),INTENT(IN)::ALPHA1,ALPHA2,BETA
                         
 			CALL ZSPMV('U',ie_op%Nz,ALPHA1,ie_op%G_symmT(:,Tc,Iy,Ix),&
-			&ie_op%field_inT(:,1,c_in,Iy,Ix),ONE,BETA,ie_op%field_outT(:,1,c_out,Iy,Ix),ONE)
+			&p_in(:,1,c_in,Iy,Ix),ONE,BETA,p_out(:,1,c_out,Iy,Ix),ONE)
 			CALL ZSPMV('U',ie_op%Nz,ALPHA2,ie_op%G_symmT(:,Tc,Iy,Ix),&
-			&ie_op%field_inT(:,2,c_in,Iy,Ix),ONE,BETA,ie_op%field_outT(:,2,c_out,Iy,Ix),ONE)
+			&p_in(:,2,c_in,Iy,Ix),ONE,BETA,p_out(:,2,c_out,Iy,Ix),ONE)
 	END SUBROUTINE
 
-	SUBROUTINE  IE_OP_ZGEMV_ASYM_DOUBLE(ie_op,TRANS,Tc,c_in,c_out,Ix,Iy,ALPHA1,ALPHA2,BETA)
+	SUBROUTINE  IE_OP_ZGEMV_ASYM_DOUBLE(ie_op,TRANS,Tc,c_in,c_out,Ix,Iy,ALPHA1,ALPHA2,BETA,p_in,p_out)
 			TYPE(IntegralEquationOperator),INTENT(INOUT)::ie_op
+                        COMPLEX(REALPARM),POINTER,INTENT(IN)::p_in(:,:,:,:,:)
+                        COMPLEX(REALPARM),POINTER,INTENT(IN)::p_out(:,:,:,:,:)
 			CHARACTER,INTENT(IN)::TRANS(*)
 			INTEGER,INTENT(IN)::Tc,c_in,c_out,Ix,Iy
 			COMPLEX(REALPARM),INTENT(IN)::ALPHA1,ALPHA2,BETA
 			CALL ZGEMV(TRANS,ie_op%Nz,ie_op%Nz,ALPHA1,ie_op%G_asymT(:,:,Tc,Iy,Ix),&
-                        &ie_op%Nz,ie_op%field_inT(:,1,c_in,Iy,Ix),ONE,BETA,ie_op%field_outT(:,1,c_out,Iy,Ix),ONE)
+                        &ie_op%Nz,p_in(:,1,c_in,Iy,Ix),ONE,BETA,p_out(:,1,c_out,Iy,Ix),ONE)
 			CALL ZGEMV(TRANS,ie_op%Nz,ie_op%Nz,ALPHA2,ie_op%G_asymT(:,:,Tc,Iy,Ix),&
-                        &ie_op%Nz,ie_op%field_inT(:,2,c_in,Iy,Ix),ONE,BETA,ie_op%field_outT(:,2,c_out,Iy,Ix),ONE)
+                        &ie_op%Nz,p_in(:,2,c_in,Iy,Ix),ONE,BETA,p_out(:,2,c_out,Iy,Ix),ONE)
 	END SUBROUTINE
 !--------------------------------------------------------------------------------------------------------------------!       
 #ifdef gggg

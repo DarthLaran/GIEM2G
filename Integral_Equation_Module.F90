@@ -42,6 +42,7 @@ MODULE INTEGRAL_EQUATION_MODULE
 		INTEGER::Nx,Ny,Nz
 
 		INTEGER::Nx_loc,Ny_loc,Ny_offset
+                INTEGER::NxHalf
 		INTEGER::NxNy_loc
 !---------------------------------------------------------------------------------------------------!
 		INTEGER(LONG_INT)::local_length
@@ -62,6 +63,7 @@ MODULE INTEGRAL_EQUATION_MODULE
 		INTEGER(MPI_CTL_KIND)::ie_comm
 		INTEGER(MPI_CTL_KIND)::me
 		INTEGER(MPI_CTL_KIND)::master_proc
+		INTEGER(MPI_CTL_KIND)::comm_size
 		LOGICAL::master
 !---------------------------------------------------------------------------------------------------!		     
 		LOGICAL::fftw_threads_ok
@@ -104,7 +106,7 @@ CONTAINS
 			RETURN
 		ENDIF
 
-		NxNyloc=(2*Nx*Ny)/Np
+		NxNyloc=(Nx*Ny)/Np
 		symm_length=2*Nz*(Nz+1)*NxNyloc
 		asym_length=2*Nz*Nz*NxNyloc
 		local_length=symm_length+asym_length
@@ -155,6 +157,7 @@ CONTAINS
 		CALL MPI_COMM_RANK(comm, me, IERROR)
 		CALL MPI_COMM_SIZE(comm,comm_size,IERROR) 
 		ie_op%me=me
+                ie_op%comm_size=comm_size
 		if (me==0) THEN
 			ie_op%master=.TRUE.
 		ELSE
@@ -168,34 +171,30 @@ CONTAINS
 			STOP
 		ENDIF
 !---------------------------------------------------------------------------------------------!
-		ie_op%Nx_loc=Nx
+		ie_op%Nx_loc=Nx/2
 		ie_op%Ny_loc=2*Ny/comm_size
 		ie_op%Ny_offset=me*ie_op%Ny_loc
 		ie_op%NxNy_loc=ie_op%Nx_loc*ie_op%Ny_loc
 		ie_op%local_length=local_length
+                ie_op%NxHalf=Nx/2
 !---------------------------------------------------------------------------------------------!
 !		ie_op%matrix_kind=UNIFORM_MATRIX
 		ie_op%matrix_kind=GENERAL_MATRIX
-		CALL SetTensorPointers(ie_op,buff_ptr)
 		IF (ie_op%Ny_offset >= Ny) THEN   
 			ie_op%real_space=.FALSE.
-			CALL MPI_COMM_SPLIT(ie_op%ie_comm, MPI_TWO, ie_op%me, ie_op%fgmres_comm, IERROR)
 		ELSE
 			ie_op%real_space=.TRUE.
-			CALL MPI_COMM_SPLIT(ie_op%ie_comm, MPI_ONE, ie_op%me, ie_op%fgmres_comm, IERROR)
-			CALL MPI_COMM_RANK(ie_op%fgmres_comm, ie_op%fgmres_me, IERROR)
 		ENDIF
-		CALL MPI_COMM_RANK(ie_op%fgmres_comm, ie_op%fgmres_me, IERROR)
-
+		CALL SetTensorPointers(ie_op,buff_ptr)
 	ENDSUBROUTINE
 !--------------------------------------------------------------------------------------------------------------------!	
 	  SUBROUTINE  SetTensorPointers(ie_op,buff_ptr)
 		TYPE(IntegralEquationOperator),INTENT(INOUT)::ie_op
 		TYPE(C_PTR),INTENT(IN)::buff_ptr
 		COMPLEX(REALPARM),POINTER:: ptr(:)
-		INTEGER::Nx,Ny,Nz,Nx2
+		INTEGER::Nx,Ny,Nz,NxHalf
 		INTEGER::NxNy_loc,N1,N2
-		INTEGER::symm_length,asym_length,loc_length
+		INTEGER::Nxfirst,Nxlast
                 INTEGER(C_INTPTR_T)::bl
                 TYPE(C_PTR)::pin,pout
 		CALL C_F_POINTER(buff_ptr,ptr,(/ie_op%local_length/))
@@ -203,18 +202,24 @@ CONTAINS
 		Nz=ie_op%Nz
 		Nx=ie_op%Nx
 		Ny=ie_op%Ny
-		NxNy_loc=ie_op%NxNy_loc
-		Nx2=ie_op%Nx_loc-1
+                NxHalf=ie_op%NxHalf
 		N1=ie_op%Ny_offset
 		N2=ie_op%Ny_offset+ie_op%Ny_loc-1
-
+                ie_op%buff_ptr=buff_ptr
+                IF (ie_op%real_space) THEN
+                        Nxfirst=0
+                        Nxlast=NxHalf-1
+                ELSE
+                        Nxfirst=NxHalf
+                        Nxlast=Nx-1
+                ENDIF
                 IF (ie_op%matrix_kind==GENERAL_MATRIX) THEN
-                        ie_op%G_asym(1:Nz,1:Nz,A_EXZ:A_EYZ,0:Nx2,N1:N2)=>ptr
-                        ie_op%G_asymT(1:Nz,1:Nz,A_EXZ:A_EYZ,1:ie_op%Ny_loc,0:Nx2)=>ptr
-
+                        ie_op%G_asym(1:Nz,1:Nz,A_EXZ:A_EYZ,N1:N2,0:NxHalf-1)=>ptr
+                        ie_op%G_asymT(1:Nz,1:Nz,A_EXZ:A_EYZ,1:ie_op%Ny_loc,Nxfirst:Nxlast)=>ptr
                         ptr=>ptr(SIZE(ie_op%G_asym)+1:)
-                        ie_op%G_symm(1:Nz*(Nz+1)/2,S_EXX:S_EZZ,0:Nx2,N1:N2)=>ptr
-                        ie_op%G_symmT(1:Nz*(Nz+1)/2,S_EXX:S_EZZ,1:ie_op%Ny_loc,0:Nx2)=>ptr
+                        ie_op%G_symm(1:Nz*(Nz+1)/2,S_EXX:S_EZZ,N1:N2,0:NxHalf-1)=>ptr
+                        ie_op%G_symmT(1:Nz*(Nz+1)/2,S_EXX:S_EZZ,1:ie_op%Ny_loc,Nxfirst:Nxlast)=>ptr
+
                         ie_op%G_symm5=>NULL()
                 ELSEIF (ie_op%matrix_kind==UNIFORM_MATRIX) THEN
 
@@ -280,9 +285,10 @@ CONTAINS
                 CALL CalcPreparedForwardFFT(ie_op%DFD)
 
 	ENDSUBROUTINE
-	SUBROUTINE IE_OP_FFTW_FWD_FOR_TENSOR(ie_op)
+	SUBROUTINE IE_OP_FFTW_FWD_FOR_TENSOR(ie_op,sy)
 		TYPE(IntegralEquationOperator),INTENT(INOUT)::ie_op
-                CALL CalcForwardIETensorFFT(ie_op%DFD)
+		COMPLEX(REALPARM),INTENT(IN)::sy
+                CALL CalcForwardIETensorFFT(ie_op%DFD,sy)
 
 	ENDSUBROUTINE
 	SUBROUTINE IE_OP_FFTW_BWD_PREPARED(ie_op)
@@ -315,19 +321,19 @@ CONTAINS
 		Nz=ie_op%Nz
 		N=(Nz*(Nz+1))/2
 
-		CALL CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,S_EXX,.FALSE.,Gout)
-		CALL CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,S_EXY,.TRUE.,Gout)
-		CALL CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,S_EYY,.FALSE.,Gout)
-		CALL CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,S_EZZ,.FALSE.,Gout)
+		CALL CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,S_EXX,C_ONE,C_ONE,Gout)
+		CALL CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,S_EXY,-C_ONE,-C_ONE,Gout)
+		CALL CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,S_EYY,C_ONE,C_ONE,Gout)
+		CALL CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,S_EZZ,C_ONE,C_ONE,Gout)
 
-		ptr=C_LOC(ie_op%G_asymT(1,1,1,1,0))
+		ptr=ie_op%buff_ptr!C_LOC(ie_op%G_asymT(1,1,1,1,0))
 		N=Nz*Nz
-		CALL C_F_POINTER(ptr,G,(/N,2,ie_op%Nx_loc,ie_op%Ny_loc/))
+		CALL C_F_POINTER(ptr,G,(/N,2,ie_op%Ny_loc,ie_op%Nx_loc/))
 		CALL C_F_POINTER(ptr,Gout,(/N,2,ie_op%Ny_loc,ie_op%Nx_loc/))
 
 
-		CALL CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,A_EXZ,.TRUE.,Gout)
-		CALL CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,A_EYZ,.FALSE.,Gout)
+		CALL CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,A_EXZ,-C_ONE,C_ONE,Gout)
+		CALL CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,A_EYZ,C_ONE,-C_ONE,Gout)
 
 		time2=GetTime()
 		CALL PRINT_CALC_TIME('FFT of  IE tensor has been computed: ',time2-time1)
@@ -367,135 +373,74 @@ CONTAINS
 		ie_op%counter%tensor_fft=time2-time1
 	ENDSUBROUTINE
 #else
-	SUBROUTINE CalcFFTofIETensor(ie_op)
-		TYPE(IntegralEquationOperator),INTENT(INOUT)::ie_op
-		INTEGER::Iz,Is,Ia
-		INTEGER::Is1,Ia1
-		INTEGER(MPI_CTL_KIND)::IERROR
-		REAL(DOUBLEPARM)::time1,time2
-		time1=GetTime()
-		Is=1
-		Ia=1
-		ie_op%field_in4=C_ZERO
-		DO Iz=1,ie_op%Nz/3 
-			ie_op%field_in4(:,1:2,:,:)=ie_op%G_symm_fftw(:,:,Is,:,:)
-			ie_op%field_in4(:,3,:,:)=ie_op%G_asym_fftw(:,1,Ia,:,:)
-			CALL IE_OP_FFTW_FWD(ie_op)
-			ie_op%G_symm_fftw(:,:,Is,:,:)=ie_op%field_out4(:,1:2,:,:)
-			ie_op%G_asym_fftw(:,1,Ia,:,:)=ie_op%field_out4(:,3,:,:)
-			Is=Is+1
-			ie_op%field_in4(:,1,:,:)=ie_op%G_symm_fftw(:,1,Is,:,:)
-			ie_op%field_in4(:,2,:,:)=ie_op%G_asym_fftw(:,2,Ia,:,:)
-			ie_op%field_in4(:,3,:,:)=ie_op%G_asym_fftw(:,1,Ia+1,:,:)
-			CALL IE_OP_FFTW_FWD(ie_op)
-			ie_op%G_symm_fftw(:,1,Is,:,:)=ie_op%field_out4(:,1,:,:)
-			ie_op%G_asym_fftw(:,2,Ia,:,:)=ie_op%field_out4(:,2,:,:)
-			ie_op%G_asym_fftw(:,1,Ia+1,:,:)=ie_op%field_out4(:,3,:,:)
-			Ia=Ia+1
-
-			ie_op%field_in4(:,1,:,:)=ie_op%G_symm_fftw(:,2,Is,:,:)
-			ie_op%field_in4(:,2,:,:)=ie_op%G_asym_fftw(:,2,Ia,:,:)
-			ie_op%field_in4(:,3,:,:)=ie_op%G_asym_fftw(:,1,Ia+1,:,:)
-			CALL IE_OP_FFTW_FWD(ie_op)
-			ie_op%G_symm_fftw(:,2,Is,:,:)=ie_op%field_out4(:,1,:,:)
-			ie_op%G_asym_fftw(:,2,Ia,:,:)=ie_op%field_out4(:,2,:,:)
-			ie_op%G_asym_fftw(:,1,Ia+1,:,:)=ie_op%field_out4(:,3,:,:)
-			Ia=Ia+1
-			Is=Is+1
-			ie_op%field_in4(:,1:2,:,:)=ie_op%G_symm_fftw(:,:,Is,:,:)
-			ie_op%field_in4(:,3,:,:)=ie_op%G_asym_fftw(:,2,Ia,:,:)
-			CALL IE_OP_FFTW_FWD(ie_op)
-			ie_op%G_symm_fftw(:,:,Is,:,:)=ie_op%field_out4(:,1:2,:,:)
-			ie_op%G_asym_fftw(:,2,Ia,:,:)=ie_op%field_out4(:,3,:,:)
-			Is=Is+1
-			Ia=Ia+1
-		ENDDO
-		IF (Ia==ie_op%Nz-1) THEN
-			ie_op%field_in4(:,1:2,:,:)=ie_op%G_symm_fftw(:,:,Is,:,:)
-			ie_op%field_in4(:,3,:,:)=ie_op%G_asym_fftw(:,1,Ia,:,:)
-			CALL IE_OP_FFTW_FWD(ie_op)	!Nz-1 Nz-1
-			ie_op%G_symm_fftw(:,:,Is,:,:)=ie_op%field_out4(:,1:2,:,:)
-			ie_op%G_asym_fftw(:,1,Ia,:,:)=ie_op%field_out4(:,3,:,:)
-			Is=Is+1
-
-			ie_op%field_in4(:,1,:,:)=ie_op%G_symm_fftw(:,1,Is,:,:)
-			ie_op%field_in4(:,2,:,:)=ie_op%G_asym_fftw(:,2,Ia,:,:)
-			ie_op%field_in4(:,3,:,:)=ie_op%G_asym_fftw(:,1,Ia+1,:,:)
-			CALL IE_OP_FFTW_FWD(ie_op) !Nz Nz
-			ie_op%G_symm_fftw(:,1,Is,:,:)=ie_op%field_out4(:,1,:,:)
-			ie_op%G_asym_fftw(:,2,Ia,:,:)=ie_op%field_out4(:,2,:,:)
-			ie_op%G_asym_fftw(:,1,Ia+1,:,:)=ie_op%field_out4(:,3,:,:)
-			Ia=Ia+1
-
-			ie_op%field_in4(:,1,:,:)=ie_op%G_symm_fftw(:,2,Is,:,:)
-			ie_op%field_in4(:,2,:,:)=ie_op%G_asym_fftw(:,2,Ia,:,:)
-			CALL IE_OP_FFTW_FWD(ie_op) !Nz Nz
-			ie_op%G_symm_fftw(:,2,Is,:,:)=ie_op%field_out4(:,1,:,:)
-			ie_op%G_asym_fftw(:,2,Ia,:,:)=ie_op%field_out4(:,2,:,:)
-			Is=Is+1
-			ie_op%field_in4(:,1:2,:,:)=ie_op%G_symm_fftw(:,1:2,Is,:,:)
-			CALL IE_OP_FFTW_FWD(ie_op) !Nz+1 
-			ie_op%G_symm_fftw(:,1:2,Is,:,:)=ie_op%field_out4(:,1:2,:,:)
-		ELSEIF (Ia==ie_op%Nz) THEN
-			ie_op%field_in4(:,1:2,:,:)=ie_op%G_symm_fftw(:,:,Is,:,:)
-			ie_op%field_in4(:,3,:,:)=ie_op%G_asym_fftw(:,1,Ia,:,:)
-			CALL IE_OP_FFTW_FWD(ie_op)	!Nz Nz
-			ie_op%G_symm_fftw(:,:,Is,:,:)=ie_op%field_out4(:,1:2,:,:)
-			ie_op%G_asym_fftw(:,1,Ia,:,:)=ie_op%field_out4(:,3,:,:)
-			Is=Is+1
-			ie_op%field_in4(:,1:2,:,:)=ie_op%G_symm_fftw(:,1:2,Is,:,:)
-			ie_op%field_in4(:,3,:,:)=ie_op%G_asym_fftw(:,2,Ia,:,:)
-			CALL IE_OP_FFTW_FWD(ie_op) !Nz+1 Nz
-			ie_op%G_symm_fftw(:,1:2,Is,:,:)=ie_op%field_out4(:,1:2,:,:)
-			ie_op%G_asym_fftw(:,2,Ia,:,:)=ie_op%field_out4(:,3,:,:)
-		ELSE
-			ie_op%field_in4(:,1:2,:,:)=ie_op%G_symm_fftw(:,1:2,Is,:,:)
-			CALL IE_OP_FFTW_FWD(ie_op) 
-			ie_op%G_symm_fftw(:,1:2,Is,:,:)=ie_op%field_out4(:,1:2,:,:)
-		ENDIF
-		time2=GetTime()
-
-		CALL PRINT_CALC_TIME('FFT of  IE tensor has been computed: ',time2-time1)
-		ie_op%counter%tensor_fft=time2-time1
-	ENDSUBROUTINE
 #endif
-	SUBROUTINE CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,comp,negative,Gout)
+	SUBROUTINE CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,comp,sx,sy,Gout)
 		TYPE(IntegralEquationOperator),TARGET,INTENT(INOUT)::ie_op
 		COMPLEX(REALPARM),INTENT(INOUT)::G(1:,1:,1:,1:)
 		COMPLEX(REALPARM),INTENT(INOUT)::Gout(1:,1:,1:,1:)
 		COMPLEX(REALPARM),POINTER::p_in(:,:,:)
 		COMPLEX(REALPARM),POINTER::p_out(:,:,:)
 		INTEGER,INTENT(IN)::comp
-		LOGICAL,INTENT(IN)::negative
+                COMPLEX(REALPARM),INTENT(IN)::sx,sy
 		COMPLEX(REALPARM)::tmp(3*ie_op%Nz)
 		INTEGER::N,Nz,M,Nz3,Nx,l
 		INTEGER::Iz,Ix,Iy,s
+                INTEGER(MPI_CTL_KIND)::Nx2,xfirst,xlast,data_length
+                INTEGER(MPI_CTL_KIND)::proc,recv_start
+		INTEGER(MPI_CTL_KIND)::requests(2),IERROR
 		Nx=ie_op%Nx
+                Nx2=Nx/2
 		Nz=ie_op%Nz
 		Nz3=3*Nz
 		M=1
 		l=MIN(Nz3,N-M+1)
-                p_in(1:Nz3,1:2*Nx,1:ie_op%Ny_loc)=>ie_op%DFD%field_out
+                p_in(1:Nz3,1:ie_op%Ny_loc,1:2*Nx)=>ie_op%DFD%field_out
                 p_out(1:Nz3,1:ie_op%Ny_loc,1:2*Nx)=>ie_op%DFD%field_out
+                
+                proc=MODULO((ie_op%me+ie_op%comm_size/2),ie_op%comm_size)
+                IF (ie_op%real_space) THEN
+                        xfirst=1
+                        xlast=Nx2
+                        recv_start=Nx2+1
+                ELSE
+                        recv_start=1
+                        xfirst=Nx2+1
+                        xlast=Nx
+                ENDIF
+                data_length=Nz3*ie_op%Ny_loc*Nx2
 		DO
-			DO Iy=1,ie_op%Ny_loc
-				DO Ix=1,Nx
-				      CALL ZCOPY(l,G(M:,comp,Ix,Iy),ONE,p_in(:,Ix,Iy),ONE)  
-				ENDDO
-				p_in(:,Nx+1,Iy)=C_ZERO
-				DO Ix=1,Nx-1
-				      CALL ZCOPY(l,G(M:,comp,Ix+1,Iy),ONE,p_in(:,2*Nx-Ix+1,Iy),ONE)  
-				ENDDO
-			ENDDO
-			IF (negative) THEN
-				p_in(:,Nx+2:,:)=-p_in(:,Nx+2:,:)
-			ENDIF
-			CALL IE_OP_FFTW_FWD_FOR_TENSOR(ie_op) 
+                         CALL  MPI_IRECV(p_in(:,:,recv_start:),data_length,MPI_DOUBLE_COMPLEX,proc,proc,&
+                         &ie_op%ie_comm,requests(1),IERROR)
                         !$OMP PARALLEL DEFAULT(SHARED), PRIVATE(Ix,Iy)
                         !$OMP DO SCHEDULE(GUIDED) 
-			DO Ix=1,Nx
+        		DO Ix=1,Nx2
+	        		DO Iy=1,ie_op%Ny_loc
+				      CALL ZCOPY(l,G(M:,comp,Iy,Ix),ONE,p_in(:,Iy,Ix+xfirst-1),ONE)  
+				ENDDO
+			ENDDO
+                        !$OMP END DO
+        		!$OMP END PARALLEL
+                         CALL  MPI_ISEND(p_in(:,:,xfirst:),data_length,MPI_DOUBLE_COMPLEX,proc,ie_op%me,&
+                         &ie_op%ie_comm,requests(2),IERROR)
+
+                        CALL MPI_WAITALL(2, requests,  MPI_STATUSES_IGNORE, IERROR)
+                        
+                        !$OMP PARALLEL DEFAULT(SHARED), PRIVATE(Ix,Iy)
+                        !$OMP DO SCHEDULE(GUIDED) 
+			DO Ix=1,Nx-1
+	                        p_in(:,:,2*Nx-Ix+1)=sx*p_in(:,:,Ix+1)		
+			ENDDO
+                        !$OMP END DO
+        		!$OMP END PARALLEL
+
+                        p_in(:,:,Nx+1)=C_ZERO
+			CALL IE_OP_FFTW_FWD_FOR_TENSOR(ie_op,sy)
+
+                        !$OMP PARALLEL DEFAULT(SHARED), PRIVATE(Ix,Iy)
+                        !$OMP DO SCHEDULE(GUIDED) 
+			DO Ix=1,Nx2
                                 DO Iy=1,ie_op%Ny_loc
-        			      CALL ZCOPY(l,p_out(:,Iy,Ix),ONE,Gout(M:,comp,Iy,Ix),ONE) 
+        			      CALL ZCOPY(l,p_out(:,Iy,Ix+xfirst-1),ONE,Gout(M:,comp,Iy,Ix),ONE) 
                                 ENDDO
 			ENDDO
                         !$OMP END DO
@@ -503,7 +448,7 @@ CONTAINS
 			DO Iy=1,ie_op%Ny_loc
 				CALL ZCOPY(l,p_out(:,Iy,Nx+1),ONE,tmp,ONE) 
 				s=1
-				DO Ix=1,Nx
+				DO Ix=1,Nx2
 				      Gout(M:M+l-1,comp,Iy,Ix)=Gout(M:M+l-1,comp,Iy,Ix)-tmp(1:l)*s
 				      s=-s
 				ENDDO

@@ -60,7 +60,6 @@ CONTAINS
 		REAL(8)::time(4),time_all!,Wt_Threshold
 		REAL(8)::time_max(4),time_min(4)
 		REAL(8)::time1,time2,time3,time4
-!		CALL MPI_BARRIER(ie_op%ie_op_comm,IERROR)
 		time_all=GetTime()
 		requests(1:ie_op%Ny_loc,1:4)=>all_requests
 		CALL PRINT_BORDER
@@ -113,46 +112,9 @@ CONTAINS
 			send_start=Nx2
 		ENDIF
 
-		DO Iy=Ny_offset,Ny_offset+Ny_loc-1
-			pGsend_symm=>G_symm(:,:,send_start:,Iy)
-			pGrecv_symm=>G_symm(:,:,recv_start:,Iy)
-			pGsend_asym=>G_asym(:,:,:,send_start:,Iy)
-			pGrecv_asym=>G_asym(:,:,:,recv_start:,Iy)
-			IF ((Iy==Ny).OR.(Iy==0)) THEN
-				shift=Ny
-			ELSE
-				shift=2*Ny
-			ENDIF
-			recv_proc=(shift-Iy)/Ny_loc
-			send_proc=(shift-Iy)/Ny_loc
-			IF (Ny_offset<Ny) THEN
-				ly=Iy
-			ELSE
-				ly=shift-Iy
-			ENDIF
-			CALL MPI_IRECV(pGrecv_symm,Nrecv_symm,MPI_DOUBLE_COMPLEX,send_proc,Iy,&
-				&ie_op%ie_comm,requests(Iy+1-Ny_offset,1),IERROR)
-			CALL MPI_IRECV(pGrecv_asym,Nrecv_asym,MPI_DOUBLE_COMPLEX,send_proc,Iy,&
-				&ie_op%ie_comm,requests(Iy+1-Ny_offset,3),IERROR)
 
-			CALL	CalcTensorAlongX(xfirst,xlast,ly,G_symm(:,:,:,Iy),G_asym(:,:,:,:,Iy),&
+		CALL CalcGeneralTensorAlongXY(xfirst,Nx2,Ny_offset,Ny_loc,G_symm,G_asym,&
 					&time,anomaly,bkg,ie_op%dz)
-
-			CALL MPI_ISEND(pGsend_symm,Nsend_symm,MPI_DOUBLE_COMPLEX,recv_proc,shift-Iy,&
-				&ie_op%ie_comm,requests(Iy+1-Ny_offset,2),IERROR)
-			CALL MPI_ISEND(pGsend_asym,Nsend_asym,MPI_DOUBLE_COMPLEX,recv_proc,shift-Iy,&
-				&ie_op%ie_comm,requests(Iy+1-Ny_offset,4),IERROR)
-		ENDDO
-		
-		CALL MPI_WAITALL(Ny_loc*4, all_requests,  MPI_STATUSES_IGNORE, IERROR)
-
-		IF (Ny_offset>=Ny) THEN
-!			CALL MirroringAdditionalSpace(Ny_offset,Ny_loc,Ny,Nx, G_symm,G_asym)
-			G_symm(:,S_EXY,:,:)=-G_symm(:,S_EXY,:,:)
-			G_asym(:,:,A_EYZ,:,:)=-G_asym(:,:,A_EYZ,:,:)
-		ELSE
-!			CALL MirroringRealSpace(Ny_offset,Ny_loc,Ny,Nx, G_symm,G_asym)
-		ENDIF
 
 #ifdef internal_timer
 		time(3)=time(2)-time(4) 
@@ -192,6 +154,51 @@ CONTAINS
 #endif
 	END SUBROUTINE
 !---------------------------------------------------------------------------------------------------------------------------------------------!
+	SUBROUTINE   CalcGeneralTensorAlongXY(xfirst,Nx2,Ny_offset,Ny_loc,G_symm,G_asym,time,anomaly,bkg,dz)
+			INTEGER,INTENT(IN)::xfirst,Nx2,Ny_offset,Ny_loc
+			COMPLEX(REALPARM),POINTER,INTENT(IN)::G_symm(:,:,:,:)
+			COMPLEX(REALPARM),POINTER,INTENT(IN)::G_asym(:,:,:,:,:)
+			REAL(DOUBLEPARM),INTENT(INOUT)::time(4)
+			TYPE (BKG_DATA_TYPE),INTENT(IN)::bkg
+			TYPE (ANOMALY_TYPE),INTENT(IN)::anomaly
+			REAL(REALPARM),POINTER,INTENT(IN)::dz(:)
+			COMPLEX(REALPARM),POINTER::G_symm1(:,:,:,:)
+			COMPLEX(REALPARM),POINTER::G_asym1(:,:,:,:,:)
+			INTEGER::Ix,Iy,ly,Ny
+			G_symm1(1:,S_EXX:,Ny_offset:,0:)=>G_symm
+			G_asym1(1:,1:,A_EXZ:,Ny_offset:,0:)=>G_asym
+                        Ny=anomaly%Ny
+			!$OMP PARALLEL PRIVATE(Ix,Iy,ly),DEFAULT(SHARED)&
+			!$OMP &FIRSTPRIVATE(time)
+#ifdef internal_timer
+			!$OMP DO SCHEDULE(GUIDED)&
+			!$OMP& REDUCTION (MAX:time1,time2,time3,time4)
+#else
+			!$OMP DO SCHEDULE(GUIDED)
+#endif
+				DO Ix=0,Nx2-1
+                        		DO Iy=Ny_offset,Ny_offset+Ny_loc-1
+                                		ly=MODULO(Iy,Ny)
+	        				CALL CalcIntegralGreenTensor3dElementGeneral(Ix+xfirst,ly,G_symm1(:,:,Iy,Ix),&
+		        			&G_asym1(:,:,:,Iy,Ix),time,anomaly,bkg,dz)
+			        	ENDDO
+                                ENDDO
+			!$OMP ENDDO
+#ifdef internal_timer
+				time1=time(1)
+				time2=time(2)
+				time3=time(3)
+				time4=time(4)
+			!$OMP END PARALLEL
+			time(1)=time1
+			time(2)=time2
+			time(3)=time3
+			time(4)=time4
+#else
+			!$OMP END PARALLEL
+#endif
+	ENDSUBROUTINE
+
 	SUBROUTINE   CalcGeneralTensorAlongX(xfirst,xlast,ly,G_symm,G_asym,time,anomaly,bkg,dz)
 			INTEGER,INTENT(IN)::xfirst,xlast,ly
 			COMPLEX(REALPARM),POINTER,INTENT(IN)::G_symm(:,:,:)

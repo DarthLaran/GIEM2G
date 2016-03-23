@@ -161,7 +161,7 @@ CONTAINS
                         CALL C_F_POINTER(ie_ptr,ie_op)
 			IF (ASSOCIATED(ie_op%csigb))	ie_op%csigb(1:ie_op%Nz)=ie_op%csigb(1:ie_op%Nz)
                         CALL CalcFFTofIETensor(ie_op)
-!                        CALL PrintTimings(ie_op%DFD)
+                        CALL PrintTimings(ie_op%DFD)
         ENDSUBROUTINE
 
         SUBROUTINE GIEM2G_SET_ANOMALY_CONDUCTIVITY(ie_op_ptr,siga_ptr) &
