@@ -37,8 +37,11 @@ MODULE APPLY_IE_OPERATOR_MODULE
                 fft_buff(1:2*ie_op%Nx,1:ie_op%Ny_loc,1:ie_op%Nz,1:3)=>ie_op%DFD%field_in
                 N=4*ie_op%Nx*ie_op%Ny
 		!$OMP PARALLEL DEFAULT(SHARED),PRIVATE(Ix,Ic,Iz,Iy,asiga,dsig,gsig)
-
+#ifndef IBM_Bluegene
                 !$OMP DO SCHEDULE(GUIDED) COLLAPSE(3)
+#else
+                !$OMP DO SCHEDULE(GUIDED) 
+#endif
                 DO Iz=1,ie_op%Nz
                         DO Iy=1,ie_op%Ny_loc
                                 DO Ix=1,ie_op%Nx
@@ -52,7 +55,11 @@ MODULE APPLY_IE_OPERATOR_MODULE
                         ENDDO
                 ENDDO
                 !$OMP END DO
+#ifndef IBM_Bluegene
                 !$OMP DO SCHEDULE(GUIDED) COLLAPSE(3)
+#else
+                !$OMP DO SCHEDULE(GUIDED) 
+#endif
                 DO Iz=1,ie_op%Nz
                         DO Iy=1,ie_op%Ny_loc
                                 DO Ix=1,ie_op%Nx
@@ -66,8 +73,11 @@ MODULE APPLY_IE_OPERATOR_MODULE
                         ENDDO
                 ENDDO
                 !$OMP END DO
+#ifndef IBM_Bluegene
                 !$OMP DO SCHEDULE(GUIDED) COLLAPSE(3)
-
+#else
+                !$OMP DO SCHEDULE(GUIDED) 
+#endif
                 DO Iz=1,ie_op%Nz
                         DO Iy=1,ie_op%Ny_loc
                                 DO Ix=1,ie_op%Nx
@@ -88,7 +98,11 @@ MODULE APPLY_IE_OPERATOR_MODULE
 
 		CALL	MULT_IE_OP(ie_op)
 		!$OMP PARALLEL DEFAULT(SHARED), PRIVATE(Iy,Ix,Ic,Iz,d1,d2,asiga)
-		!$OMP DO SCHEDULE(GUIDED) COLLAPSE(4)
+#ifndef IBM_Bluegene
+                !$OMP DO SCHEDULE(GUIDED) COLLAPSE(4)
+#else
+                !$OMP DO SCHEDULE(GUIDED) 
+#endif
 		DO Iy=1,ie_op%Ny_loc
 			DO Ix=1,ie_op%Nx
 				DO Ic=1,3

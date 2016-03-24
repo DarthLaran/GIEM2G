@@ -78,7 +78,7 @@ CONTAINS
 			ENDIF
 			G=(e1-e2+e4-e3)*A(l,1,1)/t1
 			G=G/dz/eta(l)
-			E0(Iz,pol,:,:)=G
+			E0(:,:,Iz,pol)=G
 		ENDDO
 	END SUBROUTINE
 END MODULE

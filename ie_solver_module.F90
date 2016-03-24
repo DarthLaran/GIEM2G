@@ -18,8 +18,8 @@ MODULE IE_SOLVER_MODULE
 	
 	CONTAINS
 
-	SUBROUTINE SolveEquation(int_eq,fgmres_ctl,E_bkg,Esol,E0)
-		TYPE(IntegralEquationOperator),INTENT(INOUT)::int_eq
+	SUBROUTINE SolveEquation(ie_op,fgmres_ctl,E_bkg,Esol,E0)
+		TYPE(IntegralEquationOperator),INTENT(INOUT)::ie_op
 		TYPE (FGMRES_CTL_TYPE),INTENT(IN)::fgmres_ctl
 		COMPLEX(REALPARM),POINTER,INTENT(IN)::E_bkg(:,:,:,:),Esol(:,:,:,:)
 		COMPLEX(REALPARM),POINTER,INTENT(IN),OPTIONAL::E0(:,:,:,:) !
@@ -34,32 +34,32 @@ MODULE IE_SOLVER_MODULE
                 CALL PRINT_BORDER
 	        CALL LOGGER('Solver started')
 		time1=GetTime()
-		Nx=int_eq%Nx
-		Nz=int_eq%Nz
-		Ny_loc=int_eq%Ny_loc
-		IF (int_eq%real_space) THEN
+		Nx=ie_op%Nx
+		Nz=ie_op%Nz
+		Ny_loc=ie_op%Ny_loc
+		IF (ie_op%real_space) THEN
 			DO Iz=1,Nz
-				Esol(Iz,:,:,:)=int_eq%sqsigb(Iz)*E_bkg(Iz,:,:,:)
+				Esol(:,:,Iz,:)=ie_op%sqsigb(Iz)*E_bkg(:,:,Iz,:)
 			ENDDO
-			ALLOCATE(guess(Nz,3,int_eq%Nx,int_eq%Ny_loc))
+			ALLOCATE(guess(ie_op%Nx,ie_op%Ny_loc,ie_op%Nz,3))
 			IF (PRESENT(E0)) THEN
 				DO Iz=1,Nz
-					guess(Iz,:,:,:)=int_eq%sqsigb(Iz)*E0(Iz,:,:,:)
+					guess(:,:,Iz,:)=ie_op%sqsigb(Iz)*E0(:,:,Iz,:)
 				ENDDO
 			ELSE
 				guess=Esol
 			ENDIF			
 		ENDIF
-		CALL GIEM2G_FGMRES(int_eq,fgmres_ctl,Esol,guess)
+		CALL GIEM2G_FGMRES(ie_op,fgmres_ctl,Esol,guess)
 
 
-		IF (int_eq%real_space) THEN
+		IF (ie_op%real_space) THEN
 			DO Iy=1,Ny_loc
-				DO Ix=1,int_eq%Nx
+				DO Ix=1,ie_op%Nx
 					DO Ic=1,3
 						DO Iz=1,Nz
-							asiga=C_TWO*int_eq%sqsigb(Iz)/(int_eq%csiga(Iz,Ix,Iy)+CONJG(int_eq%csigb(Iz)))
-							Esol(Iz,Ic,Ix,Iy)=asiga*Esol(Iz,Ic,Ix,Iy)
+							asiga=C_TWO*ie_op%sqsigb(Iz)/(ie_op%csiga(Ix,Iy,Iz)+CONJG(ie_op%csigb(Iz)))
+							Esol(Ix,Iy,Iz,Ic)=asiga*Esol(Ix,Iy,Iz,Ic)
 						ENDDO
 					ENDDO
 				ENDDO
@@ -69,42 +69,49 @@ MODULE IE_SOLVER_MODULE
 		time2=GetTime()
 	        CALL LOGGER('Solver finished')
 		CALL PRINT_CALC_TIME('Total time:                                               ',time2-time1)
-		CALL PRINT_CALC_TIME('Time for multiplications:					', int_eq%counter%apply)
-		CALL PRINT_CALC_TIME('Time for dot products:					', int_eq%counter%dotprod)
-		CALL PRINT_CALC_TIME('Average dot product:					', int_eq%counter%dotprod/int_eq%counter%dotprod_num)
-		CALL PRINT_CALC_TIME('Average fftw forward:					', int_eq%counter%mult_fftw/int_eq%counter%mult_num)
-		CALL PRINT_CALC_TIME('Average fftw backward:					', int_eq%counter%mult_fftw_b/int_eq%counter%mult_num)
-		CALL PRINT_CALC_TIME('Average zgemv:						', int_eq%counter%mult_zgemv/int_eq%counter%mult_num)
-		CALL PRINT_CALC_TIME('Average mult:						', int_eq%counter%apply/int_eq%counter%mult_num)
-		CALL PRINT_CALC_TIME('Total mult/dp:						', int_eq%counter%apply/int_eq%counter%dotprod)
+		CALL PRINT_CALC_TIME('Time for multiplications:					', ie_op%counter%apply)
+		CALL PRINT_CALC_TIME('Time for dot products:					', ie_op%counter%dotprod)
+		CALL PRINT_CALC_TIME('Average dot product:					', ie_op%counter%dotprod/ie_op%counter%dotprod_num)
+		CALL PRINT_CALC_TIME('Average fftw forward:					', ie_op%counter%mult_fftw/ie_op%counter%mult_num)
+		CALL PRINT_CALC_TIME('Average fftw backward:					', ie_op%counter%mult_fftw_b/ie_op%counter%mult_num)
+		CALL PRINT_CALC_TIME('Average zgemv:						', ie_op%counter%mult_zgemv/ie_op%counter%mult_num)
+		CALL PRINT_CALC_TIME('Average mult:						', ie_op%counter%apply/ie_op%counter%mult_num)
+		CALL PRINT_CALC_TIME('Total mult/dp:						', ie_op%counter%apply/ie_op%counter%dotprod)
 		CALL PRINT_CALC_TIME('Average mult/dp:						',&
-                                & int_eq%counter%apply/int_eq%counter%dotprod*int_eq%counter%dotprod_num/int_eq%counter%mult_num)
-		CALL PRINT_CALC_NUMBER('Number of matrix-vector multiplications:                  ', int_eq%counter%mult_num)
-		CALL PRINT_CALC_NUMBER('Number of dotproducts:					  ', int_eq%counter%dotprod_num)
+                                & ie_op%counter%apply/ie_op%counter%dotprod*ie_op%counter%dotprod_num/ie_op%counter%mult_num)
+		CALL PRINT_CALC_NUMBER('Number of matrix-vector multiplications:                  ', ie_op%counter%mult_num)
+		CALL PRINT_CALC_NUMBER('Number of dotproducts:					  ', ie_op%counter%dotprod_num)
                 CALL PRINT_BORDER
 	END SUBROUTINE
-	SUBROUTINE SetAnomalySigma(int_eq,siga,freq)
-		TYPE(IntegralEquationOperator),INTENT(INOUT)::int_eq
+	SUBROUTINE SetAnomalySigma(ie_op,siga,freq)
+		TYPE(IntegralEquationOperator),INTENT(INOUT)::ie_op
 		REAL(REALPARM),INTENT(IN),POINTER::siga(:,:,:)
 		REAL(REALPARM),INTENT(IN)::freq
 		REAL(REALPARM)::w
-		IF (int_eq%real_space) THEN
-			IF (ASSOCIATED(int_eq%csiga)) DEALLOCATE(int_eq%csiga)
-			ALLOCATE(int_eq%csiga(int_eq%Nz,int_eq%Nx,int_eq%Ny_loc))
+		INTEGER::Ix,Iy,Iz
+		IF (ie_op%real_space) THEN
+			IF (ASSOCIATED(ie_op%csiga)) DEALLOCATE(ie_op%csiga)
+			ALLOCATE(ie_op%csiga(ie_op%Nx,ie_op%Ny_loc,ie_op%Nz))
 			w=freq*PI*2
+			DO Iz=1,ie_op%Nz
+			    DO Iy=1,ie_op%Ny_loc
+				DO Ix=1,ie_op%Nx
 #ifndef NO_DISPLACEMENT_CURRENTS
-			int_eq%csiga=siga-C_IONE*w*EPS0	
+					ie_op%csiga(Ix,Iy,Iz)=siga(Iz,Ix,Iy)-C_IONE*w*EPS0	
 #else
-			int_eq%csiga=siga	
+					ie_op%csiga(Ix,Iy,Iz)=siga(Iz,Ix,Iy)	
 #endif
+				   ENDDO
+			ENDDO
+		    ENDDO
 		ENDIF
 
 	ENDSUBROUTINE
 !-------------------------------------PRIVATE---------------------------------------------------------------------!
-	SUBROUTINE GIEM2G_FGMRES(int_eq,fgmres_ctl,Esol, guess)
-		TYPE(IntegralEquationOperator),INTENT(INOUT)::int_eq
+	SUBROUTINE GIEM2G_FGMRES(ie_op,fgmres_ctl,Esol, guess)
+		TYPE(IntegralEquationOperator),INTENT(INOUT)::ie_op
 		TYPE (FGMRES_CTL_TYPE),INTENT(IN)::fgmres_ctl
-		COMPLEX(REALPARM),POINTER,INTENT(INOUT)::Esol(:,:,:,:),guess(:,:,:,:)
+		COMPLEX(REALPARM),POINTER,INTENT(IN)::Esol(:,:,:,:),guess(:,:,:,:)
 		INTEGER :: buf_length,maxit,maxit_precond
 		REAL(REALPARM)::misfit
 		COMPLEX(REALPARM),POINTER :: work_fgmres(:)
@@ -122,7 +129,11 @@ MODULE IE_SOLVER_MODULE
 		INTEGER :: irc(7), icntl(7), info(3)
 		INTEGER:: irc2(5), icntl2(8), info2(3)
 		LOGICAL :: NextMult
-		INTEGER(MPI_CTL_KIND):: IERROR,comm_inner,comm_outer
+		INTEGER(MPI_CTL_KIND)::	IERROR,comm_inner,comm_outer,fgmres_comm,fgmres_me
+               INTEGER(MPI_CTL_KIND),PARAMETER::MPI_TWO=2
+	         INTEGER(MPI_CTL_KIND),PARAMETER::MPI_ONE=1
+
+
 		INTEGER::   MATVEC, PRECONDLEFT,PRECONDRIGHT,DOTPROD
 		parameter (matvec=1, precondLeft=2, precondRight=3, dotProd=4)
 		INTEGER::Nloc
@@ -138,27 +149,35 @@ MODULE IE_SOLVER_MODULE
 		CHARACTER(LEN=2048,KIND=C_CHAR)::message 
 
 		full_time=GetTime()
-		int_eq%counter%mult_num=0
-		int_eq%counter%dotprod_num=0
-		int_eq%counter%apply=0d0
-		int_eq%counter%mult_fftw=0d0
-		int_eq%counter%mult_fftw_b=0d0
-		int_eq%counter%mult_zgemv=0d0
-		int_eq%counter%dotprod=0d0
+		ie_op%counter%mult_num=0
+		ie_op%counter%dotprod_num=0
+		ie_op%counter%apply=0d0
+		ie_op%counter%mult_fftw=0d0
+		ie_op%counter%mult_fftw_b=0d0
+		ie_op%counter%mult_zgemv=0d0
+		ie_op%counter%dotprod=0d0
 		NextMult=.FALSE.
 		Nfgmres=0
-		IF (.NOT. int_eq%real_space) THEN
+
+		   IF (ie_op%real_space) THEN
+			 CALL  MPI_COMM_SPLIT(ie_op%ie_comm, MPI_ONE, ie_op%me,    fgmres_comm, IERROR)
+			 CALL   MPI_COMM_RANK(fgmres_comm, fgmres_me, IERROR)
+		   ELSE
+		      CALL   MPI_COMM_SPLIT(ie_op%ie_comm, MPI_TWO, ie_op%me,   fgmres_comm, IERROR)
+		   ENDIF
+
+		IF (.NOT. ie_op%real_space) THEN
 			DO
-				CALL MPI_BCAST(NextMult,1,MPI_LOGICAL, int_eq%master_proc,int_eq%ie_comm, IERROR)
+				CALL MPI_BCAST(NextMult,1,MPI_LOGICAL, ie_op%master_proc,ie_op%ie_comm, IERROR)
 				IF (NextMult) THEN
-					CALL APPLY_IE_OP(int_eq)
+					CALL APPLY_IE_OP(ie_op)
 				ELSE
 					RETURN
 				ENDIF
 			END DO
 		ENDIF
-		CALL MPI_COMM_DUP(int_eq%fgmres_comm, comm_inner, IERROR)
-		CALL MPI_COMM_DUP(int_eq%fgmres_comm, comm_outer, IERROR)
+		CALL MPI_COMM_DUP(fgmres_comm, comm_inner, IERROR)
+		CALL MPI_COMM_DUP(fgmres_comm, comm_outer, IERROR)
 		
 		
 		CALL init_zfgmres(icntl,cntl)
@@ -168,7 +187,7 @@ MODULE IE_SOLVER_MODULE
 		maxit=fgmres_ctl%fgmres_maxit
 		maxit_precond=fgmres_ctl%gmres_buf
 
-		Nloc=3*int_eq%Nz*int_eq%Nx*int_eq%Ny_loc
+		Nloc=3*ie_op%Nz*ie_op%Nx*ie_op%Ny_loc
 		m=buf_length
 		l_fgmres = m*m + m*(2*Nloc+6) + 6*Nloc + 1
 		l_gmres=maxit_precond*maxit_precond+maxit_precond*(Nloc+6)+6*Nloc+1
@@ -184,7 +203,7 @@ MODULE IE_SOLVER_MODULE
 
 		icntl2(2) = 0
 		icntl(6) = maxit 
-		IF (int_eq%fgmres_me==0) THEN
+		IF (fgmres_me==0) THEN
 			icntl(3) = 220
 			icntl2(3) = 320
 			icntl(2)=1
@@ -203,7 +222,7 @@ MODULE IE_SOLVER_MODULE
 		icntl2(7) = maxit_precond
 		CALL ZCOPY (Nloc, guess, ONE, work_fgmres, ONE)
 		CALL ZCOPY (Nloc, Esol, ONE, work_fgmres(Nloc+1:), ONE)
-		N_unknowns=3*int_eq%Nz*int_eq%Nx*int_eq%Ny
+		N_unknowns=3*ie_op%Nz*ie_op%Nx*ie_op%Ny
 		CALL PRINT_CALC_NUMBER('Number of unknowns:', N_unknowns)
 
 		DO
@@ -222,15 +241,15 @@ MODULE IE_SOLVER_MODULE
 			ENDIF
 			SELECT CASE(REVCOM)
 			CASE (MATVEC)
-				IF (.NOT. int_eq%master) THEN
+				IF (.NOT. ie_op%master) THEN
 					CALL MPI_BCAST(NextMult,1,MPI_LOGICAL, &
-					&int_eq%master_proc, int_eq%ie_comm, IERROR)
+					&ie_op%master_proc, ie_op%ie_comm, IERROR)
 				ELSE
 					NextMult=.TRUE.
 					CALL MPI_BCAST(NextMult,1,MPI_LOGICAL, &
-					&int_eq%master_proc, int_eq%ie_comm, IERROR)
+					&ie_op%master_proc, ie_op%ie_comm, IERROR)
 				ENDIF
-				CALL APPLY_IE_OP(int_eq,v_in,v_out)
+				CALL APPLY_IE_OP(ie_op,v_in,v_out)
 			CASE(PRECONDRIGHT)
 				work_gmres(1:Nloc)=v_in
 				work_gmres(Nloc+1:2*Nloc)=v_in
@@ -254,15 +273,15 @@ MODULE IE_SOLVER_MODULE
 						CASE(MATVEC)
 							v_in2=>work_gmres(colx2:colx2+Nloc-1)
 							v_out2=>work_gmres(colz2:colz2+Nloc-1)
-							IF (.NOT. int_eq%master) THEN
+							IF (.NOT. ie_op%master) THEN
 								CALL MPI_BCAST(NextMult,1,MPI_LOGICAL, &
-								&int_eq%master_proc, int_eq%ie_comm, IERROR)
+								&ie_op%master_proc, ie_op%ie_comm, IERROR)
 							ELSE
 								NextMult=.TRUE.
 								CALL MPI_BCAST(NextMult,1,MPI_LOGICAL, &
-								&int_eq%master_proc, int_eq%ie_comm, IERROR)
+								&ie_op%master_proc, ie_op%ie_comm, IERROR)
 							ENDIF
-							CALL APPLY_IE_OP(int_eq,v_in2,v_out2)
+							CALL APPLY_IE_OP(ie_op,v_in2,v_out2)
 						CASE (DOTPROD)
 							time1=GetTime()
 							CALL zgemv('C',Nloc,nbscal2,C_ONE,&
@@ -272,8 +291,8 @@ MODULE IE_SOLVER_MODULE
 								&MPI_DOUBLE_COMPLEX,&
 							&MPI_SUM,comm_inner,IERROR)
 							time2=GetTime()
-							int_eq%counter%dotprod_num=int_eq%counter%dotprod_num+nbscal2
-							int_eq%counter%dotprod=int_eq%counter%dotprod+time2-time1
+							ie_op%counter%dotprod_num=ie_op%counter%dotprod_num+nbscal2
+							ie_op%counter%dotprod=ie_op%counter%dotprod+time2-time1
 						CASE DEFAULT
 							EXIT
 					ENDSELECT
@@ -286,26 +305,27 @@ MODULE IE_SOLVER_MODULE
 				CALL MPI_ALLREDUCE(aux,work_fgmres(colz:),nbscal,&
 					&MPI_DOUBLE_COMPLEX,MPI_SUM,comm_outer,IERROR)
 				time2=GetTime()
-				int_eq%counter%dotprod_num=int_eq%counter%dotprod_num+nbscal
-				int_eq%counter%dotprod=int_eq%counter%dotprod+time2-time1
+				ie_op%counter%dotprod_num=ie_op%counter%dotprod_num+nbscal
+				ie_op%counter%dotprod=ie_op%counter%dotprod+time2-time1
 			CASE DEFAULT
 				EXIT
 			END SELECT
 		ENDDO
-		IF (.NOT. int_eq%master) THEN
+		IF (.NOT. ie_op%master) THEN
 			CALL MPI_BCAST(NextMult,1,MPI_LOGICAL, &
-				&int_eq%master_proc, int_eq%ie_comm, IERROR)
+				&ie_op%master_proc, ie_op%ie_comm, IERROR)
 		ELSE
 			NextMult=.FALSE.
 			CALL MPI_BCAST(NextMult,1,MPI_LOGICAL, &
-				&int_eq%master_proc, int_eq%ie_comm, IERROR)
+				&ie_op%master_proc, ie_op%ie_comm, IERROR)
 		ENDIF
 		CALL ZCOPY (Nloc, work_fgmres, ONE, Esol, ONE)
 		DEALLOCATE(aux,work_fgmres,work_gmres)
 		CALL MPI_COMM_FREE(comm_inner,IERROR)
 		CALL MPI_COMM_FREE(comm_outer,IERROR)
+		CALL MPI_COMM_FREE(fgmres_comm,IERROR)
 		full_time=GetTime()-full_time
-		int_eq%counter%solving=full_time
+		ie_op%counter%solving=full_time
 		IF (info(1)==0) THEN
 			WRITE(message,info_fmt) 'FGMRES converged in', Nfgmres, &
 				&' iterations with b.e:',rinfo	

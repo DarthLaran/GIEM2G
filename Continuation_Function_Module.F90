@@ -71,7 +71,7 @@ CONTAINS
 		INTEGER::Nx,Ny,Nz
 		INTEGER::Nx2,Ny2,Nc,Nr3,Nopt
 		INTEGER(MPI_CTL_KIND)::comm_size,IERROR,me
-       		INTEGER(C_LONG_LONG)::tensor_size,buff_len,fft_len
+       		INTEGER(C_INTPTR_T)::tensor_size,buff_len,fft_len
 		TYPE(C_PTR)::p1,p2
 		INTEGER::NT
 		Nx=anomaly%Nx
@@ -205,8 +205,8 @@ CONTAINS
 				DO Ix=1,Nx
 					DO Ic=1,3
 						DO Iz=1,Nz
-							dsig=(rc_op%csiga(Iz,Ix,Iy)-rc_op%csigb(Iz))
-							rc_op%field_in4(Iz,Ic,Ix,Iy)=dsig*Eint(Iz,Ic,Ix,Iy)
+							dsig=(rc_op%csiga(Ix,Iy,Iz)-rc_op%csigb(Iz))
+							rc_op%field_in4(Iz,Ic,Ix,Iy)=dsig*Eint(Ix,Iy,Iz,Ic)
 						ENDDO
 					ENDDO
 				ENDDO

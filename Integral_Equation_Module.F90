@@ -80,9 +80,6 @@ MODULE INTEGRAL_EQUATION_MODULE
 		COMPLEX(REALPARM),POINTER::csiga(:,:,:)
 !---------------------------------------------------------------------------------------------------!
 
-		INTEGER(MPI_CTL_KIND)::fgmres_comm
-		INTEGER(MPI_CTL_KIND)::fgmres_me
-
 		LOGICAL::real_space
 		TYPE(TypeCounter)::counter
 	ENDTYPE
@@ -273,14 +270,6 @@ CONTAINS
 
 	ENDSUBROUTINE
 
-	SUBROUTINE IE_OP_FFTW_FWD(ie_op)
-		TYPE(IntegralEquationOperator),INTENT(INOUT)::ie_op
-		CALL	CalcDistributedFourier(ie_op%DFD,FFT_FWD)
-	ENDSUBROUTINE
-	SUBROUTINE IE_OP_FFTW_BWD(ie_op)
-		TYPE(IntegralEquationOperator),INTENT(INOUT)::ie_op
-		CALL	CalcDistributedFourier(ie_op%DFD,FFT_BWD)
-	ENDSUBROUTINE
 
 	SUBROUTINE IE_OP_FFTW_FWD_PREPARED(ie_op)
 		TYPE(IntegralEquationOperator),INTENT(INOUT)::ie_op

@@ -23,7 +23,7 @@ INTEGER(MPI_CTL_KIND):: STATUS(MPI_STATUS_SIZE)
 INTEGER::Iz,Ifreq
 REAL(REALPARM),POINTER::freqs(:)
 TYPE (RECEIVER_TYPE),POINTER::recvs(:)
-TYPE(IntegralEquationOperator)::int_eq
+TYPE(IntegralEquationOperator)::ie_op
 TYPE(RC_OPERATOR)::rc_op
 COMPLEX(REALPARM),POINTER::FX(:,:,:,:),FY(:,:,:,:)
 COMPLEX(REALPARM),POINTER::Ea(:,:,:,:),Ha(:,:,:,:)
@@ -32,6 +32,8 @@ COMPLEX(REALPARM),POINTER::E_bkg(:,:,:,:)
 COMPLEX(REALPARM),POINTER::E_sol(:,:,:,:)
 COMPLEX(REALPARM),POINTER::Eprevy(:,:,:,:)
 COMPLEX(REALPARM),POINTER::Eprevx(:,:,:,:)
+INTEGER(MPI_CTL_KIND),PARAMETER::MPI_TWO=2
+INTEGER(MPI_CTL_KIND),PARAMETER::MPI_ONE=1
 INTEGER::N,Nfreq,Nr
 INTEGER::NT
 LOGICAL::threads_ok
@@ -144,7 +146,7 @@ DO Ir=1,Nr
 	recv_depths(Ir)=recvs(Ir)%zrecv
 ENDDO
 CALL PRINT_BORDER
-WRITE (message,'(A I5 A I5 A I5)') 'Nx=',anomaly%Nx, ' Ny=',anomaly%Ny,' Nz=',anomaly%Nz
+WRITE (message,'(A, I5, A, I5, A, I5)') 'Nx=',anomaly%Nx, ' Ny=',anomaly%Ny,' Nz=',anomaly%Nz
 CALL LOGGER(message)
 
 #ifdef performance_test
@@ -165,23 +167,27 @@ p1=ALLOCATE_BUFF(kernel_len)
 p2=ALLOCATE_BUFF(fft_len)
 p3=ALLOCATE_BUFF(fft_len)
 
-CALL PrepareIntegralEquation(int_eq,anomaly,wcomm,p1,p2,p3,kernel_len,fft_len,threads_ok)
-real_comm=int_eq%fgmres_comm
+CALL PrepareIntegralEquation(ie_op,anomaly,wcomm,p1,p2,p3,kernel_len,fft_len,threads_ok)
 
+IF (ie_op%real_space) THEN
+     CALL  MPI_COMM_SPLIT(ie_op%ie_comm, MPI_ONE, ie_op%me,    real_comm, IERROR)
+ELSE
+  CALL   MPI_COMM_SPLIT(ie_op%ie_comm, MPI_TWO, ie_op%me,   real_comm, IERROR)
+ENDIF
 #ifndef performance_test
 CALL PrepareContinuationOperator(rc_op,anomaly,recvs,wcomm,threads_ok);
 #endif
 
-IF (int_eq%real_space) THEN
+IF (ie_op%real_space) THEN
 	CALL AllocateSiga(anomaly)
 	ALLOCATE(FX(Nr,1,1,6),FY(Nr,1,1,6))
-	ALLOCATE(E_bkg(int_eq%Nz,3,int_eq%Nx,int_eq%Ny_loc))
-	ALLOCATE(E_sol(int_eq%Nz,3,int_eq%Nx,int_eq%Ny_loc))
-	ALLOCATE(Eprevx(int_eq%Nz,3,int_eq%Nx,int_eq%Ny_loc))
-	ALLOCATE(Eprevy(int_eq%Nz,3,int_eq%Nx,int_eq%Ny_loc))
+	ALLOCATE(E_bkg(ie_op%Nx,ie_op%Ny_loc,ie_op%Nz,3))
+	ALLOCATE(E_sol(ie_op%Nx,ie_op%Ny_loc,ie_op%Nz,3))
+	ALLOCATE(Eprevx(ie_op%Nx,ie_op%Ny_loc,ie_op%Nz,3))
+	ALLOCATE(Eprevy(ie_op%Nx,ie_op%Ny_loc,ie_op%Nz,3))
 
-	ALLOCATE(Ea(Nr,EX:EZ,int_eq%Nx,int_eq%Ny_loc),Ha(Nr,HX:HZ,int_eq%Nx,int_eq%Ny_loc))
-	ALLOCATE(Et(Nr,EX:EZ,int_eq%Nx,int_eq%Ny_loc),Ht(Nr,HX:HZ,int_eq%Nx,int_eq%Ny_loc))
+	ALLOCATE(Ea(Nr,EX:EZ,ie_op%Nx,ie_op%Ny_loc),Ha(Nr,HX:HZ,ie_op%Nx,ie_op%Ny_loc))
+	ALLOCATE(Et(Nr,EX:EZ,ie_op%Nx,ie_op%Ny_loc),Ht(Nr,HX:HZ,ie_op%Nx,ie_op%Ny_loc))
 ELSE
 	FX=>NULL()
 	FY=>NULL();
@@ -206,8 +212,8 @@ DO Ifreq=1,Nfreq
 
 	CALL Set_Freq(bkg,freqs(Ifreq))
 
-	CALL CalcIntegralGreenTensor(int_eq,bkg,anomaly)
-	CALL CalcFFTofIETensor(int_eq)
+	CALL CalcIntegralGreenTensor(ie_op,bkg,anomaly)
+	CALL CalcFFTofIETensor(ie_op)
 
 
 #ifndef performance_test
@@ -218,7 +224,7 @@ DO Ifreq=1,Nfreq
 		WRITE (fnum2,'(I5.5)') Ia
 		WRITE (message,'(A, I4, 2A )') 'Anomaly ', Ia, ' from ', trim(anom_list(Ia))
 		CALL LOGGER(message)
-		IF (int_eq%real_space) THEN
+		IF (ie_op%real_space) THEN
 			CALL PlaneWaveIntegral(EY,bkg,anomaly,E_bkg)
 			CALL PlaneWave(EY,bkg,recv_depths,FY)
 			IF ((Na/=1).OR.(Ifreq==1))THEN
@@ -226,19 +232,19 @@ DO Ifreq=1,Nfreq
 			ENDIF
 		ENDIF
 
-		CALL SetAnomalySigma(int_eq,anomaly%siga,freqs(Ifreq))
-		rc_op%csigb=>int_eq%csigb
-		rc_op%csiga=>int_eq%csiga
+		CALL SetAnomalySigma(ie_op,anomaly%siga,freqs(Ifreq))
+		rc_op%csigb=>ie_op%csigb
+		rc_op%csiga=>ie_op%csiga
 		IF (Ifreq==1) THEN
-			CALL SolveEquation(int_eq,fgmres_ctl,E_bkg,E_sol)
+			CALL SolveEquation(ie_op,fgmres_ctl,E_bkg,E_sol)
 		ELSE
-			CALL SolveEquation(int_eq,fgmres_ctl,E_bkg,E_sol,Eprevy)
+			CALL SolveEquation(ie_op,fgmres_ctl,E_bkg,E_sol,Eprevy)
 		ENDIF
 		Eprevy=E_sol
 #ifndef performance_test
 		IF (SAVE_SOLUTION) THEN
 			time2=GetTime()
-			IF (int_eq%real_space) THEN
+			IF (ie_op%real_space) THEN
 				CALL SaveIESolutionOneFIleBinary(E_sol,real_comm,'SOL_PY_F'//trim(fnum1)//'T_'//trim(fnum2))
 			ENDIF
 			time2=GetTime()-time2;
@@ -248,7 +254,7 @@ DO Ifreq=1,Nfreq
 		ENDIF
 		CALL ReCalculation(rc_op,E_sol,Ea,Ha)
 		time2=GetTime()
-		IF (int_eq%real_space) THEN
+		IF (ie_op%real_space) THEN
 			DO Ir=1,Nr
 				Et(Ir,EX,:,:)=Ea(Ir,EX,:,:)+FY(Ir,1,1,EX)
 				Et(Ir,EY,:,:)=Ea(Ir,EY,:,:)+FY(Ir,1,1,EY)
@@ -263,21 +269,21 @@ DO Ifreq=1,Nfreq
 		time2=GetTime()-time2;
 		CALL PRINT_CALC_TIME("Save fields in",time2) 
 #endif
-		IF (int_eq%real_space) THEN
+		IF (ie_op%real_space) THEN
 			CALL PlaneWaveIntegral(EX,bkg,anomaly,E_bkg)
 			CALL PlaneWave(EX,bkg,recv_depths,FX)
 		ENDIF
 
 		IF (Ifreq==1) THEN
-			CALL SolveEquation(int_eq,fgmres_ctl,E_bkg,E_sol)
+			CALL SolveEquation(ie_op,fgmres_ctl,E_bkg,E_sol)
 		ELSE
-			CALL SolveEquation(int_eq,fgmres_ctl,E_bkg,E_sol,Eprevx)
+			CALL SolveEquation(ie_op,fgmres_ctl,E_bkg,E_sol,Eprevx)
 		ENDIF
 		Eprevx=E_sol
 #ifndef performance_test
 		IF (SAVE_SOLUTION) THEN
 			time2=GetTime()
-			IF (int_eq%real_space) THEN
+			IF (ie_op%real_space) THEN
 				CALL SaveIESolutionOneFIleBinary(E_sol,real_comm,'SOL_PX_F'//trim(fnum1)//'T_'//trim(fnum2))
 			ENDIF
 			time2=GetTime()-time2;
@@ -289,7 +295,7 @@ DO Ifreq=1,Nfreq
 		CALL ReCalculation(rc_op,E_sol,Ea,Ha)
 
 		time2=GetTime()
-		IF (int_eq%real_space) THEN
+		IF (ie_op%real_space) THEN
 			DO Ir=1,Nr
 				Et(Ir,EX,:,:)=Ea(Ir,EX,:,:)+FX(Ir,1,1,EX)
 				Et(Ir,EY,:,:)=Ea(Ir,EY,:,:)+FX(Ir,1,1,EY)
@@ -307,7 +313,7 @@ DO Ifreq=1,Nfreq
 	ENDDO
 ENDDO
 CALL CHECK_MEM(me,0,wcomm)
-CALL DeleteIE_OP(int_eq)
+CALL DeleteIE_OP(ie_op)
 CALL DeleteRC_OP(RC_OP)
 CALL MPI_FINALIZE(IERROR)
 END PROGRAM

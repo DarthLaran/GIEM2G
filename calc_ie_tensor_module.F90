@@ -77,14 +77,6 @@ CONTAINS
 		G_asym=>ie_op%G_asym
 		G_asym=C_ZERO
 
-		IF (ie_op%matrix_kind==GENERAL_MATRIX) THEN
-			CalcTensorAlongX=>CalcGeneralTensorAlongX
-			LFFT=>NULL()
-		ELSEIF (ie_op%matrix_kind==UNIFORM_MATRIX) THEN
-			CalcTensorAlongX=>CalcUniformTensorAlongX
-			LFFT=>ie_op%LFFT
-		ELSE
-		ENDIF	
 
 		dx=anomaly%dx
 		dy=anomaly%dy
@@ -164,6 +156,7 @@ CONTAINS
 			REAL(REALPARM),POINTER,INTENT(IN)::dz(:)
 			COMPLEX(REALPARM),POINTER::G_symm1(:,:,:,:)
 			COMPLEX(REALPARM),POINTER::G_asym1(:,:,:,:,:)
+			REAL(DOUBLEPARM)::time1,time2,time3,time4
 			INTEGER::Ix,Iy,ly,Ny
 			G_symm1(1:,S_EXX:,Ny_offset:,0:)=>G_symm
 			G_asym1(1:,1:,A_EXZ:,Ny_offset:,0:)=>G_asym
@@ -199,46 +192,6 @@ CONTAINS
 #endif
 	ENDSUBROUTINE
 
-	SUBROUTINE   CalcGeneralTensorAlongX(xfirst,xlast,ly,G_symm,G_asym,time,anomaly,bkg,dz)
-			INTEGER,INTENT(IN)::xfirst,xlast,ly
-			COMPLEX(REALPARM),POINTER,INTENT(IN)::G_symm(:,:,:)
-			COMPLEX(REALPARM),POINTER,INTENT(IN)::G_asym(:,:,:,:)
-			REAL(DOUBLEPARM),INTENT(INOUT)::time(4)
-			TYPE (BKG_DATA_TYPE),INTENT(IN)::bkg
-			TYPE (ANOMALY_TYPE),INTENT(IN)::anomaly
-			REAL(REALPARM),POINTER,INTENT(IN)::dz(:)
-			COMPLEX(REALPARM),POINTER::G_symm1(:,:,:)
-			COMPLEX(REALPARM),POINTER::G_asym1(:,:,:,:)
-			INTEGER::Ix
-			G_symm1(1:,S_EXX:,0:)=>G_symm
-			G_asym1(1:,1:,A_EXZ:,0:)=>G_asym
-			!$OMP PARALLEL PRIVATE(Ix),DEFAULT(SHARED)&
-			!$OMP &FIRSTPRIVATE(time)
-#ifdef internal_timer
-			!$OMP DO SCHEDULE(GUIDED)&
-			!$OMP& REDUCTION (MAX:time1,time2,time3,time4)
-#else
-			!$OMP DO SCHEDULE(GUIDED)
-#endif
-				DO Ix=xfirst,xlast
-					CALL CalcIntegralGreenTensor3dElementGeneral(Ix,ly,G_symm1(:,:,Ix),&
-					&G_asym1(:,:,:,Ix),time,anomaly,bkg,dz)
-				ENDDO
-				!$OMP ENDDO
-#ifdef internal_timer
-				time1=time(1)
-				time2=time(2)
-				time3=time(3)
-				time4=time(4)
-			!$OMP END PARALLEL
-			time(1)=time1
-			time(2)=time2
-			time(3)=time3
-			time(4)=time4
-#else
-			!$OMP END PARALLEL
-#endif
-	ENDSUBROUTINE
 
 	SUBROUTINE CalcIntegralGreenTensor3dElementGeneral(lx,ly,G_symm,G_asym,calc_time,anomaly,bkg,dz)
 		INTEGER, INTENT(IN)::lx,ly
@@ -294,54 +247,6 @@ CONTAINS
 #endif
 	END SUBROUTINE
 
-	SUBROUTINE   CalcUniformTensorAlongX(xfirst,xlast,ly,G_symm,G_asym,time,anomaly,bkg,dz)
-			INTEGER,INTENT(IN)::xfirst,xlast,ly
-			COMPLEX(REALPARM),POINTER,INTENT(IN)::G_symm(:,:,:)
-			COMPLEX(REALPARM),POINTER,INTENT(IN)::G_asym(:,:,:,:)
-			REAL(DOUBLEPARM),INTENT(INOUT)::time(4)
-			TYPE (BKG_DATA_TYPE),INTENT(IN)::bkg
-			TYPE (ANOMALY_TYPE),INTENT(IN)::anomaly
-			REAL(REALPARM),POINTER,INTENT(IN)::dz(:)
-			COMPLEX(REALPARM),POINTER::G_symm1(:,:,:)
-			COMPLEX(REALPARM),POINTER::G_symm2(:,:,:,:)
-			COMPLEX(REALPARM),POINTER::G_asym1(:,:,:,:)
-			TYPE(C_PTR)::ptr_c
-			COMPLEX(REALPARM),POINTER::ptr(:)
-			INTEGER::Ix,N,TN
-                        G_symm1(1:,S_EXX:,0:)=>G_symm
-			G_asym1(1:,1:,A_EXZ:,0:)=>G_asym
-			N=anomaly%Nz*4*2*anomaly%Nx
-			ptr_c=C_LOC(G_symm1(1,S_EXX,0))
-			CALL C_F_POINTER(ptr_c,ptr,(/N/))
-			G_symm2(1:2*anomaly%Nz,1:2,S_EXX:S_EZZ,0:2*anomaly%Nx-1)=>ptr
-			!$OMP PARALLEL PRIVATE(Ix,TN),DEFAULT(SHARED)&
-			!$OMP &FIRSTPRIVATE(time)
-			TN=OMP_GET_THREAD_NUM()
-#ifdef internal_timer
-			!$OMP DO SCHEDULE(GUIDED)&
-			!$OMP& REDUCTION (MAX:time1,time2,time3,time4)
-#else
-			!$OMP DO SCHEDULE(GUIDED)
-#endif
-				DO Ix=xfirst,xlast
-					CALL CalcIntegralGreenTensor3dElementUniform(Ix,ly,G_symm2(:,:,:,Ix),&
-					&G_asym1(:,:,:,Ix),time,anomaly,bkg,dz,TN)
-				ENDDO
-				!$OMP ENDDO
-#ifdef internal_timer
-				time1=time(1)
-				time2=time(2)
-				time3=time(3)
-				time4=time(4)
-			!$OMP END PARALLEL
-			time(1)=time1
-			time(2)=time2
-			time(3)=time3
-			time(4)=time4
-#else
-			!$OMP END PARALLEL
-#endif
-	ENDSUBROUTINE
 	SUBROUTINE CalcIntegralGreenTensor3dElementUniform(lx,ly,G_symm,G_asym,calc_time,anomaly,bkg,dz,TN)
 		INTEGER, INTENT(IN)::lx,ly
 		TYPE (BKG_DATA_TYPE),INTENT(IN)::bkg
