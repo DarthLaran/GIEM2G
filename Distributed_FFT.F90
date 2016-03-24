@@ -82,7 +82,7 @@ MODULE DISTRIBUTED_FFT_MODULE
 		ENDSUBROUTINE
 	ENDINTERFACE
 
-	PUBLIC:: DistributedFourierData! CalcDistributedFourier
+	PUBLIC:: DistributedFourierData, CalcDistributedFourier
 	PUBLIC:: PrepareDistributedFourierData,DeleteDistributedFourierData
         PUBLIC:: CalcPreparedForwardFFT
         PUBLIC:: CalcPreparedBackwardFFT
@@ -225,7 +225,79 @@ MODULE DISTRIBUTED_FFT_MODULE
 		CALL InitialTransposeRepack(DFD)
 		CALL ProcessDistributedFourierKernelSync(DFD,FFT_BWD)
 	END SUBROUTINE
+
+!----------------------------------------------------------------------------------------------------------------------------------!
+	SUBROUTINE CalcDistributedFourier(DFD,FFT_DIR)
+		TYPE (DistributedFourierData),INTENT(INOUT)::DFD
+		INTEGER,INTENT(IN)::FFT_DIR
+		CALL InitialTranspose(DFD)
+		CALL ProcessDistributedFourierKernelSync(DFD,FFT_DIR)
+		CALL FinalTranspose(DFD)
+		IF (FFT_DIR/=FFT_BWD) THEN
+			DFD%field_load_out=DFD%field_load_in
+		ELSE
+			DFD%field_load_out=DFD%field_load_in/DFD%Nx/DFD%Ny
+		ENDIF
+	END SUBROUTINE
  
+	SUBROUTINE InitialTranspose(DFD)
+		TYPE (DistributedFourierData),INTENT(INOUT)::DFD
+		INTEGER::Ixy,Ic
+		INTEGER::Nx,Ny,Nc,M,Nt
+		COMPLEX(REALPARM),POINTER::p_in(:,:),p_out(:,:)
+		REAL(DOUBLEPARM)::time1,time2
+#ifndef performance_test
+		time1=GetTime()
+#endif
+		Nx=DFD%Nx
+		Ny=DFD%Ny_loc
+		Nc=DFD%Nc
+		M=Nx*Ny
+		p_in(1:Nc,1:M)=>DFD%field_out
+		p_out(1:M,1:Nc)=>DFD%field_in
+		!$OMP PARALLEL DEFAULT(SHARED), PRIVATE(Ic,Ixy) 
+		!$OMP DO SCHEDULE(GUIDED) 
+		DO Ic=1,Nc
+			DO Ixy=1,M
+					p_out(Ixy,Ic)=p_in(Ic,Ixy)
+			ENDDO
+		ENDDO
+		!$OMP ENDDO
+		!$OMP END PARALLEL
+#ifndef performance_test
+		time2=GetTime()
+		DFD%timer(FFT_FWD)%local_transpose(1)=time2-time1+DFD%timer(FFT_FWD)%local_transpose(1)
+#endif
+	ENDSUBROUTINE
+	SUBROUTINE FinalTranspose(DFD)
+		TYPE (DistributedFourierData),INTENT(INOUT)::DFD
+		INTEGER::Ixy,Ic
+		INTEGER::Nx,Ny,Nc,M
+		COMPLEX(REALPARM),POINTER::p_in(:,:),p_out(:,:)
+		REAL(DOUBLEPARM)::time1,time2
+#ifndef performance_test
+		time1=GetTime()
+#endif
+		Nx=DFD%Nx
+		Ny=DFD%Ny_loc
+		Nc=DFD%Nc
+		M=Nx*Ny
+		p_in(1:M,1:Nc)=>DFD%field_in
+		p_out(1:Nc,1:M)=>DFD%field_out
+		!$OMP PARALLEL DEFAULT(SHARED), PRIVATE(Ic,Ixy) 
+		!$OMP DO SCHEDULE(GUIDED) 
+		DO Ixy=1,M
+			DO Ic=1,Nc
+					p_out(Ic,Ixy)=p_in(Ixy,Ic)
+			ENDDO
+		ENDDO
+		!$OMP ENDDO
+		!$OMP END PARALLEL
+#ifndef performance_test
+		time2=GetTime()
+		DFD%timer(FFT_FWD)%local_transpose(2)=time2-time1+DFD%timer(FFT_FWD)%local_transpose(2)
+#endif
+	ENDSUBROUTINE
 !----------------------------------------------------------------------------------------------------------------------------------!
 
 	SUBROUTINE ProcessDistributedFourierKernelSync(DFD,FFT_DIR)

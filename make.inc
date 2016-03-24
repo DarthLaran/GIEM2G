@@ -98,7 +98,7 @@ INCLUDE= -I/opt/ibmmath/include -I/opt/ibmcmp/xlmass/bg/4.4/include -I/gpfs/opt/
 ifdef RECALC_ONLY
 INSTALL_PATH=~/bin/fast/giem2g_master_rc
 else
-INSTALL_PATH=~/bin/fast/giem2g_master_mf
+INSTALL_PATH=~/bin/fast/giem2g_master
 endif
 
 endif
