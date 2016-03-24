@@ -162,6 +162,7 @@ CONTAINS
 			IF (ASSOCIATED(ie_op%csigb))	ie_op%csigb(1:ie_op%Nz)=ie_op%csigb(1:ie_op%Nz)
                         CALL CalcFFTofIETensor(ie_op)
                         CALL PrintTimings(ie_op%DFD)
+                        CALL DROP_COUNTER(ie_op%DFD)
         ENDSUBROUTINE
 
         SUBROUTINE GIEM2G_SET_ANOMALY_CONDUCTIVITY(ie_op_ptr,siga_ptr) &
@@ -214,6 +215,13 @@ CONTAINS
                         LOGGER=>EXTREME_LOGGER
         ENDSUBROUTINE
 
+        SUBROUTINE GIEM2G_PRINT_STATS(ie_op_ptr) BIND(C, NAME='giem2g_print_stats')
+                        TYPE(C_PTR),VALUE,INTENT(IN)::ie_op_ptr
+        		TYPE(IntegralEquationOperator),POINTER::ie_op
+                        CALL C_F_POINTER(ie_op_ptr,ie_op)
+                        CALL PRINT_STATS(ie_op)
+                        CALL DROP_COUNTER(ie_op%DFD)
+        ENDSUBROUTINE
         SUBROUTINE GIEM2G_DELETE_OPERATOR(ie_op_ptr) BIND(C, NAME='giem2g_delete_ie_operator')
                         TYPE(C_PTR),VALUE,INTENT(IN)::ie_op_ptr
                 	TYPE(IntegralEquationOperator),POINTER::ie_op

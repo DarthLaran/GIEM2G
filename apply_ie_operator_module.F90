@@ -125,18 +125,21 @@ MODULE APPLY_IE_OPERATOR_MODULE
 		COMPLEX(REALPARM),POINTER::p_recv(:,:,:,:,:)
 		COMPLEX(REALPARM),POINTER::p_in(:,:,:,:,:)
 		COMPLEX(REALPARM),POINTER::p_out(:,:,:,:,:)
-                INTEGER(MPI_CTL_KIND)::Nx2,xfirst,xlast,data_length
+                INTEGER(MPI_CTL_KIND)::NxHalf,xfirst,xlast,data_length
                 INTEGER(MPI_CTL_KIND)::proc,recv_start
 		INTEGER(MPI_CTL_KIND)::requests(2),IERROR
 		COMPLEX(REALPARM)::MirrorY
 		time1=GetTime()
 		CALL IE_OP_FFTW_FWD_PREPARED(ie_op)
-                Nx2=ie_op%Nx/2
+		time2=GetTime()
+		ie_op%counter%mult_fftw=ie_op%counter%mult_fftw+time2-time1
+
+                NxHalf=ie_op%Nx/2
                 data_length=3*ie_op%Nz*ie_op%Ny_loc*ie_op%Nx
 
                 IF (ie_op%real_space) THEN
-                        p_send=>ie_op%field_inT(:,:,:,:,Nx2:)
-                        p_recv=>ie_op%field_outT(:,:,:,:,Nx2:)
+                        p_send=>ie_op%field_inT(:,:,:,:,NxHalf:)
+                        p_recv=>ie_op%field_outT(:,:,:,:,NxHalf:)
                         MirrorY=C_ONE
                 ELSE
                         p_send=>ie_op%field_inT(:,:,:,:,0:)
@@ -144,23 +147,21 @@ MODULE APPLY_IE_OPERATOR_MODULE
                         MirrorY=-C_ONE
                 ENDIF
 
-                proc=MODULO((ie_op%me+ie_op%comm_size/2),ie_op%comm_size)
+                proc=ie_op%partner
 
                 CALL  MPI_IRECV(p_recv,data_length,MPI_DOUBLE_COMPLEX,proc,proc,&
                          &ie_op%ie_comm,requests(1),IERROR)
                 CALL  MPI_ISEND(p_send,data_length,MPI_DOUBLE_COMPLEX,proc,ie_op%me,&
                          &ie_op%ie_comm,requests(2),IERROR)
-		time2=GetTime()
-		ie_op%counter%mult_fftw=ie_op%counter%mult_fftw+time2-time1
                 p_in=>ie_op%field_inT
                 p_out=>ie_op%field_outT
 
 
                 IF (ie_op%real_space) THEN
-                        CALL VERTICAL_MULT_GENERAL(ie_op,1,Nx2-1,MirrorY,p_in,p_out)
+                        CALL VERTICAL_MULT_GENERAL(ie_op,1,NxHalf-1,MirrorY,p_in,p_out)
                         CALL VERTICAL_MULT_GENERAL_ZERO(ie_op,MirrorY,p_in,p_out)
                 ELSE
-                        CALL VERTICAL_MULT_GENERAL(ie_op,Nx2,ie_op%Nx-1,MirrorY,p_in,p_out)
+                        CALL VERTICAL_MULT_GENERAL(ie_op,NxHalf,ie_op%Nx-1,MirrorY,p_in,p_out)
                 ENDIF
 
                 CALL MPI_WAITALL(2, requests,  MPI_STATUSES_IGNORE, IERROR)
@@ -169,12 +170,12 @@ MODULE APPLY_IE_OPERATOR_MODULE
                 IF (ie_op%real_space) THEN
                        p_in(1:,1:,1:,1:,0:)=>p_recv 
                        p_out(1:,1:,1:,1:,0:)=>p_send 
-                        CALL VERTICAL_MULT_GENERAL(ie_op,1,Nx2-1,MirrorY,p_in,p_out)
+                        CALL VERTICAL_MULT_GENERAL(ie_op,1,NxHalf-1,MirrorY,p_in,p_out)
                         CALL VERTICAL_MULT_GENERAL_ZERO(ie_op,MirrorY,p_in,p_out)
                 ELSE
-                       p_in(1:,1:,1:,1:,Nx2:)=>p_recv 
-                       p_out(1:,1:,1:,1:,Nx2:)=>p_send 
-                        CALL VERTICAL_MULT_GENERAL(ie_op,Nx2,ie_op%Nx-1,MirrorY,p_in,p_out)
+                       p_in(1:,1:,1:,1:,NxHalf:)=>p_recv 
+                       p_out(1:,1:,1:,1:,NxHalf:)=>p_send 
+                        CALL VERTICAL_MULT_GENERAL(ie_op,NxHalf,ie_op%Nx-1,MirrorY,p_in,p_out)
                 ENDIF
                 CALL  MPI_IRECV(p_recv,data_length,MPI_DOUBLE_COMPLEX,proc,proc,&
                          &ie_op%ie_comm,requests(1),IERROR)

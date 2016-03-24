@@ -62,6 +62,7 @@ MODULE INTEGRAL_EQUATION_MODULE
 
 		INTEGER(MPI_CTL_KIND)::ie_comm
 		INTEGER(MPI_CTL_KIND)::me
+		INTEGER(MPI_CTL_KIND)::partner
 		INTEGER(MPI_CTL_KIND)::master_proc
 		INTEGER(MPI_CTL_KIND)::comm_size
 		LOGICAL::master
@@ -158,6 +159,7 @@ CONTAINS
 		CALL MPI_COMM_SIZE(comm,comm_size,IERROR) 
 		ie_op%me=me
                 ie_op%comm_size=comm_size
+                ie_op%partner=MODULO((ie_op%me+ie_op%comm_size/2),ie_op%comm_size)
 		if (me==0) THEN
 			ie_op%master=.TRUE.
 		ELSE
@@ -295,9 +297,7 @@ CONTAINS
 		TYPE(IntegralEquationOperator),INTENT(INOUT)::ie_op
                 CALL CalcPreparedBackwardFFT(ie_op%DFD)
 	ENDSUBROUTINE
-#define fft_new
 
-#ifdef fft_new
 	SUBROUTINE CalcFFTofIETensor(ie_op)
 		TYPE(IntegralEquationOperator),INTENT(INOUT)::ie_op
 		IF (ie_op%matrix_kind==GENERAL_MATRIX) THEN
@@ -372,8 +372,7 @@ CONTAINS
 		CALL PRINT_CALC_TIME('FFT of  IE tensor has been computed: ',time2-time1)
 		ie_op%counter%tensor_fft=time2-time1
 	ENDSUBROUTINE
-#else
-#endif
+
 	SUBROUTINE CALC_FFT_OF_TENSOR_COMPONENT(ie_op,G,N,comp,sx,sy,Gout)
 		TYPE(IntegralEquationOperator),TARGET,INTENT(INOUT)::ie_op
 		COMPLEX(REALPARM),INTENT(INOUT)::G(1:,1:,1:,1:)
@@ -385,11 +384,12 @@ CONTAINS
 		COMPLEX(REALPARM)::tmp(3*ie_op%Nz)
 		INTEGER::N,Nz,M,Nz3,Nx,l
 		INTEGER::Iz,Ix,Iy,s
-                INTEGER(MPI_CTL_KIND)::Nx2,xfirst,xlast,data_length
-                INTEGER(MPI_CTL_KIND)::proc,recv_start
+                INTEGER::NxHalf,xfirst,xlast
+                INTEGER(MPI_CTL_KIND)::proc,recv_start,data_length
+
 		INTEGER(MPI_CTL_KIND)::requests(2),IERROR
 		Nx=ie_op%Nx
-                Nx2=Nx/2
+                NxHalf=ie_op%NxHalf
 		Nz=ie_op%Nz
 		Nz3=3*Nz
 		M=1
@@ -397,23 +397,23 @@ CONTAINS
                 p_in(1:Nz3,1:ie_op%Ny_loc,1:2*Nx)=>ie_op%DFD%field_out
                 p_out(1:Nz3,1:ie_op%Ny_loc,1:2*Nx)=>ie_op%DFD%field_out
                 
-                proc=MODULO((ie_op%me+ie_op%comm_size/2),ie_op%comm_size)
+                proc=ie_op%partner
                 IF (ie_op%real_space) THEN
                         xfirst=1
-                        xlast=Nx2
-                        recv_start=Nx2+1
+                        xlast=NxHalf
+                        recv_start=NxHalf+1
                 ELSE
                         recv_start=1
-                        xfirst=Nx2+1
+                        xfirst=NxHalf+1
                         xlast=Nx
                 ENDIF
-                data_length=Nz3*ie_op%Ny_loc*Nx2
+                data_length=Nz3*ie_op%Ny_loc*NxHalf
 		DO
                          CALL  MPI_IRECV(p_in(:,:,recv_start:),data_length,MPI_DOUBLE_COMPLEX,proc,proc,&
                          &ie_op%ie_comm,requests(1),IERROR)
                         !$OMP PARALLEL DEFAULT(SHARED), PRIVATE(Ix,Iy)
                         !$OMP DO SCHEDULE(GUIDED) 
-        		DO Ix=1,Nx2
+        		DO Ix=1,NxHalf
 	        		DO Iy=1,ie_op%Ny_loc
 				      CALL ZCOPY(l,G(M:,comp,Iy,Ix),ONE,p_in(:,Iy,Ix+xfirst-1),ONE)  
 				ENDDO
@@ -438,7 +438,7 @@ CONTAINS
 
                         !$OMP PARALLEL DEFAULT(SHARED), PRIVATE(Ix,Iy)
                         !$OMP DO SCHEDULE(GUIDED) 
-			DO Ix=1,Nx2
+			DO Ix=1,NxHalf
                                 DO Iy=1,ie_op%Ny_loc
         			      CALL ZCOPY(l,p_out(:,Iy,Ix+xfirst-1),ONE,Gout(M:,comp,Iy,Ix),ONE) 
                                 ENDDO
@@ -448,7 +448,7 @@ CONTAINS
 			DO Iy=1,ie_op%Ny_loc
 				CALL ZCOPY(l,p_out(:,Iy,Nx+1),ONE,tmp,ONE) 
 				s=1
-				DO Ix=1,Nx2
+				DO Ix=1,NxHalf
 				      Gout(M:M+l-1,comp,Iy,Ix)=Gout(M:M+l-1,comp,Iy,Ix)-tmp(1:l)*s
 				      s=-s
 				ENDDO
@@ -459,6 +459,18 @@ CONTAINS
 		ENDDO
 	END SUBROUTINE
 
+        SUBROUTINE PRINT_STATS(ie_op)
+		TYPE(IntegralEquationOperator),INTENT(IN)::ie_op
+                CALL PRINT_BORDER
+		CALL PRINT_CALC_TIME('Time for multiplications:					', ie_op%counter%apply)
+		CALL PRINT_CALC_TIME('Average fftw forward:					', ie_op%counter%mult_fftw/ie_op%counter%mult_num)
+		CALL PRINT_CALC_TIME('Average fftw backward:					', ie_op%counter%mult_fftw_b/ie_op%counter%mult_num)
+		CALL PRINT_CALC_TIME('Average zgemv:						', ie_op%counter%mult_zgemv/ie_op%counter%mult_num)
+		CALL PRINT_CALC_TIME('Average mult:						', ie_op%counter%apply/ie_op%counter%mult_num)
+		CALL PRINT_CALC_NUMBER('Number of matrix-vector multiplications:                  ', ie_op%counter%mult_num)
+                CALL PRINT_BORDER
+                CALL PrintTimings(ie_op%DFD)
+        END SUBROUTINE
 
 	SUBROUTINE DeleteIE_OP(ie_op)
 		TYPE(IntegralEquationOperator),INTENT(INOUT)::ie_op

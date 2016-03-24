@@ -82,12 +82,12 @@ MODULE DISTRIBUTED_FFT_MODULE
 		ENDSUBROUTINE
 	ENDINTERFACE
 
-	PUBLIC:: DistributedFourierData, CalcDistributedFourier
+	PUBLIC:: DistributedFourierData! CalcDistributedFourier
 	PUBLIC:: PrepareDistributedFourierData,DeleteDistributedFourierData
         PUBLIC:: CalcPreparedForwardFFT
         PUBLIC:: CalcPreparedBackwardFFT
         PUBLIC:: CalcForwardIETensorFFT
-	PUBLIC:: CalcLocalFFTSize,PrintTimings
+	PUBLIC:: CalcLocalFFTSize,PrintTimings,DROP_COUNTER
 	CONTAINS
 	SUBROUTINE  PrepareDistributedFourierData(DFD,Nx,Ny,Nc,comm,fft_buff_in,fft_buff_out,buff_length)
 		TYPE (DistributedFourierData),TARGET,INTENT(INOUT)::DFD
@@ -206,19 +206,6 @@ MODULE DISTRIBUTED_FFT_MODULE
 		DFD%FFTW_TRANSPOSE%p_out=>r_out
 	ENDSUBROUTINE
 
-	SUBROUTINE CalcDistributedFourier(DFD,FFT_DIR)
-		TYPE (DistributedFourierData),INTENT(INOUT)::DFD
-		INTEGER,INTENT(IN)::FFT_DIR
-		CALL InitialTranspose(DFD)
-		CALL ProcessDistributedFourierKernelSync(DFD,FFT_DIR)
-		CALL FinalTranspose(DFD)
-		IF (FFT_DIR/=FFT_BWD) THEN
-			DFD%field_load_out=DFD%field_load_in
-		ELSE
-			DFD%field_load_out=DFD%field_load_in/DFD%Nx/DFD%Ny
-		ENDIF
-	END SUBROUTINE
-
 	SUBROUTINE CalcPreparedForwardFFT(DFD)
 		TYPE (DistributedFourierData),INTENT(INOUT)::DFD
 		CALL ProcessDistributedFourierKernelSync(DFD,FFT_FWD)
@@ -230,8 +217,9 @@ MODULE DISTRIBUTED_FFT_MODULE
 		COMPLEX(REALPARM),INTENT(IN)::sy
 		CALL InitialTransposeIE(DFD)
 		CALL ProcessDistributedFourierKernelSyncMirror(DFD,FFT_FWD,sy)
-		CALL FinalTransposeRepackOld(DFD)
+		CALL FinalTransposeIE(DFD)
 	END SUBROUTINE
+
 	SUBROUTINE CalcPreparedBackwardFFT(DFD)
 		TYPE (DistributedFourierData),INTENT(INOUT)::DFD
 		CALL InitialTransposeRepack(DFD)
@@ -406,112 +394,6 @@ MODULE DISTRIBUTED_FFT_MODULE
 #endif
 	END SUBROUTINE
 
-	SUBROUTINE TransposeLoopOMP(p_in,p_out,Nc,Nxy,Nt)
-		COMPLEX(REALPARM),POINTER,INTENT(INOUT)::p_in(:,:),p_out(:,:)
-		INTEGER,INTENT(IN)::Nxy,Nc,Nt
-		INTEGER::Ic,Ixy
-		!$OMP PARALLEL DEFAULT(SHARED), PRIVATE(Ic,Ixy) NUM_THREADS(Nt)
-		!$OMP DO SCHEDULE(GUIDED) 
-		DO Ic=1,Nc
-			DO Ixy=1,Nxy
-					p_out(Ixy,Ic)=p_in(Ic,Ixy)
-			ENDDO
-		ENDDO
-		!$OMP ENDDO
-		!$OMP END PARALLEL
-	ENDSUBROUTINE
-
-	SUBROUTINE TransposeBlas(p_in,p_out,Nc,Nxy,Nt)
-		COMPLEX(REALPARM),POINTER,INTENT(INOUT)::p_in(:,:),p_out(:,:)
-		INTEGER,INTENT(IN)::Nxy,Nc,Nt
-		INTEGER::M
-		M=Nxy
-#ifndef IBM_Bluegene
-		CALL ZOMATCOPY('C','T',Nc,M,C_ONE,p_in,Nc,p_out,M)
-#else
-		p_out=TRANSPOSE(p_in)
-#endif
-	ENDSUBROUTINE
-	
-	SUBROUTINE SetOptimalTranspose(DFD)
-		TYPE (DistributedFourierData),INTENT(INOUT)::DFD
-		INTEGER::Nmax,OMP_GET_MAX_THREADS
-#ifdef ExtrEMe
-		INTEGER,PARAMETER::Nloop=5
-#else
-		INTEGER,PARAMETER::Nloop=50
-#endif
-		INTEGER::I,J
-		REAL(DOUBLEPARM)::t1,t2,t3,tmin
-		INTEGER::Nx,Ny,Nc,Nt,Nopt,M
-		COMPLEX(REALPARM),POINTER::p_in(:,:),p_out(:,:)
-		CHARACTER(len=128)::text
-		Nmax=OMP_GET_MAX_THREADS()
-		Nx=DFD%Nx
-		Ny=DFD%Ny_loc
-		Nc=DFD%Nc
-		M=Nx*Ny
-		p_in(1:Nc,1:M)=>DFD%field_in
-		p_out(1:M,1:Nc)=>DFD%field_out
-		Nopt=-1
-		t3=GetTime()
-		t1=t3
-		DO I=1,Nloop
-			CALL TransposeBlas(p_in,p_out,Nc,M,Nopt)
-		ENDDO
-		t2=GetTime()
-		tmin=t2-t1
-		DFD%FullLocalTranspose%LocalTranspose=>TransposeBlas
-		DO J=1,Nmax
-			t1=GetTime()
-			DO I=1,Nloop
-				CALL TransposeLoopOMP(p_in,p_out,Nc,M,J)
-			ENDDO
-			t2=GetTime()
-			IF (tmin> (t2-t1)) THEN
-				tmin=t2-t1
-				Nopt=J
-				DFD%FullLocalTranspose%LocalTranspose=>TransposeLoopOMP
-			ENDIF
-		ENDDO
-		
-		DFD%FullLocalTranspose%Nopt=Nopt
-		t3=GetTime()-t3
-		DFD%local_transpose_time(1)=tmin
-		DFD%local_transpose_time(2)=t3
-#ifdef print_time
-		IF (Nopt>0) THEN	
-			WRITE (text,'(A, I4, A)') 'Simple OMP loop transpose with', Nopt, ' threads'
-			CALL LOGGER(text)
-		ELSE
-			CALL LOGGER('Blas transpose')
-		ENDIF
-#endif
-	ENDSUBROUTINE
-
-	SUBROUTINE InitialTranspose(DFD)
-		TYPE (DistributedFourierData),INTENT(INOUT)::DFD
-		INTEGER::Ix,Iy,Ic,l
-		INTEGER::Nx,Ny,Nc,M,Nt
-		COMPLEX(REALPARM),POINTER::p_in(:,:),p_out(:,:)
-		REAL(DOUBLEPARM)::time1,time2
-#ifndef performance_test
-		time1=GetTime()
-#endif
-		Nx=DFD%Nx
-		Ny=DFD%Ny_loc
-		Nc=DFD%Nc
-		Nt=DFD%FullLocalTranspose%Nopt
-		M=Nx*Ny
-		p_in(1:Nc,1:M)=>DFD%field_out
-		p_out(1:M,1:Nc)=>DFD%field_in
-		CALL DFD%FullLocalTranspose%LocalTranspose(p_in,p_out,Nc,M,Nt)
-#ifndef performance_test
-		time2=GetTime()
-		DFD%timer(FFT_FWD)%local_transpose(1)=time2-time1+DFD%timer(FFT_FWD)%local_transpose(1)
-#endif
-	ENDSUBROUTINE
-
 	SUBROUTINE InitialTransposeIE(DFD)
 		TYPE (DistributedFourierData),INTENT(INOUT)::DFD
 		INTEGER::Ix,Iy,Ic,l
@@ -543,30 +425,8 @@ MODULE DISTRIBUTED_FFT_MODULE
 		DFD%timer(FFT_FWD)%local_transpose(1)=time2-time1+DFD%timer(FFT_FWD)%local_transpose(1)
 #endif
 	ENDSUBROUTINE
-	SUBROUTINE FinalTranspose(DFD)
-		TYPE (DistributedFourierData),INTENT(INOUT)::DFD
-		INTEGER::Ix,Iy,Ic,l
-		INTEGER::Nx,Ny,Nc,Nt,M
-		COMPLEX(REALPARM),POINTER::p_in(:,:),p_out(:,:)
-		REAL(DOUBLEPARM)::time1,time2
-#ifndef performance_test
-		time1=GetTime()
-#endif
-		Nx=DFD%Nx
-		Ny=DFD%Ny_loc
-		Nc=DFD%Nc
-		Nt=DFD%FullLocalTranspose%Nopt
-		M=Nx*Ny
-		p_in(1:M,1:Nc)=>DFD%field_in
-		p_out(1:Nc,1:M)=>DFD%field_out
-		CALL DFD%FullLocalTranspose%LocalTranspose(p_in,p_out,M,Nc,Nt)
-#ifndef performance_test
-		time2=GetTime()
-		DFD%timer(FFT_FWD)%local_transpose(2)=time2-time1+DFD%timer(FFT_FWD)%local_transpose(2)
-#endif
-	ENDSUBROUTINE
 
-	SUBROUTINE FinalTransposeRepackOld(DFD)
+	SUBROUTINE FinalTransposeIE(DFD)
 		TYPE (DistributedFourierData),INTENT(INOUT)::DFD
 		INTEGER::Ix,Iy,Ic,l
 		INTEGER::Nx,Ny,Nc,Nt,M
@@ -597,6 +457,7 @@ MODULE DISTRIBUTED_FFT_MODULE
 		DFD%timer(FFT_FWD)%local_transpose(2)=time2-time1+DFD%timer(FFT_FWD)%local_transpose(2)
 #endif
 	ENDSUBROUTINE
+
 	SUBROUTINE FinalTransposeRepack(DFD)
 		TYPE (DistributedFourierData),INTENT(INOUT)::DFD
 		INTEGER::Ix,Iy,Ic,l,Iz
@@ -644,40 +505,6 @@ MODULE DISTRIBUTED_FFT_MODULE
 #endif
 	ENDSUBROUTINE
 
-	SUBROUTINE InitialTransposeRepack2(DFD)
-		TYPE (DistributedFourierData),INTENT(INOUT)::DFD
-		INTEGER::Ix,Iy,Ic,l
-		INTEGER::Nx,Ny,Nc,Nt,M
-		COMPLEX(REALPARM),POINTER::p_in(:,:,:),p_out(:,:,:)
-		REAL(DOUBLEPARM)::time1,time2
-#ifndef performance_test
-		time1=GetTime()
-#endif
-		Nx=DFD%Nx
-		Ny=DFD%Ny_loc
-		Nc=DFD%Nc
-		p_in(1:Nc,1:Ny,1:Nx)=>DFD%field_in
-		p_out(1:Nx,1:Ny,1:Nc)=>DFD%field_out
-
-		!$OMP PARALLEL DEFAULT(SHARED), PRIVATE(Ix,Iy,Ic) 
-		!$OMP DO SCHEDULE(GUIDED) 
-		DO Ix=1,Nx
-			DO Iy=1,Ny
-                                DO Ic=1,Nc
-					p_out(Ix,Iy,Ic)=p_in(Ic,Iy,Ix)
-                                ENDDO
-			ENDDO
-		ENDDO
-		!$OMP ENDDO
-                !$OMP WORKSHARE
-                DFD%field_in=DFD%field_out
-                !$OMP END WORKSHARE
-		!$OMP END PARALLEL
-#ifndef performance_test
-		time2=GetTime()
-		DFD%timer(FFT_FWD)%local_transpose(2)=time2-time1+DFD%timer(FFT_FWD)%local_transpose(2)
-#endif
-	ENDSUBROUTINE
 	SUBROUTINE InitialTransposeRepack(DFD)
 		TYPE (DistributedFourierData),INTENT(INOUT)::DFD
 		INTEGER::Ix,Iy,Ic,l,Iz
@@ -746,7 +573,7 @@ MODULE DISTRIBUTED_FFT_MODULE
 		!$OMP END PARALLEL
 #ifndef performance_test
 		time2=GetTime()
-		DFD%timer(FFT_FWD)%local_transpose(2)=time2-time1+DFD%timer(FFT_FWD)%local_transpose(2)
+		DFD%timer(FFT_BWD)%local_transpose(1)=time2-time1+DFD%timer(FFT_BWD)%local_transpose(1)
 #endif
 	ENDSUBROUTINE
 	SUBROUTINE BlockTransposeXToY(DFD)
@@ -925,26 +752,9 @@ MODULE DISTRIBUTED_FFT_MODULE
 		DFD%Ny_loc=Ny_loc
 		DFD%K=K
 		CALL CreateBlockPlans(DFD)
-!-----------------------------------------------------------------------------!
-		DFD%timer(FFT_FWD)%N=0
-		DFD%timer(FFT_FWD)%fftx=0d0
-		DFD%timer(FFT_FWD)%ffty=0d0
-		DFD%timer(FFT_FWD)%x2y_transpose=0d0
-		DFD%timer(FFT_FWD)%y2x_transpose=0d0
-		DFD%timer(FFT_FWD)%kernel_total=0d0
+                CALL DROP_COUNTER(DFD)
 
-		DFD%timer(FFT_BWD)%N=0
-		DFD%timer(FFT_BWD)%fftx=0d0
-		DFD%timer(FFT_BWD)%ffty=0d0
-		DFD%timer(FFT_BWD)%x2y_transpose=0d0
-		DFD%timer(FFT_BWD)%y2x_transpose=0d0
 		
-		DFD%timer(FFT_BWD)%kernel_total=0d0
-		DFD%timer(FFT_FWD)%local_transpose(:)=0d0
-		DFD%timer(FFT_BWD)%local_transpose(:)=0d0
-!-----------------------------------------------------------------------------!
-		
-		CALL SetOptimalTranspose(DFD)
 		
 	ENDSUBROUTINE
 	SUBROUTINE PrintTimings(DFD)
@@ -952,13 +762,13 @@ MODULE DISTRIBUTED_FFT_MODULE
 		REAL(DOUBLEPARM)::fftx_av(2),ffty_av(2),x2y_av,y2x_av
 		REAL(DOUBLEPARM)::kernel_av(2)
 		REAL(DOUBLEPARM)::total_av(2)
-		REAL(REALPARM)::av_times(14)
-		REAL(REALPARM)::max_times(14)
-		REAL(REALPARM)::min_times(14)
+		REAL(REALPARM)::av_times(16)
+		REAL(REALPARM)::max_times(16)
+		REAL(REALPARM)::min_times(16)
 		REAL(REALPARM)::min_overhead(2)
 		REAL(REALPARM)::max_overhead(2)
 		REAL(REALPARM)::variation(8)
-		REAL(REALPARM)::local_transpose_av(2)
+		REAL(REALPARM)::local_transpose_av(2,2)
 		REAL(REALPARM)::max_total(2)
 		REAL(REALPARM)::min_total(2)
 		INTEGER(MPI_CTL_KIND)::IERROR
@@ -967,18 +777,15 @@ MODULE DISTRIBUTED_FFT_MODULE
 		Nfwd=DFD%timer(FFT_FWD)%N
 		Nbwd=DFD%timer(FFT_BWD)%N
 		M=Nfwd+Nbwd
-		IF (M/=0) THEN
-			x2y_av=DFD%timer(FFT_FWD)%x2y_transpose/M
-			y2x_av=DFD%timer(FFT_FWD)%y2x_transpose/M
-			local_transpose_av=DFD%timer(FFT_FWD)%local_transpose/M
-		ELSE
-		    RETURN
-		ENDIF	
+                IF (M==0) RETURN
+		x2y_av=DFD%timer(FFT_FWD)%x2y_transpose/M
+		y2x_av=DFD%timer(FFT_FWD)%y2x_transpose/M
 		IF (Nfwd/=0) THEN 
 			fftx_av(1)=DFD%timer(FFT_FWD)%fftx/Nfwd
 			ffty_av(1)=DFD%timer(FFT_FWD)%ffty/Nfwd
 			kernel_av(1)=DFD%timer(FFT_FWD)%kernel_total/Nfwd
-			total_av(1)=kernel_av(1)+local_transpose_av(1)+local_transpose_av(2)
+			local_transpose_av(:,1)=DFD%timer(FFT_FWD)%local_transpose/Nfwd
+			total_av(1)=kernel_av(1)+local_transpose_av(1,1)+local_transpose_av(2,1)
 			
 		ELSE
 			fftx_av(1)=0d0
@@ -989,7 +796,8 @@ MODULE DISTRIBUTED_FFT_MODULE
 			fftx_av(2)=DFD%timer(FFT_BWD)%fftx/Nbwd
 			ffty_av(2)=DFD%timer(FFT_BWD)%ffty/Nbwd
 			kernel_av(2)=DFD%timer(FFT_BWD)%kernel_total/Nbwd
-			total_av(2)=kernel_av(2)+local_transpose_av(1)+local_transpose_av(2)
+			local_transpose_av(:,2)=DFD%timer(FFT_BWD)%local_transpose/Nbwd
+			total_av(2)=kernel_av(2)+local_transpose_av(1,2)+local_transpose_av(2,2)
 		ELSE
 			fftx_av(2)=0d0
 			ffty_av(2)=0d0
@@ -1001,10 +809,11 @@ MODULE DISTRIBUTED_FFT_MODULE
 		av_times(5:6)=ffty_av
 		av_times(7:8)=kernel_av
 		av_times(9:10)=total_av
-		av_times(11:12)=local_transpose_av
-		av_times(13:14)=kernel_av-av_times(1)-av_times(2)-av_times(3:4)-av_times(5:6)
-		CALL MPI_REDUCE(av_times,min_times,14,MPI_DOUBLE,MPI_MIN,0,DFD%COMM,IERROR)
-		CALL MPI_REDUCE(av_times,max_times,14,MPI_DOUBLE,MPI_MAX,0,DFD%COMM,IERROR)
+		av_times(11:12)=local_transpose_av(:,1)
+		av_times(13:14)=local_transpose_av(:,2)
+		av_times(15:16)=kernel_av-av_times(1)-av_times(2)-av_times(3:4)-av_times(5:6)
+		CALL MPI_REDUCE(av_times,min_times,16,MPI_DOUBLE,MPI_MIN,0,DFD%COMM,IERROR)
+		CALL MPI_REDUCE(av_times,max_times,16,MPI_DOUBLE,MPI_MAX,0,DFD%COMM,IERROR)
 
 
 
@@ -1013,8 +822,8 @@ MODULE DISTRIBUTED_FFT_MODULE
 			CALL PRINT_BORDER
 			CALL PRINT_CALC_NUMBER("Number of forward Fourier transforms:", Nfwd)
 			CALL PRINT_CALC_TIME_RANGE('Forward total time from:                 ', min_times(9)*Nfwd, max_times(9)*Nfwd)
-			CALL PRINT_CALC_TIME_RANGE('Average kernel forward transform  from:  ', min_times(9), max_times(9))
-			CALL PRINT_CALC_TIME_RANGE('Transfer  from:                          ', min_times(13),max_times(13))
+			CALL PRINT_CALC_TIME_RANGE('Average total forward transform  from:  ', min_times(9), max_times(9))
+			CALL PRINT_CALC_TIME_RANGE('Transfer  from:                          ', min_times(15),max_times(15))
 			CALL PRINT_CALC_TIME_RANGE('Average forward transform along X from:  ',min_times(3),max_times(3))
 			CALL PRINT_CALC_TIME_RANGE('Average forward transform along Y from:  ',min_times(5), max_times(5)) 
 
@@ -1026,18 +835,38 @@ MODULE DISTRIBUTED_FFT_MODULE
 	
 		IF (Nbwd/=0) THEN 
 			CALL PRINT_BORDER
-			CALL PRINT_CALC_NUMBER("Number of backward Fourier transforms:", Nfwd)
-			CALL PRINT_CALC_TIME_RANGE('Backward total time from:               ', min_times(10)*Nfwd, max_times(10)*Nfwd)
-			CALL PRINT_CALC_TIME_RANGE('Average kernel backward transform from: ', min_times(10), max_times(10))
-			CALL PRINT_CALC_TIME_RANGE('Transfer  from:                         ', min_times(14),max_times(14))
+			CALL PRINT_CALC_NUMBER("Number of backward Fourier transforms:", Nbwd)
+			CALL PRINT_CALC_TIME_RANGE('Backward total time from:               ', min_times(10)*Nbwd, max_times(10)*Nbwd)
+			CALL PRINT_CALC_TIME_RANGE('Average total backward transform from: ', min_times(10), max_times(10))
+			CALL PRINT_CALC_TIME_RANGE('Transfer  from:                         ', min_times(16),max_times(16))
 			CALL PRINT_CALC_TIME_RANGE('Average forward transform along X from: ',min_times(4),max_times(4))
 			CALL PRINT_CALC_TIME_RANGE('Average forward transform along Y from: ',min_times(6), max_times(6)) 
 
 			CALL PRINT_CALC_TIME_RANGE('Average X to Y transpose from:          ',min_times(1), max_times(1))
 			CALL PRINT_CALC_TIME_RANGE('Average Y to X transpose from:          ',min_times(2),max_times(2))
-			CALL PRINT_CALC_TIME_RANGE('Initial transpose from:                 ',min_times(11),max_times(11))
-			CALL PRINT_CALC_TIME_RANGE('Final transpose from:                   ',min_times(12),max_times(12))
+			CALL PRINT_CALC_TIME_RANGE('Initial transpose from:                 ',min_times(13),max_times(13))
+			CALL PRINT_CALC_TIME_RANGE('Final transpose from:                   ',min_times(14),max_times(14))
 		ENDIF
 		CALL LOGGER('===================================================================================')
 	END SUBROUTINE
+
+        SUBROUTINE DROP_COUNTER(DFD)
+		TYPE (DistributedFourierData),INTENT(INOUT)::DFD
+		DFD%timer(FFT_FWD)%N=0
+		DFD%timer(FFT_FWD)%fftx=0d0
+		DFD%timer(FFT_FWD)%ffty=0d0
+		DFD%timer(FFT_FWD)%x2y_transpose=0d0
+		DFD%timer(FFT_FWD)%y2x_transpose=0d0
+		DFD%timer(FFT_FWD)%kernel_total=0d0
+		DFD%timer(FFT_FWD)%local_transpose(:)=0d0
+
+		DFD%timer(FFT_BWD)%N=0
+		DFD%timer(FFT_BWD)%fftx=0d0
+		DFD%timer(FFT_BWD)%ffty=0d0
+		DFD%timer(FFT_BWD)%x2y_transpose=0d0
+		DFD%timer(FFT_BWD)%y2x_transpose=0d0
+		
+		DFD%timer(FFT_BWD)%kernel_total=0d0
+		DFD%timer(FFT_BWD)%local_transpose(:)=0d0
+        END SUBROUTINE
 END MODULE
