@@ -97,21 +97,51 @@ MODULE APPLY_IE_OPERATOR_MODULE
 		!$OMP END PARALLEL
 
 		CALL	MULT_IE_OP(ie_op)
-		!$OMP PARALLEL DEFAULT(SHARED), PRIVATE(Iy,Ix,Ic,Iz,d1,d2,asiga)
+		!$OMP PARALLEL DEFAULT(SHARED), PRIVATE(Iy,Ix,Iz,d1,d2,asiga)
 #ifndef IBM_Bluegene
-                !$OMP DO SCHEDULE(GUIDED) COLLAPSE(4)
+                !$OMP DO SCHEDULE(GUIDED) COLLAPSE(3)
 #else
                 !$OMP DO SCHEDULE(GUIDED) 
 #endif
-		DO Iy=1,ie_op%Ny_loc
-			DO Ix=1,ie_op%Nx
-				DO Ic=1,3
-					DO Iz=1,ie_op%Nz
-						asiga=C_TWO*ie_op%sqsigb(Iz)/(ie_op%csiga(Ix,Iy,Iz)+CONJG(ie_op%csigb(Iz)))
-						d1=field_in(Ix,Iy,Iz,Ic)*asiga
-						d2=d1-fft_buff(Ix,Iy,Iz,Ic)/(ie_op%dz(Iz))/N
-						field_out(Ix,Iy,Iz,Ic)=d2*ie_op%sqsigb(Iz)
-					ENDDO
+		DO Iz=1,ie_op%Nz
+			DO Iy=1,ie_op%Ny_loc
+				DO Ix=1,ie_op%Nx
+					asiga=C_TWO*ie_op%sqsigb(Iz)/(ie_op%csiga(Ix,Iy,Iz)+CONJG(ie_op%csigb(Iz)))
+					d1=field_in(Ix,Iy,Iz,EX)*asiga
+					d2=d1-fft_buff(Ix,Iy,Iz,EX)/(ie_op%dz(Iz))/N
+					field_out(Ix,Iy,Iz,EX)=d2*ie_op%sqsigb(Iz)
+				ENDDO
+			ENDDO
+		ENDDO
+		!$OMP END DO
+#ifndef IBM_Bluegene
+                !$OMP DO SCHEDULE(GUIDED) COLLAPSE(3)
+#else
+                !$OMP DO SCHEDULE(GUIDED) 
+#endif
+		DO Iz=1,ie_op%Nz
+			DO Iy=1,ie_op%Ny_loc
+				DO Ix=1,ie_op%Nx
+					asiga=C_TWO*ie_op%sqsigb(Iz)/(ie_op%csiga(Ix,Iy,Iz)+CONJG(ie_op%csigb(Iz)))
+					d1=field_in(Ix,Iy,Iz,EY)*asiga
+					d2=d1-fft_buff(Ix,Iy,Iz,EY)/(ie_op%dz(Iz))/N
+					field_out(Ix,Iy,Iz,EY)=d2*ie_op%sqsigb(Iz)
+				ENDDO
+			ENDDO
+		ENDDO
+		!$OMP END DO
+#ifndef IBM_Bluegene
+                !$OMP DO SCHEDULE(GUIDED) COLLAPSE(3)
+#else
+                !$OMP DO SCHEDULE(GUIDED) 
+#endif
+		DO Iz=1,ie_op%Nz
+			DO Iy=1,ie_op%Ny_loc
+				DO Ix=1,ie_op%Nx
+					asiga=C_TWO*ie_op%sqsigb(Iz)/(ie_op%csiga(Ix,Iy,Iz)+CONJG(ie_op%csigb(Iz)))
+					d1=field_in(Ix,Iy,Iz,EZ)*asiga
+					d2=d1-fft_buff(Ix,Iy,Iz,EZ)/(ie_op%dz(Iz))/N
+					field_out(Ix,Iy,Iz,EZ)=d2*ie_op%sqsigb(Iz)
 				ENDDO
 			ENDDO
 		ENDDO
