@@ -80,12 +80,12 @@ MODULE RC_Kernel_Image_Module
 		ELSE
 			N=recv%anom_cell
 			CALL Calc_pexpz(bkg,anomaly,expz,eta,p,1,N,pez)
-			CALL Calc_qexpz(bkg,anomaly,expz,eta,q,N,Nz,qez)
+			CALL Calc_qexpz(bkg,anomaly,expz,eta,q,N+1,Nz,qez)
 
 			CALL Calc_Ftb(bkg,anomaly,expz,eta,pez,1,N,Ftb)
-			CALL Calc_Ftb(bkg,anomaly,expz,eta,qez,N,Nz,Ftb)
+			CALL Calc_Ftb(bkg,anomaly,expz,eta,qez,N+1,Nz,Ftb)
 			CALL Calc_G_not_match(bkg,anomaly,A,eta,recv,lm2,Ftb,w1,w2,G)
-!			CALL Calc_G_match(bkg,anomaly,A,p,eta,recv,N,Fb,G)
+			!CALL Calc_G_match(bkg,anomaly,A,p,eta,recv,N,Fb,G)
 			
 		ENDIF
 #ifdef internal_timer
@@ -176,7 +176,7 @@ MODULE RC_Kernel_Image_Module
 			eta_dr=C_ZERO
 		ENDIF
 		N=recv%anom_cell
-		N1=MAX(1,N)
+		N1=MAX(1,N+1)
 		N2=MIN(N,anomaly%Nz)
 		DO I=N1,anomaly%Nz
 			l=anomaly%Lnumber(I)

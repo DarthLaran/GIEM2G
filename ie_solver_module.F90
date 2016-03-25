@@ -118,6 +118,7 @@ MODULE IE_SOLVER_MODULE
 		COMPLEX(REALPARM),POINTER :: work_gmres(:)
 		COMPLEX(REALPARM),POINTER ::v_in(:),v_out(:)
 		COMPLEX(REALPARM),POINTER ::v_in2(:),v_out2(:)
+		COMPLEX(REALPARM),POINTER::tmp_in(:),tmp_out(:);
 		COMPLEX(REALPARM),POINTER :: aux(:)
 		COMPLEX(REALPARM),POINTER::tmp(:)
 		INTEGER :: l_fgmres
@@ -128,10 +129,7 @@ MODULE IE_SOLVER_MODULE
 		INTEGER :: revcom2, colx2, coly2, colz2, nbscal2
 		INTEGER :: irc(7), icntl(7), info(3)
 		INTEGER:: irc2(5), icntl2(8), info2(3)
-		LOGICAL :: NextMult
-		INTEGER(MPI_CTL_KIND)::	IERROR,comm_inner,comm_outer,fgmres_comm,fgmres_me
-               INTEGER(MPI_CTL_KIND),PARAMETER::MPI_TWO=2
-	         INTEGER(MPI_CTL_KIND),PARAMETER::MPI_ONE=1
+		INTEGER(MPI_CTL_KIND)::	IERROR,comm_inner,comm_outer
 
 
 		INTEGER::   MATVEC, PRECONDLEFT,PRECONDRIGHT,DOTPROD
@@ -156,30 +154,12 @@ MODULE IE_SOLVER_MODULE
 		ie_op%counter%mult_fftw_b=0d0
 		ie_op%counter%mult_zgemv=0d0
 		ie_op%counter%dotprod=0d0
-		NextMult=.FALSE.
 		Nfgmres=0
 
-		   IF (ie_op%real_space) THEN
-			 CALL  MPI_COMM_SPLIT(ie_op%ie_comm, MPI_ONE, ie_op%me,    fgmres_comm, IERROR)
-			 CALL   MPI_COMM_RANK(fgmres_comm, fgmres_me, IERROR)
-		   ELSE
-		      CALL   MPI_COMM_SPLIT(ie_op%ie_comm, MPI_TWO, ie_op%me,   fgmres_comm, IERROR)
-		   ENDIF
-
-		IF (.NOT. ie_op%real_space) THEN
-			DO
-				CALL MPI_BCAST(NextMult,1,MPI_LOGICAL, ie_op%master_proc,ie_op%ie_comm, IERROR)
-				IF (NextMult) THEN
-					CALL APPLY_IE_OP(ie_op)
-				ELSE
-					RETURN
-				ENDIF
-			END DO
-		ENDIF
-		CALL MPI_COMM_DUP(fgmres_comm, comm_inner, IERROR)
-		CALL MPI_COMM_DUP(fgmres_comm, comm_outer, IERROR)
-		
-		
+		!CALL MPI_COMM_DUP(ie_op%ie_comm, comm_inner, IERROR)
+		!CALL MPI_COMM_DUP(ie_op%ie_comm, comm_outer, IERROR)
+		comm_inner=ie_op%ie_comm
+		comm_outer=ie_op%ie_comm
 		CALL init_zfgmres(icntl,cntl)
 		CALL init_zgmres(icntl2,cntl2)
 		misfit=fgmres_ctl%misfit
@@ -187,23 +167,24 @@ MODULE IE_SOLVER_MODULE
 		maxit=fgmres_ctl%fgmres_maxit
 		maxit_precond=fgmres_ctl%gmres_buf
 
-		Nloc=3*ie_op%Nz*ie_op%Nx*ie_op%Ny_loc
+		Nloc=3*ie_op%Nz*ie_op%Nx*ie_op%Ny_loc/2
 		m=buf_length
 		l_fgmres = m*m + m*(2*Nloc+6) + 6*Nloc + 1
 		l_gmres=maxit_precond*maxit_precond+maxit_precond*(Nloc+6)+6*Nloc+1
-		WRITE (message,*) 'Solver needs',(l_fgmres+l_gmres+Nloc+2)*16.0/1024/1024/1024, 'Gb for workspace'
-
+		WRITE (message,*) 'Solver needs',(l_fgmres+l_gmres+Nloc+2+4*Nloc)*16.0/1024/1024/1024, 'Gb for workspace'
+		
 		CALL LOGGER(message)
 
 		ALLOCATE(work_fgmres(l_fgmres),work_gmres(l_gmres))
 		ALLOCATE(aux(Nloc+2)) ! possible it is greater than necessary
-
+		ALLOCATE(tmp_in(2*Nloc))
+		ALLOCATE(tmp_out(2*Nloc))
 		cntl(1) = misfit
 		cntl2(1) = misfit
 
 		icntl2(2) = 0
 		icntl(6) = maxit 
-		IF (fgmres_me==0) THEN
+		IF (ie_op%me==0) THEN
 			icntl(3) = 220
 			icntl2(3) = 320
 			icntl(2)=1
@@ -220,8 +201,15 @@ MODULE IE_SOLVER_MODULE
 		icntl2(5) =fgmres_ctl%ort_type
 		icntl2(6)=1
 		icntl2(7) = maxit_precond
-		CALL ZCOPY (Nloc, guess, ONE, work_fgmres, ONE)
-		CALL ZCOPY (Nloc, Esol, ONE, work_fgmres(Nloc+1:), ONE)
+		IF (ie_op%real_space) THEN
+			CALL ZCOPY (2*Nloc, guess, ONE, work_fgmres, ONE)
+			CALL MPI_SEND(work_fgmres(Nloc+1:),Nloc, MPI_DOUBLE_COMPLEX, ie_op%partner, ie_op%me,ie_op%ie_comm, IERROR)
+			CALL ZCOPY (2*Nloc, Esol, ONE, work_fgmres(Nloc+1:), ONE)
+			CALL MPI_SEND(work_fgmres(2*Nloc+1:),Nloc, MPI_DOUBLE_COMPLEX, ie_op%partner, ie_op%me+ie_op%comm_size,ie_op%ie_comm, IERROR)
+		ELSE
+			CALL MPI_RECV(work_fgmres,Nloc, MPI_DOUBLE_COMPLEX, ie_op%partner, ie_op%partner,ie_op%ie_comm, IERROR,MPI_STATUS_IGNORE)
+			CALL MPI_RECV(work_fgmres(Nloc+1:),Nloc, MPI_DOUBLE_COMPLEX, ie_op%partner, ie_op%partner+ie_op%comm_size,ie_op%ie_comm, IERROR,MPI_STATUS_IGNORE)
+		ENDIF
 		N_unknowns=3*ie_op%Nz*ie_op%Nx*ie_op%Ny
 		CALL PRINT_CALC_NUMBER('Number of unknowns:', N_unknowns)
 
@@ -241,15 +229,19 @@ MODULE IE_SOLVER_MODULE
 			ENDIF
 			SELECT CASE(REVCOM)
 			CASE (MATVEC)
-				IF (.NOT. ie_op%master) THEN
-					CALL MPI_BCAST(NextMult,1,MPI_LOGICAL, &
-					&ie_op%master_proc, ie_op%ie_comm, IERROR)
+				IF (ie_op%real_space) THEN
+					CALL ZCOPY (Nloc, v_in, ONE, tmp_in, ONE)
+					CALL MPI_RECV(tmp_in(Nloc+1:),Nloc, MPI_DOUBLE_COMPLEX, ie_op%partner, ie_op%partner,ie_op%ie_comm, IERROR,MPI_STATUS_IGNORE)
+					CALL APPLY_IE_OP(ie_op,tmp_in,tmp_out)
+					CALL MPI_SEND(tmp_out(Nloc+1:),Nloc, MPI_DOUBLE_COMPLEX, ie_op%partner, ie_op%me+ie_op%comm_size,ie_op%ie_comm, IERROR)
+					CALL ZCOPY (Nloc, tmp_out, ONE, v_out, ONE)
+
 				ELSE
-					NextMult=.TRUE.
-					CALL MPI_BCAST(NextMult,1,MPI_LOGICAL, &
-					&ie_op%master_proc, ie_op%ie_comm, IERROR)
+					CALL MPI_SEND(v_in,Nloc, MPI_DOUBLE_COMPLEX, ie_op%partner, ie_op%me,ie_op%ie_comm, IERROR)
+					CALL APPLY_IE_ZEROS(ie_op)
+					CALL MPI_RECV(v_out,Nloc, MPI_DOUBLE_COMPLEX, ie_op%partner, ie_op%partner+ie_op%comm_size,ie_op%ie_comm, IERROR,MPI_STATUS_IGNORE)
 				ENDIF
-				CALL APPLY_IE_OP(ie_op,v_in,v_out)
+
 			CASE(PRECONDRIGHT)
 				work_gmres(1:Nloc)=v_in
 				work_gmres(Nloc+1:2*Nloc)=v_in
@@ -273,15 +265,18 @@ MODULE IE_SOLVER_MODULE
 						CASE(MATVEC)
 							v_in2=>work_gmres(colx2:colx2+Nloc-1)
 							v_out2=>work_gmres(colz2:colz2+Nloc-1)
-							IF (.NOT. ie_op%master) THEN
-								CALL MPI_BCAST(NextMult,1,MPI_LOGICAL, &
-								&ie_op%master_proc, ie_op%ie_comm, IERROR)
+							IF (ie_op%real_space) THEN
+								CALL ZCOPY (Nloc, v_in2, ONE, tmp_in, ONE)
+								CALL MPI_RECV(tmp_in(Nloc+1:),Nloc, MPI_DOUBLE_COMPLEX, ie_op%partner, ie_op%partner,ie_op%ie_comm, IERROR,MPI_STATUS_IGNORE)
+								CALL APPLY_IE_OP(ie_op,tmp_in,tmp_out)
+								CALL MPI_SEND(tmp_out(Nloc+1:),Nloc, MPI_DOUBLE_COMPLEX, ie_op%partner, ie_op%me+ie_op%comm_size,ie_op%ie_comm, IERROR)
+								CALL ZCOPY (Nloc, tmp_out, ONE, v_out2, ONE)
+
 							ELSE
-								NextMult=.TRUE.
-								CALL MPI_BCAST(NextMult,1,MPI_LOGICAL, &
-								&ie_op%master_proc, ie_op%ie_comm, IERROR)
+								CALL MPI_SEND(v_in2,Nloc, MPI_DOUBLE_COMPLEX, ie_op%partner, ie_op%me,ie_op%ie_comm, IERROR)
+								CALL APPLY_IE_ZEROS(ie_op)
+								CALL MPI_RECV(v_out2,Nloc, MPI_DOUBLE_COMPLEX, ie_op%partner, ie_op%partner+ie_op%comm_size,ie_op%ie_comm, IERROR,MPI_STATUS_IGNORE)
 							ENDIF
-							CALL APPLY_IE_OP(ie_op,v_in2,v_out2)
 						CASE (DOTPROD)
 							time1=GetTime()
 							CALL zgemv('C',Nloc,nbscal2,C_ONE,&
@@ -311,19 +306,16 @@ MODULE IE_SOLVER_MODULE
 				EXIT
 			END SELECT
 		ENDDO
-		IF (.NOT. ie_op%master) THEN
-			CALL MPI_BCAST(NextMult,1,MPI_LOGICAL, &
-				&ie_op%master_proc, ie_op%ie_comm, IERROR)
+		IF (ie_op%real_space) THEN
+			CALL MPI_RECV(work_fgmres(Nloc+1:),Nloc, MPI_DOUBLE_COMPLEX, ie_op%partner, ie_op%partner,ie_op%ie_comm, IERROR,MPI_STATUS_IGNORE)
+			CALL ZCOPY (2*Nloc, work_fgmres, ONE, Esol, ONE)
 		ELSE
-			NextMult=.FALSE.
-			CALL MPI_BCAST(NextMult,1,MPI_LOGICAL, &
-				&ie_op%master_proc, ie_op%ie_comm, IERROR)
+			CALL MPI_SEND(work_fgmres,Nloc, MPI_DOUBLE_COMPLEX, ie_op%partner, ie_op%me,ie_op%ie_comm, IERROR)
 		ENDIF
-		CALL ZCOPY (Nloc, work_fgmres, ONE, Esol, ONE)
 		DEALLOCATE(aux,work_fgmres,work_gmres)
-		CALL MPI_COMM_FREE(comm_inner,IERROR)
-		CALL MPI_COMM_FREE(comm_outer,IERROR)
-		CALL MPI_COMM_FREE(fgmres_comm,IERROR)
+		DEALLOCATE(tmp_in,tmp_out)
+		!CALL MPI_COMM_FREE(comm_inner,IERROR)
+		!CALL MPI_COMM_FREE(comm_outer,IERROR)
 		full_time=GetTime()-full_time
 		ie_op%counter%solving=full_time
 		IF (info(1)==0) THEN
