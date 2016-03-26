@@ -86,7 +86,7 @@ FC_Link=mpixlf2003_r
 AR=ar
 
 FFLAGS= -qessl -g -O5   -qsmp=omp   -qalias=std -qarch=450d -qhot -qmaxmem=-1  -qipa=partition=large -qunroll=yes -qipa=level=2
-FDEFS=-WF,-DLEGACY_MPI -WF,-DIBM_Bluegene  -WF,-DMPI_TIMER 
+FDEFS=-WF,-DLEGACY_MPI -WF,-DIBM_Bluegene  -WF,-DMPI_TIMER  -WF,-Dinternal_timer 
 FOPTS=$(FFLAGS) $(FDEFS)
 
 LIB_FFTW=-L/gpfs/opt/bgp/fftw/3.3.3-fast/lib -lfftw3_mpi  -lfftw3_omp   -lfftw3
@@ -98,7 +98,7 @@ INCLUDE= -I/opt/ibmmath/include -I/opt/ibmcmp/xlmass/bg/4.4/include -I/gpfs/opt/
 ifdef RECALC_ONLY
 INSTALL_PATH=~/bin/fast/giem2g_master_rc
 else
-INSTALL_PATH=~/bin/fast/giem2g_master
+INSTALL_PATH=~/bin/fast/giem2g_master_test
 endif
 
 endif

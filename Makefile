@@ -10,7 +10,7 @@ else
 	FILTER_WEIGHTS_O=IntegralCodes.o   VolumeBesselTransforms.o  
 	OPTS=$(FOPTS)
 endif
-MISC_O=const_module.o  mpi_module.o Logger_Module.o timer_module.o  check_memory_module.o
+MISC_O=const_module.o  mpi_module.o timer_module.o  Logger_Module.o check_memory_module.o
 FFT_O=fftw3_mod.o Distributed_FFT.o Local_OMP_FFT_module.o
 SAVE_LOAD_O=mpi_saveload_module.o
 MODEL_O=data_types_module.o 
