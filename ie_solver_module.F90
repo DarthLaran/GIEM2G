@@ -43,12 +43,19 @@ MODULE IE_SOLVER_MODULE
 			ENDDO
 			ALLOCATE(guess(ie_op%Nx,ie_op%Ny_loc,ie_op%Nz,3))
 			IF (PRESENT(E0)) THEN
-				DO Iz=1,Nz
-					guess(:,:,Iz,:)=ie_op%sqsigb(Iz)*E0(:,:,Iz,:)
-				ENDDO
+			    DO Iy=1,Ny_loc
+				    DO Ix=1,ie_op%Nx
+					    DO Ic=1,3
+						    DO Iz=1,Nz
+							    asiga=C_TWO*ie_op%sqsigb(Iz)/(ie_op%csiga(Ix,Iy,Iz)+CONJG(ie_op%csigb(Iz)))
+							    guess(Ix,Iy,Iz,Ic)=E0(Ix,Iy,Iz,Ic)/asiga
+						    ENDDO
+					    ENDDO
+				    ENDDO
+			    ENDDO
 			ELSE
-				guess=Esol
-			ENDIF			
+			    guess=Esol
+			ENDIF
 		ENDIF
 		CALL GIEM2G_FGMRES(ie_op,fgmres_ctl,Esol,guess)
 

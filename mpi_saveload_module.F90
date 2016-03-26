@@ -599,7 +599,7 @@ CONTAINS
 		CLOSE(277)
 	ENDSUBROUTINE
 	SUBROUTINE SaveIESolutionOneFileBinary(Eint,comm,fname)
-		COMPLEX(REALPARM),INTENT(IN)::Eint(1:,EX:,1:,1:)
+		COMPLEX(REALPARM),INTENT(IN)::Eint(1:,1:,1:,1:)
 		INTEGER(MPI_CTL_KIND),INTENT(IN)::comm
 		CHARACTER(*),INTENT(IN)::fname
 		INTEGER(MPI_CTL_KIND)::me, IERROR,csize
@@ -631,6 +631,55 @@ CONTAINS
 		ENDDO
 		CLOSE(77)
 		DEALLOCATE(Eint1)
+		CALL MPI_BARRIER(comm,IERROR)
+	ENDSUBROUTINE
+	SUBROUTINE LoadIESolutionOneFileBinary(Eint,comm,fname,success)
+		COMPLEX(REALPARM),INTENT(INOUT)::Eint(1:,1:,1:,1:)
+		INTEGER(MPI_CTL_KIND),INTENT(IN)::comm
+		CHARACTER(*),INTENT(IN)::fname
+		LOGICAL,INTENT(OUT)::success
+		INTEGER(MPI_CTL_KIND)::me, IERROR,csize
+		INTEGER::fsize,fshape(4)
+		INTEGER(MPI_CTL_KIND):: REC_STATUS(MPI_STATUS_SIZE)
+		INTEGER::Ix,Iy,I
+		COMPLEX(REALPARM),POINTER::Eint1(:,:,:,:)
+		REAL(REALPARM)::x,y
+		   
+		CALL MPI_COMM_RANK(comm, me, IERROR)
+		CALL MPI_COMM_SIZE(comm, csize, IERROR)
+		fsize=SIZE(Eint)
+		
+
+		IF (me/=0) THEN
+			CALL MPI_RECV(success, 1, MPI_LOGICAL,0,me+2*csize,comm,REC_STATUS, IERROR)
+!			PRINT*, 'Load?', success,me
+			IF (success) THEN
+				CALL MPI_RECV(Eint, fsize, MPI_DOUBLE_COMPLEX,0,me,comm,REC_STATUS, IERROR)
+			    ENDIF
+			CALL MPI_BARRIER(comm,IERROR)
+			RETURN
+		ENDIF
+		IF (me==0) THEN
+			fshape=SHAPE(Eint)
+			INQUIRE ( FILE=fname//'.bin',EXIST = success)
+!			PRINT*, 'Load?', success
+			IF (success) THEN
+				ALLOCATE(Eint1(fshape(1),fshape(2),fshape(3),fshape(4)))
+				OPEN(UNIT = 77,STATUS='old',FILE=fname//'.bin',form='unformatted',access="stream")
+				READ (UNIT =77) Eint
+				DO I=1,csize-1
+					READ (UNIT =77) Eint1
+					CALL MPI_SEND(success, 1, MPI_LOGICAL, I, I+2*csize,comm, IERROR)
+					CALL MPI_SEND(Eint1, fsize, MPI_DOUBLE_COMPLEX, I, I,comm, IERROR)
+				ENDDO
+				CLOSE(77)
+				DEALLOCATE(Eint1)
+		    ELSE
+				DO I=1,csize-1
+					CALL MPI_SEND(success, 1, MPI_LOGICAL, I, I+2*csize,comm, IERROR)
+				ENDDO
+			    ENDIF
+		    ENDIF
 		CALL MPI_BARRIER(comm,IERROR)
 	ENDSUBROUTINE
 	SUBROUTINE LoadIESolutionSeparateBinary(Eint,tag,fname)

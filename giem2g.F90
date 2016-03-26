@@ -38,6 +38,7 @@ INTEGER::N,Nfreq,Nr
 INTEGER::NT
 LOGICAL::threads_ok
 LOGICAL::SAVE_SOLUTION
+LOGICAL::success
 INTEGER(MPI_CTL_KIND)::wcomm,wsize,me,real_comm
 TYPE (BKG_DATA_TYPE)::bkg
 TYPE (ANOMALY_TYPE)::anomaly
@@ -235,10 +236,25 @@ DO Ifreq=1,Nfreq
 		CALL SetAnomalySigma(ie_op,anomaly%siga,freqs(Ifreq))
 		rc_op%csigb=>ie_op%csigb
 		rc_op%csiga=>ie_op%csiga
-		IF (Ifreq==1) THEN
+
+		time2=GetTime()
+		success=.TRUE.
+		IF (ie_op%real_space) THEN
+			CALL LoadIESolutionOneFIleBinary(Eprevy,real_comm,'SOL_PY_F'//trim(fnum1)//'T_'//trim(fnum2),success)
+		ENDIF
+		time2=GetTime()-time2;
+		IF (success) THEN
+			CALL PRINT_CALC_TIME("Load IE Solution in",time2)
+		ELSE
+		    CALL LOGGER("Solution guess not found")
+		ENDIF
+		CALL MPI_BARRIER(ie_op%ie_comm,IERROR)
+		IF (success) THEN
+				CALL SolveEquation(ie_op,fgmres_ctl,E_bkg,E_sol,Eprevy)
+		ELSEIF (Ifreq==1) THEN
 			CALL SolveEquation(ie_op,fgmres_ctl,E_bkg,E_sol)
 		ELSE
-			CALL SolveEquation(ie_op,fgmres_ctl,E_bkg,E_sol,Eprevy)
+				CALL SolveEquation(ie_op,fgmres_ctl,E_bkg,E_sol,Eprevy)
 		ENDIF
 		Eprevy=E_sol
 #ifndef performance_test
@@ -273,8 +289,20 @@ DO Ifreq=1,Nfreq
 			CALL PlaneWaveIntegral(EX,bkg,anomaly,E_bkg)
 			CALL PlaneWave(EX,bkg,recv_depths,FX)
 		ENDIF
-
-		IF (Ifreq==1) THEN
+		success=.TRUE.
+		IF (ie_op%real_space) THEN
+			CALL LoadIESolutionOneFIleBinary(Eprevx,real_comm,'SOL_PX_F'//trim(fnum1)//'T_'//trim(fnum2),success)
+		ENDIF
+		time2=GetTime()-time2;
+		IF (success) THEN
+			CALL PRINT_CALC_TIME("Load IE Solution in",time2)
+		ELSE
+		    CALL LOGGER("Solution guess not found")
+		ENDIF
+		CALL MPI_BARRIER(ie_op%ie_comm,IERROR)
+		IF (success) THEN
+			CALL SolveEquation(ie_op,fgmres_ctl,E_bkg,E_sol,Eprevx)
+		ELSEIF (Ifreq==1) THEN
 			CALL SolveEquation(ie_op,fgmres_ctl,E_bkg,E_sol)
 		ELSE
 			CALL SolveEquation(ie_op,fgmres_ctl,E_bkg,E_sol,Eprevx)
