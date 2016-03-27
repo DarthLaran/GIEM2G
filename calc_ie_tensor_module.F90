@@ -105,8 +105,35 @@ CONTAINS
 		ENDIF
 
 
-		CALL CalcGeneralTensorAlongXY(xfirst,Nx2,Ny_offset,Ny_loc,G_symm,G_asym,&
-					&time,anomaly,bkg,ie_op%dz)
+			!$OMP PARALLEL PRIVATE(Ix,Iy,ly),DEFAULT(SHARED)&
+			!$OMP &FIRSTPRIVATE(time)
+#ifdef internal_timer
+			!$OMP DO SCHEDULE(GUIDED)&
+			!$OMP& REDUCTION (MAX:time1,time2,time3,time4)
+#else
+			!$OMP DO SCHEDULE(GUIDED)
+#endif
+				DO Ix=0,Nx2-1
+                        		DO Iy=Ny_offset,Ny_offset+Ny_loc-1
+                                		ly=MODULO(Iy,Ny)
+	        				CALL CalcIntegralGreenTensor3dElementGeneral(Ix+xfirst,ly,G_symm(:,:,Iy,Ix),&
+		        			&G_asym(:,:,:,Iy,Ix),time,anomaly,bkg,ie_op%dz)
+			        	ENDDO
+                                ENDDO
+			!$OMP ENDDO
+#ifdef internal_timer
+				time1=time(1)
+				time2=time(2)
+				time3=time(3)
+				time4=time(4)
+			!$OMP END PARALLEL
+			time(1)=time1
+			time(2)=time2
+			time(3)=time3
+			time(4)=time4
+#else
+			!$OMP END PARALLEL
+#endif
 
 #ifdef internal_timer
 		time(3)=time(2)-time(4) 
@@ -198,8 +225,8 @@ CONTAINS
 		TYPE (BKG_DATA_TYPE),INTENT(IN)::bkg
 		TYPE (ANOMALY_TYPE),INTENT(IN)::anomaly
 		REAL(REALPARM),INTENT(IN)::dz(anomaly%Nz)
-		COMPLEX(REALPARM),INTENT(INOUT)::G_symm(anomaly%Nz*(anomaly%Nz+1)/2,S_EXX:S_EZZ)
-		COMPLEX(REALPARM),INTENT(INOUT)::G_asym(anomaly%Nz,anomaly%Nz,A_EXZ:A_EYZ)
+		COMPLEX(REALPARM),INTENT(OUT)::G_symm(anomaly%Nz*(anomaly%Nz+1)/2,S_EXX:S_EZZ)
+		COMPLEX(REALPARM),INTENT(OUT)::G_asym(anomaly%Nz,anomaly%Nz,A_EXZ:A_EYZ)
 		REAL(REALPARM),INTENT(INOUT)::calc_time(4)
 		COMPLEX(REALPARM)::G1(EXX:EZZ,anomaly%Nz,anomaly%Nz)
 		REAL(REALPARM2)::W0(1:6),W(1:6),dx,dy
@@ -263,8 +290,8 @@ CONTAINS
 	SUBROUTINE COMPUTE_WEIGHTS(lx,ly,dx,dy,WT,W0)
 		INTEGER,INTENT(IN)::lx,ly
 		REAL(REALPARM),INTENT(IN)::dx,dy
-		REAL(REALPARM),INTENT(INOUT)::WT(Nfirst:Nlast,1:6)
-		REAL(REALPARM),INTENT(INOUT)::W0(1:6)
+		REAL(REALPARM),INTENT(OUT)::WT(Nfirst:Nlast,1:6)
+		REAL(REALPARM),INTENT(OUT)::W0(1:6)
 		REAL(REALPARM2)::WT0(Nfirst:Nlast,1:6)
 		REAL(REALPARM)::x,y,lm,r
 		INTEGER::Iwt(6)

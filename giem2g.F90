@@ -145,6 +145,9 @@ ALLOCATE(recv_depths(Nr))
 CALL PrepareRecvs(recvs,anomaly,bkg)
 DO Ir=1,Nr
 	recv_depths(Ir)=recvs(Ir)%zrecv
+	IF (me==0) THEN
+	    PRINT*,recvs(Ir)%anom_cell,recvs(Ir)%zrecv
+	ENDIF
 ENDDO
 CALL PRINT_BORDER
 WRITE (message,'(A, I5, A, I5, A, I5)') 'Nx=',anomaly%Nx, ' Ny=',anomaly%Ny,' Nz=',anomaly%Nz
@@ -219,7 +222,13 @@ DO Ifreq=1,Nfreq
 
 #ifndef performance_test
 	CALL CalcRecalculationGreenTensor(rc_op,bkg,anomaly)
+	IF (me==0) THEN
+	    PRINT*, rc_op%G_E(1,1,:,0,0)
+	ENDIF
 	CALL CalcFFTofRCTensor(rc_op)
+	IF (me==0) THEN
+	    PRINT*, rc_op%G_E(1,1,:,0,0)
+	ENDIF
 #endif
 	DO Ia=1,Na
 		WRITE (fnum2,'(I5.5)') Ia
