@@ -174,7 +174,7 @@ CONTAINS
 			e=C_ONE
 		ENDIF
 		
-		DO I=1,N2
+		DO I=N1,N2
 			IF (l/=anomaly%Lnumber(I)) THEN
 				e=C_ONE
 			ENDIF

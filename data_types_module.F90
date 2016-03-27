@@ -107,6 +107,36 @@ MODULE Data_Types_Module
 			TYPE (RECEIVER_TYPE),POINTER,INTENT(INOUT)::recvs(:)
 			TYPE (ANOMALY_TYPE),INTENT(IN)::anomaly
 			TYPE (BKG_DATA_TYPE),TARGET,INTENT(IN)::bkg
+			INTEGER::I,Nr,l,Iz
+			REAL(REALPARM)::zrecv
+			Nr=SIZE(recvs)
+			DO I=1,Nr
+				zrecv=recvs(I)%zrecv
+				recvs(I)%recv_layer=MAX(GetLayer(zrecv,bkg),1)
+				IF (zrecv<=anomaly%z(0)) THEN
+					recvs(I)%anom_cell=0
+					
+				ELSEIF (zrecv>=anomaly%z(anomaly%Nz)) THEN
+					recvs(I)%anom_cell=anomaly%Nz+1
+				ELSE
+				    DO Iz=1,anomaly%Nz
+					IF (abs(zrecv/anomaly%z(Iz)-1)<1e-7) THEN
+					    recvs(I)%anom_cell=Iz
+					    EXIT
+					ELSEIF (zrecv>anomaly%z(Iz-1) .AND. zrecv< anomaly%z(Iz)) THEN
+						recvs(I)%zrecv=anomaly%z(Iz-1)
+						recvs(I)%anom_cell=Iz-1
+						EXIT
+					ENDIF
+				    ENDDO
+				ENDIF
+			ENDDO
+	END SUBROUTINE
+
+	SUBROUTINE PrepareRecvs2(recvs,anomaly,bkg)
+			TYPE (RECEIVER_TYPE),POINTER,INTENT(INOUT)::recvs(:)
+			TYPE (ANOMALY_TYPE),INTENT(IN)::anomaly
+			TYPE (BKG_DATA_TYPE),TARGET,INTENT(IN)::bkg
 			INTEGER::I,Nr,l
 			REAL(REALPARM)::zrecv
 			Nr=SIZE(recvs)
@@ -127,7 +157,6 @@ MODULE Data_Types_Module
 				ENDIF
 			ENDDO
 	END SUBROUTINE
-
 	SUBROUTINE AllocateSiga(anomaly)
 		TYPE (ANOMALY_TYPE),INTENT(INOUT)::anomaly
 		IF (ASSOCIATED(anomaly%siga))	DEALLOCATE(anomaly%siga)

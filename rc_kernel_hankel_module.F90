@@ -68,7 +68,7 @@ MODULE RC_Kernel_Image_Module
 		ENDDO
 		Nz=anomaly%Nz
 		CALL Calc_Recv_Part(bkg,anomaly,p,q,eta,recv,w1,w2)
-
+		Ftb=C_ZERO
 		IF (recv%anom_cell<1) THEN
 			CALL Calc_qexpz(bkg,anomaly,expz,eta,q,qez)
 			CALL Calc_Ftb(bkg,anomaly,expz,eta,qez,1,Nz,Ftb)
@@ -79,8 +79,11 @@ MODULE RC_Kernel_Image_Module
 			CALL Calc_G_not_match(bkg,anomaly,A,eta,recv,lm2,Ftb,w1,w2,G)
 		ELSE
 			N=recv%anom_cell
-			CALL Calc_pexpz(bkg,anomaly,expz,eta,p,1,N,pez)
-			CALL Calc_qexpz(bkg,anomaly,expz,eta,q,N+1,Nz,qez)
+!			CALL Calc_pexpz(bkg,anomaly,expz,eta,p,1,N,pez)
+!			CALL Calc_qexpz(bkg,anomaly,expz,eta,q,N+1,Nz,qez)
+
+			CALL Calc_pexpz(bkg,anomaly,expz,eta,p,pez)
+			CALL Calc_qexpz(bkg,anomaly,expz,eta,q,qez)
 
 			CALL Calc_Ftb(bkg,anomaly,expz,eta,pez,1,N,Ftb)
 			CALL Calc_Ftb(bkg,anomaly,expz,eta,qez,N+1,Nz,Ftb)
@@ -190,7 +193,7 @@ MODULE RC_Kernel_Image_Module
 		IF (rl<bkg%Nl) THEN
 			eta_dr=eta_r*bkg%depth(rl)*C_TWO
 		ELSE
-			eta_dr=C_ZERO
+			eta_dr=C_ONE*HUGE(recv%zrecv)
 		ENDIF
 		DO I=1,N2
 			l=anomaly%Lnumber(I)
