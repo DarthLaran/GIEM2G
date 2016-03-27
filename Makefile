@@ -21,8 +21,8 @@ IE_SOLVER=ie_solver_module.o
 RC_O=Continuation_Function_Module.o calc_rc_tensor_module.o
 SRC_O=sources_module.o
 API_O=giem2g_interfaces.o
-
-ALL_O=$(MISC_O) $(FILTER_WEIGHTS_O) $(MODEL_O) $(SAVE_LOAD_O) $(FFT_O) $(IE_IMAGE) $(IE_O) $(IE_SOLVER) $(RC_IMAGE)  $(RC_O) $(SRC_O) 
+FSON=FSON/*.o
+ALL_O=$(FSON) $(MISC_O) $(FILTER_WEIGHTS_O) $(MODEL_O) $(SAVE_LOAD_O) $(FFT_O) $(IE_IMAGE) $(IE_O) $(IE_SOLVER) $(RC_IMAGE)  $(RC_O) $(SRC_O) 
 ENGINE_O=$(MISC_O) $(FILTER_WEIGHTS_O) $(MODEL_O) $(FFT_O)  $(IE_IMAGE) $(IE_O)  $(API_O) 
 
 
