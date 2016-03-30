@@ -174,6 +174,7 @@ CONTAINS
 			y=ly*dy-dy/2d0+recvs(Irecv)%y_shift
 			r=SQRT(x*x+y*y)
 			CALL VBTransformWeightsAllSingleInt(x,y,dx,dy,WT0)
+!		CALL VBTransformWeightsAllDoubleInt(x,y,dx,dy,WT0)
 			WT(:,RC_D0)=WT0(:,1)
 			WT(:,RC_DXX)=WT0(:,2)
 			WT(:,RC_DXY)=WT0(:,3)

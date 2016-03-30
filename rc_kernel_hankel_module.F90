@@ -71,11 +71,11 @@ MODULE RC_Kernel_Image_Module
 		Ftb=C_ZERO
 		IF (recv%anom_cell<1) THEN
 			CALL Calc_qexpz(bkg,anomaly,expz,eta,q,qez)
-			CALL Calc_Ftb(bkg,anomaly,expz,eta,qez,1,Nz,Ftb)
+			CALL Calc_Ftb(bkg,anomaly,expz,eta,qez,1,Nz,Ftb,C_ONE)
 			CALL Calc_G_not_match(bkg,anomaly,A,eta,recv,lm2,Ftb,w1,w2,G)
 		ELSEIF (recv%anom_cell>anomaly%Nz) THEN
 			CALL Calc_pexpz(bkg,anomaly,expz,eta,p,pez)
-			CALL Calc_Ftb(bkg,anomaly,expz,eta,pez,1,Nz,Ftb)
+			CALL Calc_Ftb(bkg,anomaly,expz,eta,pez,1,Nz,Ftb,-C_ONE)
 			CALL Calc_G_not_match(bkg,anomaly,A,eta,recv,lm2,Ftb,w1,w2,G)
 		ELSE
 			N=recv%anom_cell
@@ -85,8 +85,8 @@ MODULE RC_Kernel_Image_Module
 			CALL Calc_pexpz(bkg,anomaly,expz,eta,p,pez)
 			CALL Calc_qexpz(bkg,anomaly,expz,eta,q,qez)
 
-			CALL Calc_Ftb(bkg,anomaly,expz,eta,pez,1,N,Ftb)
-			CALL Calc_Ftb(bkg,anomaly,expz,eta,qez,N+1,Nz,Ftb)
+			CALL Calc_Ftb(bkg,anomaly,expz,eta,pez,1,N,Ftb,-C_ONE)
+			CALL Calc_Ftb(bkg,anomaly,expz,eta,qez,N+1,Nz,Ftb,C_ONE)
 			CALL Calc_G_not_match(bkg,anomaly,A,eta,recv,lm2,Ftb,w1,w2,G)
 			!CALL Calc_G_match(bkg,anomaly,A,p,eta,recv,N,Fb,G)
 			
@@ -152,10 +152,15 @@ MODULE RC_Kernel_Image_Module
 			v1=w1(:,I)
 			v2=w2(:,I)
 			G(G1,I)=a1*f(1)*v1(1)
+
 			G(G3DZ,I)=(a2*f(3)*v2(2))/bkg%csigma(rl)
+
 			G(G2DZ,I)=(a2*f(2)*v2(2))/bkg%csigma(rl)
+
 			G(G2DZ0,I)=-(a2*f(3)*v2(1))/bkg%csigma(rl)
+
 			G(G2G2DZZ,I)=lm2*(a2*f(2)*v2(1))/bkg%csigma(rl)
+
 			G(G3,I)=(a2*f(3)*v2(1)-a1*f(1)*v1(2))
 			G(G1DZ,I)=a1*f(1)*v1(2)
 			G(G2,I)=a2*f(2)*v2(1)
@@ -206,11 +211,12 @@ MODULE RC_Kernel_Image_Module
 		ENDDO
 	END SUBROUTINE
 
-	SUBROUTINE Calc_Ftb(bkg,anomaly,expz,eta,pqexpz,N1,N2,Ftb)
+	SUBROUTINE Calc_Ftb(bkg,anomaly,expz,eta,pqexpz,N1,N2,Ftb,s)
 		TYPE (BKG_DATA_TYPE),INTENT(IN)::bkg
 		TYPE (ANOMALY_TYPE),INTENT(IN)::anomaly
 		COMPLEX(REALPARM),INTENT(IN)::expz(anomaly%Nz),pqexpz(2,anomaly%Nz)
 		COMPLEX(REALPARM),INTENT(IN)::eta(bkg%Nl)
+		COMPLEX(REALPARM),INTENT(IN)::s
 		INTEGER,INTENT(IN)::N1,N2
 		COMPLEX(REALPARM),INTENT(INOUT)::Ftb(3,anomaly%Nz)
 		COMPLEX(REALPARM)::e1(2),e2(2)
@@ -222,7 +228,7 @@ MODULE RC_Kernel_Image_Module
 			a=(C_ONE-expz(I))
 			a1=a/eta(l)	
 			e1=C_ONE+pqexpz(:,I)*expz(I)
-			e2=C_ONE-pqexpz(:,I)*expz(I)
+			e2=(C_ONE-pqexpz(:,I)*expz(I))*s
 
 			Ftb(1:2,I)=a1*e1
 			Ftb(3,I)=a(2)*e2(2)

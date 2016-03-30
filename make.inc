@@ -111,7 +111,7 @@ FC_Link=mpixlf2003_r
 AR=ar
 
 FFLAGS= -qessl -g -O0  -qsmp=omp   -qalias=std  -qmaxmem=-1 -qcheck 
-FDEFS=-WF,-DLEGACY_MPI -WF,-DIBM_Bluegene  -WF,-DMPI_TIMER  -WF,-Dinternal_timer  # -WF,-DVOLUME_WEIGHT_QUAD  #  -WF,-DNO_DISPLACEMENT_CURRENTS # 
+FDEFS=-WF,-DLEGACY_MPI -WF,-DIBM_Bluegene  -WF,-DMPI_TIMER  -WF,-Dinternal_timer   -WF,-DVOLUME_WEIGHT_QUAD  #  -WF,-DNO_DISPLACEMENT_CURRENTS # 
 FOPTS=$(FFLAGS) $(FDEFS)
 
 LIB_FFTW=-L/gpfs/opt/bgp/fftw/3.3.3-stable/lib -lfftw3_mpi  -lfftw3_omp   -lfftw3

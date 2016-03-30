@@ -53,6 +53,7 @@ INTEGER::Istr,Na,Ia,Ir,Nf
 CHARACTER(LEN=2048,KIND=C_CHAR)::message 
 INTEGER(C_INTPTR_T)::kernel_len,fft_len
 TYPE(C_PTR)::p1,p2,p3
+INTEGER::ll
 !-------------------MPI INITIALIZATION-------------------------------------!
 CALL MPI_INIT_THREAD(MPI_THREAD_FUNNELED, PROVIDED, IERROR)
 CALL InitTimer
@@ -217,19 +218,77 @@ DO Ifreq=1,Nfreq
 	CALL Set_Freq(bkg,freqs(Ifreq))
 
 	CALL CalcIntegralGreenTensor(ie_op,bkg,anomaly)
-	CALL CalcFFTofIETensor(ie_op)
 
 
 #ifndef performance_test
 	CALL CalcRecalculationGreenTensor(rc_op,bkg,anomaly)
 	IF (me==0) THEN
-	    PRINT*, rc_op%G_E(1,1,:,0,0)
+!	    PRINT*, rc_op%G_E(1,1,REXX,0,0)
+!	    PRINT*, ie_op%G_symm(1,S_EXX,0,0)
+!         	PRINT*,'%%%%%%%%%%%%%%%%%%%'
+
+!	    PRINT*, rc_op%G_E(1,1,REXX,1,0)
+!	    PRINT*, ie_op%G_symm(1,S_EXX,0,1)
+
+!		PRINT*,'%%%%%%%%%%%%%%%%%%%'
 	ENDIF
-	CALL CalcFFTofRCTensor(rc_op)
-	IF (me==0) THEN
-	    PRINT*, rc_op%G_E(1,1,:,0,0)
+	IF (me==10) THEN
+!	    PRINT*, rc_op%G_E(1,1,REXY,1,10) ,"DDD"
+!	    PRINT*, ie_op%G_symm(1,S_EXY,10,1),"DDD"
+
+         	PRINT*,'%%%%%%%%%%%%%%%%%%%'
+	    PRINT*, rc_op%G_E(1,1,REXZ,1,10) ,"DDD"
+	    PRINT*, ie_op%G_asym(1,1,A_EXZ,10,1)/ie_op%dz(1),"DDD"
+         	PRINT*,'%%%%%%%%%%%%%%%%%%%'
+
+         	PRINT*,'%%%%%%%%%%%%%%%%%%%'
+	    PRINT*, rc_op%G_E(1,2,REXZ,1,10) ,"DDD"
+	    PRINT*, ie_op%G_asym(ie_op%Nz,1,A_EXZ,10,1)/ie_op%dz(ie_op%Nz),"DDD"
+         	PRINT*,'%%%%%%%%%%%%%%%%%%%'
+
+         	PRINT*,'%%%%%%%%%%%%%%%%%%%'
+	    PRINT*, rc_op%G_E(ie_op%Nz,1,REXZ,1,10) ,"DDD"
+	    PRINT*, ie_op%G_asym(1,ie_op%Nz,A_EXZ,10,1)/ie_op%dz(1),"DDD"
+         	PRINT*,'%%%%%%%%%%%%%%%%%%%'
+
+	    PRINT*, rc_op%G_E(ie_op%Nz,2,REXZ,1,10) ,"DDD"
+	    PRINT*, ie_op%G_asym(ie_op%Nz,ie_op%Nz,A_EXZ,10,1)/ie_op%dz(ie_op%Nz),"DDD"
+
+	    PRINT*, rc_op%G_E(ie_op%Nz,2,REZX,1,10) ,"DDD"
+	    PRINT*, ie_op%G_asym(ie_op%Nz,ie_op%Nz,A_EXZ,10,1)/ie_op%dz(ie_op%Nz),"DDD"
+
+!	    PRINT*, rc_op%G_E(ie_op%Nz-1,2,REXZ,1,10) ,"DDD"
+!	    PRINT*, ie_op%G_asym(ie_op%Nz,ie_op%Nz-1,A_EXZ,10,1),"DDD"
+
+
+!	    PRINT*, rc_op%G_E(ie_op%Nz-2,2,REXZ,1,10) ,"DDD"
+!	    PRINT*, ie_op%G_asym(ie_op%Nz,ie_op%Nz-2,A_EXZ,10,1),"DDD"
+
+!	    PRINT*, rc_op%G_E(ie_op%Nz-3,2,REXZ,1,10) ,"DDD"
+!	    PRINT*, ie_op%G_asym(ie_op%Nz,ie_op%Nz-3,A_EXZ,10,1),"DDD"
+
+!	    PRINT*, rc_op%G_E(3,2,REXZ,1,10) ,"DDD"
+!	    PRINT*, ie_op%G_asym(ie_op%Nz,3,A_EXZ,10,1),"DDD"
+         	PRINT*,'%%%%%%%%%%% SYMM  %%%%%%%%'
+		ll=(ie_op%Nz*(ie_op%Nz+1))/2
+
+	    PRINT*, rc_op%G_E(ie_op%Nz,2,REXY,1,10) ,"DDD"
+	    PRINT*, ie_op%G_symm(ll,S_EXY,10,1)/ie_op%dz(ie_op%Nz),"DDD"
+
+         	PRINT*,'%%%%%%%%%%%%%%%%%%%'
+	    PRINT*, rc_op%G_E(ie_op%Nz,2,REXX,1,10) ,"DDD"
+	    PRINT*, ie_op%G_symm(ll,S_EXX,10,1)/ie_op%dz(ie_op%Nz),"DDD"
+         	PRINT*,'%%%%%%%%%%%%%%%%%%%'
+	    PRINT*, rc_op%G_E(ie_op%Nz,2,REYY,1,10) ,"DDD"
+	    PRINT*, ie_op%G_symm(ll,S_EYY,10,1)/ie_op%dz(ie_op%Nz),"DDD"
+         	PRINT*,'%%%%%%%%%%%%%%%%%%%'
+	    PRINT*, rc_op%G_E(ie_op%Nz,2,REZZ,1,10) ,"DDD"
+	    PRINT*, ie_op%G_symm(ll,S_EZZ,10,1)/ie_op%dz(ie_op%Nz),"DDD"
+         	PRINT*,'%%%%%%%%%%%%%%%%%%%'
 	ENDIF
 #endif
+	CALL CalcFFTofIETensor(ie_op)
+	CALL CalcFFTofRCTensor(rc_op)
 	DO Ia=1,Na
 		WRITE (fnum2,'(I5.5)') Ia
 		WRITE (message,'(A, I4, 2A )') 'Anomaly ', Ia, ' from ', trim(anom_list(Ia))
@@ -266,6 +325,15 @@ DO Ifreq=1,Nfreq
 				CALL SolveEquation(ie_op,fgmres_ctl,E_bkg,E_sol,Eprevy)
 		ENDIF
 		Eprevy=E_sol
+
+		CALL MPI_BARRIER(ie_op%ie_comm,IERROR)
+
+		IF (me==10) THEN
+		    PRINT*, Eprevy(10,1,1,:)
+		    PRINT*,'------------------'
+		    PRINT*, Eprevy(10,1,ie_op%Nz-1,:)
+		    PRINT*, Eprevy(10,1,ie_op%Nz,:)
+		ENDIF
 #ifndef performance_test
 		IF (SAVE_SOLUTION) THEN
 			time2=GetTime()
@@ -281,6 +349,7 @@ DO Ifreq=1,Nfreq
 		time2=GetTime()
 		IF (ie_op%real_space) THEN
 			DO Ir=1,Nr
+
 				Et(Ir,EX,:,:)=Ea(Ir,EX,:,:)+FY(Ir,1,1,EX)
 				Et(Ir,EY,:,:)=Ea(Ir,EY,:,:)+FY(Ir,1,1,EY)
 				Et(Ir,EZ,:,:)=Ea(Ir,EZ,:,:)+FY(Ir,1,1,EZ)
@@ -290,6 +359,20 @@ DO Ifreq=1,Nfreq
 				Ht(Ir,HZ,:,:)=Ha(Ir,HZ,:,:)+FY(Ir,1,1,HZ)
 			ENDDO
 			CALL SaveOutputOneFile(Ea,Et,Ha,Ht,anomaly,recvs,freqs(Ifreq),real_comm,'PY_F'//trim(fnum1)//'T_'//trim(fnum2))
+		ENDIF
+		IF (me==10) THEN
+		    PRINT*, Et(1,1,10,1)
+		    PRINT*, Et(1,2,10,1)
+		    PRINT*, Et(1,3,10,1)
+
+		PRINT*,'%%%%%%%%%%%%%%%%%%%%'
+		    PRINT*, Et(2,1,10,1)
+		    PRINT*, Et(2,2,10,1)
+		    PRINT*, Et(2,3,10,1)
+		PRINT*,'%%%%%%%%%%%%%%%%%%%%'
+		    PRINT*, Et(3,1,10,1)
+		    PRINT*, Et(3,2,10,1)
+		    PRINT*, Et(3,3,10,1)
 		ENDIF
 		time2=GetTime()-time2;
 		CALL PRINT_CALC_TIME("Save fields in",time2) 
@@ -317,6 +400,13 @@ DO Ifreq=1,Nfreq
 			CALL SolveEquation(ie_op,fgmres_ctl,E_bkg,E_sol,Eprevx)
 		ENDIF
 		Eprevx=E_sol
+		CALL MPI_BARRIER(ie_op%ie_comm,IERROR)
+		IF (me==10) THEN
+		    PRINT*, Eprevx(10,1,1,:)!
+		    PRINT*,'------------------'
+		    PRINT*, Eprevx(10,1,ie_op%Nz-1,:)
+		    PRINT*, Eprevx(10,1,ie_op%Nz,:)
+		ENDIF
 #ifndef performance_test
 		IF (SAVE_SOLUTION) THEN
 			time2=GetTime()
@@ -343,6 +433,20 @@ DO Ifreq=1,Nfreq
 				Ht(Ir,HZ,:,:)=Ha(Ir,HZ,:,:)+FX(Ir,1,1,HZ)
 			ENDDO
 			CALL SaveOutputOneFile(Ea,Et,Ha,Ht,anomaly,recvs,freqs(Ifreq),real_comm,'PX_F'//trim(fnum1)//'T_'//trim(fnum2))
+		ENDIF
+		IF (me==10) THEN
+		    PRINT*, Et(1,1,10,1)
+		    PRINT*, Et(1,2,10,1)
+		    PRINT*, Et(1,3,10,1)
+
+		PRINT*,'%%%%%%%%%%%%%%%%%%%%'
+		    PRINT*, Et(2,1,10,1)
+		    PRINT*, Et(2,2,10,1)
+		    PRINT*, Et(2,3,10,1)
+		PRINT*,'%%%%%%%%%%%%%%%%%%%%'
+		    PRINT*, Et(3,1,10,1)
+		    PRINT*, Et(3,2,10,1)
+		    PRINT*, Et(3,3,10,1)
 		ENDIF
 		time2=GetTime()-time2;
 		CALL PRINT_CALC_TIME("Save fields in",time2) 
