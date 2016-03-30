@@ -157,7 +157,7 @@ MODULE RC_Kernel_Image_Module
 
 			G(G2DZ,I)=(a2*f(2)*v2(2))/bkg%csigma(rl)
 
-			G(G2DZ0,I)=-(a2*f(3)*v2(1))/bkg%csigma(rl)
+			G(G2DZ0,I)=(a2*f(3)*v2(1))/bkg%csigma(rl)
 
 			G(G2G2DZZ,I)=lm2*(a2*f(2)*v2(1))/bkg%csigma(rl)
 

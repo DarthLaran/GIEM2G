@@ -181,6 +181,18 @@ CONTAINS
 		CALL MPI_BCAST(freq,Nfreq,MPI_DOUBLE_PRECISION, 0, comm, IERROR)
 	ENDSUBROUTINE
 
+	SUBROUTINE LoadStations(filename,stations)
+		REAL(REALPARM),INTENT(INOUT),POINTER::stations(:,:)
+		CHARACTER(*),INTENT(IN)::filename
+		INTEGER(MPI_CTL_KIND)::me,IERROR
+		INTEGER:: N
+			OPEN(078,file=filename)
+			READ(078,*) N
+			ALLOCATE(stations(3,N))
+			READ(078,*) stations
+			CLOSE(078)
+			stations=stations*1000
+	ENDSUBROUTINE
 	SUBROUTINE LoadRecievers(recvs,comm,recievers)
 		TYPE (RECEIVER_TYPE),POINTER,INTENT(INOUT)::recvs(:)
 		INTEGER(MPI_CTL_KIND),INTENT(IN)::comm
@@ -495,6 +507,123 @@ CONTAINS
 				ENDDO
 			ENDDO
 		ENDDO
+		CLOSE(77)
+		DEALLOCATE(Ea1,Ha1,Et1,Ht1)
+		CALL MPI_BARRIER(comm,IERROR)
+	ENDSUBROUTINE
+	SUBROUTINE SaveOutputOneFileStations(Ea,Et,Ha,Ht,anomaly,recvs,freq,comm,fname,stations,dz)
+		COMPLEX(REALPARM),POINTER,INTENT(IN)::Ea(:,:,:,:)
+		COMPLEX(REALPARM),POINTER,INTENT(IN)::Et(:,:,:,:)
+		COMPLEX(REALPARM),POINTER,INTENT(IN)::Ha(:,:,:,:)
+		COMPLEX(REALPARM),POINTER,INTENT(IN)::Ht(:,:,:,:)
+		REAL(REALPARM),POINTER,INTENT(IN)::stations(:,:)
+		TYPE (RECEIVER_TYPE),POINTER,INTENT(IN)::recvs(:)
+		TYPE (ANOMALY_TYPE),INTENT(IN)::anomaly
+		REAL(REALPARM),INTENT(IN)::freq,dz
+		INTEGER(MPI_CTL_KIND),INTENT(IN)::comm
+		CHARACTER(*),INTENT(IN)::fname
+		CHARACTER(LEN=*), PARAMETER  :: output_fmt = "(A1, 28ES20.10E3)"
+		CHARACTER(LEN=*), PARAMETER  :: title_fmt = "(A1, 28A20)"
+		INTEGER(MPI_CTL_KIND):: REC_STATUS(MPI_STATUS_SIZE)
+		INTEGER(MPI_CTL_KIND)::me, IERROR,csize
+		INTEGER::Ir,Nr,Ns,st_shape(2)
+		INTEGER::fsize,fshape(4),fsize2
+		INTEGER::Ix,Iy,I,Ic,Is
+		COMPLEX(REALPARM),POINTER::Ea1(:,:,:,:),Et1(:,:,:,:)
+		COMPLEX(REALPARM),POINTER::Ha1(:,:,:,:),Ht1(:,:,:,:)
+		REAL(REALPARM)::x,y
+
+		CALL MPI_COMM_RANK(comm, me, IERROR)
+		CALL MPI_COMM_SIZE(comm, csize, IERROR)
+		Nr=SIZE(recvs)
+		fsize=SIZE(Ea)
+		IF (me==0) THEN
+			Ic=0
+			fshape=SHAPE(Ea)
+			st_shape=SHAPE(stations)
+			Ns=st_shape(1);
+			ALLOCATE(Ea1(fshape(1),EX:EZ,fshape(3),fshape(4)))
+			ALLOCATE(Et1(fshape(1),EX:EZ,fshape(3),fshape(4)))
+			ALLOCATE(Ha1(fshape(1),HX:HZ,fshape(3),fshape(4)))
+			ALLOCATE(Ht1(fshape(1),HX:HZ,fshape(3),fshape(4)))
+			OPEN(UNIT = 77,STATUS='replace',FILE=fname//'.dat')
+			WRITE (UNIT =77,FMT=title_fmt) "%","x_recv","y_recv","z_recv","frequency",&
+				&"Re Ex^a","Im Ex^a", "Re Ey^a", "Im Ey^a",&
+				&"Re Ez^a","Im Ez^a", "Re Hx^a", "Im Hx^a",&
+				&"Re Hy^a","Im Hy^a", "Re Hz^a", "Im Hz^a",&
+				&"Re Ex^t","Im Ex^t", "Re Ey^t", "Im Ey^t",&
+				&"Re Ez^t","Im Ez^t", "Re Hx^t", "Im Hx^t",&
+				&"Re Hy^t","Im Hy^t", "Re Hz^t", "Im Hz^t"
+
+			DO Ir=1,Nr
+				DO Iy=1,anomaly%Ny_loc
+					y=Iy*anomaly%dy-anomaly%dy/2d0+recvs(Ir)%y_shift
+					DO Ix=1,anomaly%Nx
+						x=Ix*anomaly%dx-anomaly%dx/2d0+recvs(Ir)%x_shift
+						DO Is=1,Ns
+						    IF   (ABS(x-stations(1,Is))<1.1*anomaly%dx) THEN
+							IF (ABS(y-stations(2,Is))<1.1*anomaly%dy) THEN
+							    IF(  ABS(recvs(Ir)%zrecv-stations(3,Is))<dz) THEN
+						WRITE (UNIT =77,FMT=output_fmt) " ",x,y,recvs(Ir)%zrecv,freq,&
+							& Ea(Ir,EX,Ix,Iy),Ea(Ir,EY,Ix,Iy),&
+							& Ea(Ir,EZ,Ix,Iy),Ha(Ir,HX,Ix,Iy),&
+							& Ha(Ir,HY,Ix,Iy),Ha(Ir,HZ,Ix,Iy),&
+							& Et(Ir,EX,Ix,Iy),Et(Ir,EY,Ix,Iy),&
+							& Et(Ir,EZ,Ix,Iy),Ht(Ir,HX,Ix,Iy),&
+							& Ht(Ir,HY,Ix,Iy),Ht(Ir,HZ,Ix,Iy)
+
+
+						    PRINT*,x,y,recvs(Ir)%zrecv,stations(:,Is)
+								    ENDIF
+								ENDIF
+						    ENDIF
+
+						ENDDO
+						Ic=Ic+1
+					ENDDO
+				ENDDO
+			ENDDO
+		ENDIF
+
+		IF (me/=0) THEN
+			CALL MPI_SEND(Ea, fsize, MPI_DOUBLE_COMPLEX,0,me,comm, IERROR)
+			CALL MPI_SEND(Ha, fsize, MPI_DOUBLE_COMPLEX, 0, me+csize,comm, IERROR)
+			CALL MPI_SEND(Et, fsize, MPI_DOUBLE_COMPLEX, 0, me+2*csize,comm, IERROR)
+			CALL MPI_SEND(Ht, fsize, MPI_DOUBLE_COMPLEX, 0, me+3*csize,comm, IERROR)
+			CALL MPI_BARRIER(comm,IERROR)
+			RETURN
+		ENDIF
+		DO I=1,csize-1
+			CALL MPI_RECV(Ea1, fsize, MPI_DOUBLE_COMPLEX, I, I,comm,REC_STATUS, IERROR)
+			CALL MPI_RECV(Ha1, fsize, MPI_DOUBLE_COMPLEX, I, I+csize,comm, REC_STATUS,IERROR)
+			CALL MPI_RECV(Et1, fsize, MPI_DOUBLE_COMPLEX, I, I+2*csize,comm, REC_STATUS,IERROR)
+			CALL MPI_RECV(Ht1, fsize, MPI_DOUBLE_COMPLEX, I, I+3*csize,comm, REC_STATUS,IERROR)
+			DO Ir=1,Nr
+				DO Iy=1,anomaly%Ny_loc
+					y=(Iy+I*anomaly%Ny_loc)*anomaly%dy-anomaly%dy/2d0+recvs(Ir)%y_shift
+					DO Ix=1,anomaly%Nx
+						x=Ix*anomaly%dx-anomaly%dx/2d0+recvs(Ir)%x_shift
+						DO Is=1,Ns
+						    IF   (ABS(x-stations(1,Is))<1.1*anomaly%dx) THEN
+							IF (ABS(y-stations(2,Is))<1.1*anomaly%dy) THEN
+							    IF(  ABS(recvs(Ir)%zrecv-stations(3,Is))<dz) THEN
+						WRITE (UNIT =77,FMT=output_fmt) " ",x,y,recvs(Ir)%zrecv,freq,&
+							& Ea1(Ir,EX,Ix,Iy),Ea1(Ir,EY,Ix,Iy),&
+							& Ea1(Ir,EZ,Ix,Iy),Ha1(Ir,HX,Ix,Iy),&
+							& Ha1(Ir,HY,Ix,Iy),Ha1(Ir,HZ,Ix,Iy),&
+							& Et1(Ir,EX,Ix,Iy),Et1(Ir,EY,Ix,Iy),&
+							& Et1(Ir,EZ,Ix,Iy),Ht1(Ir,HX,Ix,Iy),&
+							& Ht1(Ir,HY,Ix,Iy),Ht1(Ir,HZ,Ix,Iy)
+						    PRINT*,x,y,recvs(Ir)%zrecv,stations(:,Is)
+								    ENDIF
+							ENDIF
+						    ENDIF
+						ENDDO
+						Ic=Ic+1
+					ENDDO
+				ENDDO
+			ENDDO
+		    ENDDO
 		CLOSE(77)
 		DEALLOCATE(Ea1,Ha1,Et1,Ht1)
 		CALL MPI_BARRIER(comm,IERROR)
