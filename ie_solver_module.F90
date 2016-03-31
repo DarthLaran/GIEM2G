@@ -189,12 +189,14 @@ MODULE IE_SOLVER_MODULE
 		cntl(1) = misfit
 		cntl2(1) = misfit
 
+		icntl2(1) = 0
 		icntl2(2) = 0
 		icntl(6) = maxit 
 		IF (ie_op%me==0) THEN
+			icntl(1) = 0
+			icntl(2)=0
 			icntl(3) = 220
 			icntl2(3) = 320
-			icntl(2)=1
 		ELSE
 			icntl(1) = 0
 			icntl(2) = 0
