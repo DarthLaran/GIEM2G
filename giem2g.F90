@@ -120,7 +120,7 @@ CALL PRINT_CALC_NUMBER('Number of threads:',NT)
 SAVE_SOLUTION=.TRUE.
 
 SOLVE_EQUATION=.TRUE.
-RECALC_FIELD=.FALSE.
+RECALC_FIELD=.TRUE.
 
 #ifdef performance_test
 CALL LOGGER('PERFORMACE TEST')
@@ -220,7 +220,7 @@ IF (RECALC_FIELD) THEN
 	IF (me==0) THEN
 	    CALL LoadStations('stations.dat',stations)
 	ENDIF
-	mz=anomaly%dz(1)*0.6;
+	mz=anomaly%dz(1)*1.1;
 	IF (rc_op%real_space) THEN
 		anomaly%Ny_loc=rc_op%Ny_loc
 		CALL AllocateSiga(anomaly)
@@ -299,7 +299,7 @@ DO Ifreq=1,Nfreq
 			ELSE
 				CALL SolveEquation(ie_op,fgmres_ctl,E_bkg,E_sol,Eprevy)
 			ENDIF
-			Eprevy=E_sol
+			IF (ie_op%real_space)	Eprevy=E_sol
 
 			CALL MPI_BARRIER(ie_op%ie_comm,IERROR)
 			IF (SAVE_SOLUTION) THEN
@@ -340,9 +340,9 @@ DO Ifreq=1,Nfreq
 		    ENDIF
 		    IF (RECALC_FIELD) THEN
 			CALL ReCalculation(rc_op,Eprevy,Ea,Ha)
-			CALL PlaneWave(EY,bkg,recv_depths,FY)
 			time2=GetTime()
 			IF (rc_op%real_space) THEN
+				CALL PlaneWave(EY,bkg,recv_depths,FY)
 			    DO Ir=1,Nr
 
 				    Et(Ir,EX,:,:)=Ea(Ir,EX,:,:)+FY(Ir,1,1,EX)
@@ -382,7 +382,7 @@ DO Ifreq=1,Nfreq
 				ELSE
 					CALL SolveEquation(ie_op,fgmres_ctl,E_bkg,E_sol,Eprevx)
 				ENDIF
-				Eprevx=E_sol
+				IF (ie_op%real_space)	Eprevx=E_sol
 				CALL MPI_BARRIER(ie_op%ie_comm,IERROR)
 				IF (SAVE_SOLUTION) THEN
 					time2=GetTime()
@@ -412,9 +412,9 @@ DO Ifreq=1,Nfreq
 
 		    IF (RECALC_FIELD) THEN
 			CALL ReCalculation(rc_op,Eprevx,Ea,Ha)
-			CALL PlaneWave(EX,bkg,recv_depths,FX)
 			time2=GetTime()
 			IF (rc_op%real_space) THEN
+				CALL PlaneWave(EX,bkg,recv_depths,FX)
 				DO Ir=1,Nr
 					Et(Ir,EX,:,:)=Ea(Ir,EX,:,:)+FX(Ir,1,1,EX)
 					Et(Ir,EY,:,:)=Ea(Ir,EY,:,:)+FX(Ir,1,1,EY)

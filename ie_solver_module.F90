@@ -189,12 +189,14 @@ MODULE IE_SOLVER_MODULE
 		cntl(1) = misfit
 		cntl2(1) = misfit
 
+		icntl2(1) = 0
 		icntl2(2) = 0
 		icntl(6) = maxit 
 		IF (ie_op%me==0) THEN
-			icntl(3) = 220
-			icntl2(3) = 320
-			icntl(2)=1
+			icntl(1) = 0
+			icntl(2)=0
+			icntl(3) = 0
+			icntl2(3) = 0
 		ELSE
 			icntl(1) = 0
 			icntl(2) = 0
@@ -254,6 +256,13 @@ MODULE IE_SOLVER_MODULE
 				work_gmres(Nloc+1:2*Nloc)=v_in
 				Ngmres=0
 				DO
+					icntl2(1) = 0
+					icntl2(2) = 0
+					icntl2(3) = 0
+					icntl2(4) = 0
+					icntl2(5) =fgmres_ctl%ort_type
+					icntl2(6)=1
+					icntl2(7) = maxit_precond
 					CALL drive_zgmres(N_unknowns,Nloc,maxit_precond,l_gmres,&
 						& work_gmres(1:),irc2,icntl2,cntl2,info2,rinfo2) 
 					revcom2 = irc2(1)
