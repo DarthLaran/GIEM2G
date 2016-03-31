@@ -541,7 +541,7 @@ CONTAINS
 			Ic=0
 			fshape=SHAPE(Ea)
 			st_shape=SHAPE(stations)
-			Ns=st_shape(1);
+			Ns=st_shape(2);
 			ALLOCATE(Ea1(fshape(1),EX:EZ,fshape(3),fshape(4)))
 			ALLOCATE(Et1(fshape(1),EX:EZ,fshape(3),fshape(4)))
 			ALLOCATE(Ha1(fshape(1),HX:HZ,fshape(3),fshape(4)))
@@ -781,7 +781,6 @@ CONTAINS
 
 		IF (me/=0) THEN
 			CALL MPI_RECV(success, 1, MPI_LOGICAL,0,me+2*csize,comm,REC_STATUS, IERROR)
-!			PRINT*, 'Load?', success,me
 			IF (success) THEN
 				CALL MPI_RECV(Eint, fsize, MPI_DOUBLE_COMPLEX,0,me,comm,REC_STATUS, IERROR)
 			    ENDIF
@@ -791,7 +790,6 @@ CONTAINS
 		IF (me==0) THEN
 			fshape=SHAPE(Eint)
 			INQUIRE ( FILE=fname//'.bin',EXIST = success)
-!			PRINT*, 'Load?', success
 			IF (success) THEN
 				ALLOCATE(Eint1(fshape(1),fshape(2),fshape(3),fshape(4)))
 				OPEN(UNIT = 77,STATUS='old',FILE=fname//'.bin',form='unformatted',access="stream")

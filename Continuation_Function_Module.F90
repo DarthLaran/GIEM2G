@@ -147,6 +147,35 @@ CONTAINS
 		rc_op%csigb=>NULL()
 		anomaly%Ny_loc=rc_op%Ny_loc
 	ENDSUBROUTINE
+	SUBROUTINE FinalizeRCOperator(rc_op,bkg,anomaly,freq)
+		TYPE(RC_Operator),INTENT(INOUT)::rc_op
+		TYPE (BKG_DATA_TYPE),TARGET,INTENT(INOUT)::bkg
+		TYPE (ANOMALY_TYPE),TARGET,INTENT(INOUT)::anomaly
+		REAL(REALPARM),INTENT(IN)::freq
+		REAL(REALPARM)::w
+		INTEGER::Iz,Ix,Iy
+		IF (rc_op%real_space) THEN
+			IF (ASSOCIATED(rc_op%csigb)) DEALLOCATE(rc_op%csigb)
+			ALLOCATE(rc_op%csigb(rc_op%Nz))
+			DO Iz=1,rc_op%Nz
+					rc_op%csigb(Iz)=bkg%csigma(anomaly%Lnumber(Iz))
+			ENDDO
+			IF (ASSOCIATED(rc_op%csiga)) DEALLOCATE(rc_op%csiga)
+			ALLOCATE(rc_op%csiga(rc_op%Nx,rc_op%Ny_loc,rc_op%Nz))
+			w=freq*PI*2
+			DO Iz=1,rc_op%Nz
+			    DO Iy=1,rc_op%Ny_loc
+				DO Ix=1,rc_op%Nx
+#ifndef NO_DISPLACEMENT_CURRENTS
+					rc_op%csiga(Ix,Iy,Iz)=anomaly%siga(Iz,Ix,Iy)-C_IONE*w*EPS0	
+#else
+					rc_op%csiga(Ix,Iy,Iz)=anomaly%siga(Iz,Ix,Iy)	
+#endif
+				   ENDDO
+			ENDDO
+		    ENDDO
+		ENDIF
+	END SUBROUTINE
 #define no_compile	
 	SUBROUTINE ReCalculation(rc_op,Eint,Ea,Ha)
 		TYPE(RC_OPERATOR),INTENT(INOUT)::rc_op
