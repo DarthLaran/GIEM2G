@@ -70,7 +70,11 @@ module fson_path_m
        end subroutine array_callback_2d
 
     end interface
-
+        integer,allocatable:: arr_int_1d(:),arr_int_2d(:,:)
+        real,allocatable:: arr_real_1d(:),arr_real_2d(:,:)
+        double precision,allocatable:: arr_double_1d(:),arr_double_2d(:,:)
+        logical ,allocatable:: arr_log_1d(:),arr_log_2d(:,:)
+        character ,allocatable:: arr_ch_1d(:),arr_ch_2d(:,:)
 contains
     !
     ! GET BY PATH
@@ -81,8 +85,9 @@ contains
     ! []    = child array element
     !
     recursive subroutine get_by_path(this, path, p)
-        type(fson_value), pointer :: this, p        
-        character(len=*) :: path
+        type(fson_value), pointer,intent(in) :: this        
+        type(fson_value), pointer,intent(inout) ::  p        
+        character(len=*),intent(in) :: path
         integer :: i, length, child_i
         character :: c
         logical :: array        
@@ -189,9 +194,10 @@ contains
     ! GET INTEGER
     !
     subroutine get_integer(this, path, value)
-        type(fson_value), pointer :: this, p
-        character(len=*), optional :: path
-        integer :: value        
+        type(fson_value), pointer,intent(in) :: this
+        character(len=*),intent(in), optional :: path
+        integer,intent(out) :: value        
+        type(fson_value), pointer :: p
         
         
         nullify(p)                
@@ -228,9 +234,10 @@ contains
     ! GET REAL
     !
     subroutine get_real(this, path, value)
-        type(fson_value), pointer :: this, p
-        character(len=*), optional :: path
-        real :: value        
+        type(fson_value), pointer,intent(in) :: this 
+        character(len=*), optional,intent(in) :: path
+        real,intent(out) :: value        
+        type(fson_value), pointer :: p
         
         
         nullify(p)                
@@ -268,9 +275,10 @@ contains
     ! GET DOUBLE
     !
     subroutine get_double(this, path, value)
-        type(fson_value), pointer :: this, p
-        character(len=*), optional :: path
-        double precision :: value        
+        type(fson_value), pointer, intent(in) :: this
+        character(len=*), optional, intent(in) :: path
+        double precision, intent(out) :: value        
+        type(fson_value), pointer ::  p
         
         
         nullify(p)                
@@ -309,9 +317,10 @@ contains
     ! GET LOGICAL
     !
     subroutine get_logical(this, path, value)
-        type(fson_value), pointer :: this, p
-        character(len=*), optional :: path
-        logical :: value        
+        type(fson_value), pointer, intent(in) :: this
+        character(len=*), optional,intent(in) :: path
+        logical,intent(out) :: value        
+        type(fson_value), pointer ::  p
         
         
         nullify(p)                
@@ -343,10 +352,10 @@ contains
     ! GET CHARS
     !
     subroutine get_chars(this, path, value)
-        type(fson_value), pointer :: this, p
-        character(len=*), optional :: path
-        character(len=*) :: value  
-        
+        type(fson_value), pointer,intent(in) :: this
+        character(len=*), optional,intent(in) :: path
+        character(len=*),intent(inout) :: value  
+        type(fson_value), pointer ::  p
         nullify(p)                
         
         if(present(path)) then
@@ -421,22 +430,27 @@ contains
       type(fson_value), pointer, intent(in) :: this
       character(len=*), intent(in), optional :: path   
       integer, allocatable, intent(out) :: arr(:)
-
+        integer::l
       if (allocated(arr)) deallocate(arr)
+      if (allocated(arr_int_1d)) deallocate(arr_int_1d)
       call get_array_1d(this, path, array_callback_1d_integer)
 
-    contains
+     if (allocated(arr_int_1d)) then
+              l=SIZE(arr_int_1d)
+              allocate(arr(l))
+              arr=arr_int_1d
+              deallocate(arr_int_1d)
+      endif
+
+    end subroutine get_array_1d_integer
 
       subroutine array_callback_1d_integer(element, i, count)
         implicit none
         type(fson_value), pointer, intent(in) :: element
         integer, intent(in) :: i, count
-        if (.not. allocated(arr)) allocate(arr(count))
-        call fson_path_get(element, "", arr(i))
+        if (.not. allocated(arr_int_1d)) allocate(arr_int_1d(count))
+        call fson_path_get(element, "", arr_int_1d(i))
       end subroutine array_callback_1d_integer
-
-    end subroutine get_array_1d_integer
-
 !
 ! GET ARRAY REAL 1D
 !
@@ -447,21 +461,28 @@ contains
       character(len=*), intent(in), optional :: path   
       real, allocatable, intent(out) :: arr(:)
 
+        integer::l
       if (allocated(arr)) deallocate(arr)
+      if (allocated(arr_real_1d)) deallocate(arr_real_1d)
       call get_array_1d(this, path, array_callback_1d_real)
 
-    contains
+     if (allocated(arr_real_1d)) then
+              l=SIZE(arr_real_1d)
+              allocate(arr(l))
+              arr=arr_real_1d
+              deallocate(arr_real_1d)
+      endif
+
+
+    end subroutine get_array_1d_real
 
       subroutine array_callback_1d_real(element, i, count)
         implicit none
         type(fson_value), pointer, intent(in) :: element
         integer, intent(in) :: i, count
-        if (.not. allocated(arr)) allocate(arr(count))
-        call fson_path_get(element, "", arr(i))
+        if (.not. allocated(arr_real_1d)) allocate(arr_real_1d(count))
+        call fson_path_get(element, "", arr_real_1d(i))
       end subroutine array_callback_1d_real
-
-    end subroutine get_array_1d_real
-
 !
 ! GET ARRAY DOUBLE 1D
 !
@@ -471,21 +492,26 @@ contains
       type(fson_value), pointer, intent(in) :: this
       character(len=*), intent(in), optional :: path   
       double precision, allocatable, intent(out) :: arr(:)
-
+        integer::l
+        
       if (allocated(arr)) deallocate(arr)
+      if (allocated(arr_double_1d)) deallocate(arr_double_1d)
       call get_array_1d(this, path, array_callback_1d_double)
 
-    contains
-
+     if (allocated(arr_double_1d)) then
+              l=SIZE(arr_double_1d)
+              allocate(arr(l))
+              arr=arr_double_1d
+              deallocate(arr_double_1d)
+      endif
+    end subroutine get_array_1d_double
       subroutine array_callback_1d_double(element, i, count)
         implicit none
         type(fson_value), pointer, intent(in) :: element
         integer, intent(in) :: i, count
-        if (.not. allocated(arr)) allocate(arr(count))
-        call fson_path_get(element, "", arr(i))
+        if (.not. allocated(arr_double_1d)) allocate(arr_double_1d(count))
+        call fson_path_get(element, "", arr_double_1d(i))
       end subroutine array_callback_1d_double
-
-    end subroutine get_array_1d_double
 
 !
 ! GET ARRAY LOGICAL 1D
@@ -496,21 +522,27 @@ contains
       type(fson_value), pointer, intent(in) :: this
       character(len=*), intent(in), optional :: path   
       logical, allocatable, intent(out) :: arr(:)
-
+        integer::l
       if (allocated(arr)) deallocate(arr)
+      if (allocated(arr_log_1d)) deallocate(arr_log_1d)
       call get_array_1d(this, path, array_callback_1d_logical)
 
-    contains
+     if (allocated(arr_log_1d)) then
+              l=SIZE(arr_log_1d)
+              allocate(arr(l))
+              arr=arr_log_1d
+              deallocate(arr_log_1d)
+      endif
 
+
+    end subroutine get_array_1d_logical
       subroutine array_callback_1d_logical(element, i, count)
         implicit none
         type(fson_value), pointer, intent(in) :: element
         integer, intent(in) :: i, count
-        if (.not. allocated(arr)) allocate(arr(count))
-        call fson_path_get(element, "", arr(i))
+        if (.not. allocated(arr_log_1d)) allocate(arr_log_1d(count))
+        call fson_path_get(element, "", arr_log_1d(i))
       end subroutine array_callback_1d_logical
-
-    end subroutine get_array_1d_logical
 
 !
 ! GET ARRAY CHAR 1D
@@ -521,22 +553,28 @@ contains
       type(fson_value), pointer, intent(in) :: this
       character(len=*), intent(in), optional :: path
       character(len = *), allocatable, intent(out) :: arr(:)
-
+        integer::l
       if (allocated(arr)) deallocate(arr)
+      if (allocated(arr_ch_1d)) deallocate(arr_ch_1d)
       call get_array_1d(this, path, array_callback_1d_char)
 
-    contains
+     if (allocated(arr_ch_1d)) then
+              l=SIZE(arr_ch_1d)
+              allocate(arr(l))
+              arr=arr_ch_1d
+              deallocate(arr_ch_1d)
+      endif
+
+
+    end subroutine get_array_1d_char
 
       subroutine array_callback_1d_char(element, i, count)
         implicit none
         type(fson_value), pointer, intent(in) :: element
         integer, intent(in) :: i, count
-        if (.not. allocated(arr)) allocate(arr(count))
-        call fson_path_get(element, "", arr(i))
+        if (.not. allocated(arr_ch_1d)) allocate(arr_ch_1d(count))
+        call fson_path_get(element, "", arr_ch_1d(i))
       end subroutine array_callback_1d_char
-
-    end subroutine get_array_1d_char
-
 
     !
     ! GET ARRAY 2D
@@ -606,21 +644,25 @@ contains
       type(fson_value), pointer, intent(in) :: this
       character(len=*), intent(in), optional :: path   
       integer, allocatable, intent(out) :: arr(:, :)
-
+        integer::sh(2)
       if (allocated(arr)) deallocate(arr)
+      if (allocated(arr_int_2d)) deallocate(arr_int_2d)
       call get_array_2d(this, path, array_callback_2d_integer)
 
-    contains
-
+     if (allocated(arr_int_2d)) then
+              sh=SHAPE(arr_int_2d)
+              allocate(arr(sh(1),sh(2)))
+              arr=arr_int_2d
+              deallocate(arr_int_2d)
+      endif
+    end subroutine get_array_2d_integer
       subroutine array_callback_2d_integer(element, i1, i2, count1, count2)
         implicit none
         type(fson_value), pointer, intent(in) :: element
         integer, intent(in) :: i1, i2, count1, count2
-        if (.not. allocated(arr)) allocate(arr(count1, count2))
-        call fson_path_get(element, "", arr(i1, i2))
+        if (.not. allocated(arr_int_2d)) allocate(arr_int_2d(count1, count2))
+        call fson_path_get(element, "", arr_int_2d(i1, i2))
       end subroutine array_callback_2d_integer
-
-    end subroutine get_array_2d_integer
 
 !
 ! GET ARRAY REAL 2D
@@ -631,21 +673,27 @@ contains
       type(fson_value), pointer, intent(in) :: this
       character(len=*), intent(in), optional :: path   
       real, allocatable, intent(out) :: arr(:, :)
-
+        integer::sh(2)
       if (allocated(arr)) deallocate(arr)
+      if (allocated(arr_real_2d)) deallocate(arr_real_2d)
       call get_array_2d(this, path, array_callback_2d_real)
 
-    contains
+      if (allocated(arr_real_2d)) then
+              sh=SHAPE(arr_real_2d)
+              allocate(arr(sh(1),sh(2)))
+              arr=arr_real_2d
+              deallocate(arr_real_2d)
+      endif
 
+
+    end subroutine get_array_2d_real
       subroutine array_callback_2d_real(element, i1, i2, count1, count2)
         implicit none
         type(fson_value), pointer, intent(in) :: element
         integer, intent(in) :: i1, i2, count1, count2
-        if (.not. allocated(arr)) allocate(arr(count1, count2))
-        call fson_path_get(element, "", arr(i1, i2))
+        if (.not. allocated(arr_real_2d)) allocate(arr_real_2d(count1, count2))
+        call fson_path_get(element, "", arr_real_2d(i1, i2))
       end subroutine array_callback_2d_real
-
-    end subroutine get_array_2d_real
 
 !
 ! GET ARRAY DOUBLE 2D
@@ -656,21 +704,25 @@ contains
       type(fson_value), pointer, intent(in) :: this
       character(len=*), intent(in), optional :: path   
       double precision, allocatable, intent(out) :: arr(:, :)
-
+        integer::sh(2)
       if (allocated(arr)) deallocate(arr)
+      if (allocated(arr_double_2d)) deallocate(arr_double_2d)
       call get_array_2d(this, path, array_callback_2d_double)
 
-    contains
-
+      if (allocated(arr_double_2d)) then
+              sh=SHAPE(arr_double_2d)
+              allocate(arr(sh(1),sh(2)))
+              arr=arr_double_2d
+              deallocate(arr_double_2d)
+      endif
+    end subroutine get_array_2d_double
       subroutine array_callback_2d_double(element, i1, i2, count1, count2)
         implicit none
         type(fson_value), pointer, intent(in) :: element
         integer, intent(in) :: i1, i2, count1, count2
-        if (.not. allocated(arr)) allocate(arr(count1, count2))
-        call fson_path_get(element, "", arr(i1, i2))
+        if (.not. allocated(arr_double_2d)) allocate(arr_double_2d(count1, count2))
+        call fson_path_get(element, "", arr_double_2d(i1, i2))
       end subroutine array_callback_2d_double
-
-    end subroutine get_array_2d_double
 
 !
 ! GET ARRAY LOGICAL 2D
@@ -681,21 +733,26 @@ contains
       type(fson_value), pointer, intent(in) :: this
       character(len=*), intent(in), optional :: path   
       logical, allocatable, intent(out) :: arr(:, :)
-
+        integer::sh(2)
       if (allocated(arr)) deallocate(arr)
+      if (allocated(arr_log_2d)) deallocate(arr_log_2d)
       call get_array_2d(this, path, array_callback_2d_logical)
+      
+      if (allocated(arr_log_2d)) then
+              sh=SHAPE(arr_log_2d)
+              allocate(arr(sh(1),sh(2)))
+              arr=arr_log_2d
+              deallocate(arr_log_2d)
+      endif
 
-    contains
-
+    end subroutine get_array_2d_logical
       subroutine array_callback_2d_logical(element, i1, i2, count1, count2)
         implicit none
         type(fson_value), pointer, intent(in) :: element
         integer, intent(in) :: i1, i2, count1, count2
-        if (.not. allocated(arr)) allocate(arr(count1, count2))
-        call fson_path_get(element, "", arr(i1, i2))
+        if (.not. allocated(arr_log_2d)) allocate(arr_log_2d(count1, count2))
+        call fson_path_get(element, "", arr_log_2d(i1, i2))
       end subroutine array_callback_2d_logical
-
-    end subroutine get_array_2d_logical
 
 !
 ! GET ARRAY CHAR 2D
@@ -706,20 +763,27 @@ contains
       type(fson_value), pointer, intent(in) :: this
       character(len=*), intent(in), optional :: path
       character(len = *), allocatable, intent(out) :: arr(:, :)
+        integer::sh(2)
 
       if (allocated(arr)) deallocate(arr)
+      if (allocated(arr_ch_2d)) deallocate(arr_ch_2d)
       call get_array_2d(this, path, array_callback_2d_char)
 
-    contains
+      if (allocated(arr_ch_2d)) then
+              sh=SHAPE(arr_ch_2d)
+              allocate(arr(sh(1),sh(2)))
+              arr=arr_ch_2d
+              deallocate(arr_ch_2d)
+      endif
+
+
+    end subroutine get_array_2d_char
 
       subroutine array_callback_2d_char(element, i1, i2, count1, count2)
         implicit none
         type(fson_value), pointer, intent(in) :: element
         integer, intent(in) :: i1, i2, count1, count2
-        if (.not. allocated(arr)) allocate(arr(count1, count2))
-        call fson_path_get(element, "", arr(i1, i2))
+        if (.not. allocated(arr_ch_2d)) allocate(arr_ch_2d(count1, count2))
+        call fson_path_get(element, "", arr_ch_2d(i1, i2))
       end subroutine array_callback_2d_char
-
-    end subroutine get_array_2d_char
-
 end module fson_path_m
