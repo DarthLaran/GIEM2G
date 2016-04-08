@@ -279,18 +279,16 @@ contains
             if (eof) then
                print *, "Expecting end of string"
                call exit(1)
-            else if (escape) then
+            elseif (escape) then
               call fson_string_append(string,c)
               escape = .false.
-            else
-               if (c == '\') then
-                  escape = .true.
-               else if (c == '"') then
+	elseif (c=='\\') then
+		escape = .true.
+            elseif (c == '"') then
                   exit
-               else
+            else
                   call fson_string_append(string,c)
-               end if
-            end if
+            endif
         end do
     end function parse_string
 

@@ -28,7 +28,7 @@ ENGINE_O=$(MISC_O) $(FILTER_WEIGHTS_O) $(MODEL_O) $(FFT_O)  $(IE_IMAGE) $(IE_O) 
 LIB_ZFGMRES=-L./ZFGMRES -lzfgmres
 LIB_FSON=-L./FSON -lfson
 
-LIBS=  $(LIB_ADD)  $(LIB_FFTW) $(LIB_ZFGMRES) $(LIB_BLAS) # $(LIB_FSON)
+LIBS=  $(LIB_ADD)  $(LIB_FFTW) $(LIB_ZFGMRES) $(LIB_BLAS)  $(LIB_FSON)
 
 
 giem2g: zfgmres  giem2g_lib giem2g.F90 
