@@ -138,7 +138,7 @@ contains
                 case ("]")
                     if (.not.array) then
                         print *, "ERROR: Unexpected ], not missing preceding ["
-                        call exit(1)
+                        stop(1)
                     end if
                     array = .false.
                     child_i = parse_integer(path(child_i:i-1))                                                
@@ -209,7 +209,7 @@ contains
         
         if(.not.associated(p)) then
             print *, "Unable to resolve path: ", path
-            call exit(1)
+            stop(1)
         end if
                 
         
@@ -225,7 +225,7 @@ contains
             end if
         else
             print *, "Unable to resolve value to integer: ", path
-            call exit(1)
+            stop(1)
         end if
         
     end subroutine get_integer
@@ -250,7 +250,7 @@ contains
         
         if(.not.associated(p)) then
             print *, "Unable to resolve path: ", path
-            call exit(1)
+            stop(1)
         end if
                 
         
@@ -266,7 +266,7 @@ contains
             end if
         else
             print *, "Unable to resolve value to real: ", path
-            call exit(1)
+            stop(1)
         end if
         
     end subroutine get_real
@@ -291,7 +291,7 @@ contains
         
         if(.not.associated(p)) then
             print *, "Unable to resolve path: ", path
-            call exit(1)
+            stop(1)
         end if
                 
         
@@ -307,7 +307,7 @@ contains
             end if
         else
             print *, "Unable to resolve value to double: ", path
-            call exit(1)
+            stop(1)
         end if
         
     end subroutine get_double
@@ -333,7 +333,7 @@ contains
         
         if(.not.associated(p)) then
             print *, "Unable to resolve path: ", path
-            call exit(1)
+            stop(1)
         end if
                 
         
@@ -343,7 +343,7 @@ contains
             value = p % value_logical
         else
             print *, "Unable to resolve value to real: ", path
-            call exit(1)
+            stop(1)
         end if
         
     end subroutine get_logical
@@ -366,7 +366,7 @@ contains
         
         if(.not.associated(p)) then
             print *, "Unable to resolve path: ", path
-            call exit(1)
+            stop(1)
         end if
                 
         
@@ -374,7 +374,7 @@ contains
             call fson_string_copy(p % value_string, value)          
         else
             print *, "Unable to resolve value to characters: ", path
-            call exit(1)
+            stop(1)
         end if
         
     end subroutine get_chars
@@ -402,7 +402,7 @@ contains
             
         if(.not.associated(p)) then
             print *, "Unable to resolve path: ", path
-            call exit(1)
+            stop(1)
         end if
         
         if(p % value_type == TYPE_ARRAY) then            
@@ -414,7 +414,7 @@ contains
             end do
         else
             print *, "Resolved value is not an array. ", path
-            call exit(1)
+            stop(1)
         end if
 
         if (associated(p)) nullify(p)
@@ -599,7 +599,7 @@ contains
             
         if(.not.associated(p)) then
             print *, "Unable to resolve path: ", path
-            call exit(1)
+            stop(1)
         end if
         
         if(p % value_type == TYPE_ARRAY) then            
@@ -613,7 +613,7 @@ contains
                   else if (c /= count2) then
                      print *, "Resolved value has the wrong number of elements. ", &
                           path, "[", i1, "]"
-                     call exit(1)
+                     stop(1)
                   end if
                   item => element % children
                   do i2 = 1, count2
@@ -623,12 +623,12 @@ contains
                   element => element % next
                else
                   print *, "Resolved value is not an array. ", path, "[", i1, "]"
-                  call exit(1)
+                  stop(1)
                end if
             end do
         else
             print *, "Resolved value is not an array. ", path
-            call exit(1)
+            stop(1)
         end if
 
         if (associated(p)) nullify(p)
