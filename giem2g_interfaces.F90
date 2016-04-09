@@ -220,7 +220,8 @@ CONTAINS
         		TYPE(IntegralEquationOperator),POINTER::ie_op
                         CALL C_F_POINTER(ie_op_ptr,ie_op)
                         CALL PRINT_STATS(ie_op)
-                        CALL DROP_COUNTER(ie_op%DFD)
+                        CALL DROP_DFD_COUNTER(ie_op%DFD)
+                        CALL DROP_IE_COUNTER(ie_op)
         ENDSUBROUTINE
         SUBROUTINE GIEM2G_DELETE_OPERATOR(ie_op_ptr) BIND(C, NAME='giem2g_delete_ie_operator')
                         TYPE(C_PTR),VALUE,INTENT(IN)::ie_op_ptr

@@ -87,7 +87,7 @@ MODULE DISTRIBUTED_FFT_MODULE
 	PUBLIC:: CalcPreparedForwardFFT
 	PUBLIC:: CalcPreparedBackwardFFT
 	PUBLIC:: CalcForwardIETensorFFT
-	PUBLIC:: CalcLocalFFTSize,PrintTimings,DROP_COUNTER
+	PUBLIC:: CalcLocalFFTSize,PrintTimings,DROP_DFD_COUNTER
 	CONTAINS
 	SUBROUTINE  PrepareDistributedFourierData(DFD,Nx,Ny,Nc,comm,fft_buff_in,fft_buff_out,buff_length)
 		TYPE (DistributedFourierData),TARGET,INTENT(INOUT)::DFD
@@ -939,7 +939,7 @@ MODULE DISTRIBUTED_FFT_MODULE
 		CALL LOGGER('===================================================================================')
 	END SUBROUTINE
 
-	SUBROUTINE DROP_COUNTER(DFD)
+	SUBROUTINE DROP_DFD_COUNTER(DFD)
 		TYPE (DistributedFourierData),INTENT(INOUT)::DFD
 		DFD%timer(FFT_FWD)%N=0
 		DFD%timer(FFT_FWD)%fftx=0d0

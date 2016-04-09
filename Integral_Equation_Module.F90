@@ -185,6 +185,8 @@ CONTAINS
 			ie_op%real_space=.TRUE.
 		ENDIF
 		CALL SetTensorPointers(ie_op,buff_ptr)
+                CALL DROP_IE_COUNTER(ie_op)
+
 	ENDSUBROUTINE
 !--------------------------------------------------------------------------------------------------------------------!	
 	  SUBROUTINE  SetTensorPointers(ie_op,buff_ptr)
@@ -461,6 +463,19 @@ CONTAINS
                 CALL PrintTimings(ie_op%DFD)
         END SUBROUTINE
 
+	SUBROUTINE DROP_IE_COUNTER(ie_op)
+		TYPE(IntegralEquationOperator),INTENT(INOUT)::ie_op
+		ie_op%counter%apply=0
+                ie_op%counter%mult_fftw=0
+                ie_op%counter%mult_fftw_b=0
+                ie_op%counter%mult_zgemv=0
+                ie_op%counter%mult_num=0
+                ie_op%counter%dotprod_num=0
+                ie_op%counter%tensor_fft=0
+                ie_op%counter%tensor_calc=0
+                ie_op%counter%plans=0
+                ie_op%counter%solving=0
+	END SUBROUTINE
 	SUBROUTINE DeleteIE_OP(ie_op)
 		TYPE(IntegralEquationOperator),INTENT(INOUT)::ie_op
 		ie_op%G_symm=>NULL()
