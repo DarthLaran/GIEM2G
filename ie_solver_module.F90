@@ -154,13 +154,7 @@ MODULE IE_SOLVER_MODULE
 		CHARACTER(LEN=2048,KIND=C_CHAR)::message 
 
 		full_time=GetTime()
-		ie_op%counter%mult_num=0
-		ie_op%counter%dotprod_num=0
-		ie_op%counter%apply=0d0
-		ie_op%counter%mult_fftw=0d0
-		ie_op%counter%mult_fftw_b=0d0
-		ie_op%counter%mult_zgemv=0d0
-		ie_op%counter%dotprod=0d0
+                CALL DROP_IE_COUNTER(ie_op)
 		Nfgmres=0
 
 		!CALL MPI_COMM_DUP(ie_op%ie_comm, comm_inner, IERROR)

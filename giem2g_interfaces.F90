@@ -162,7 +162,7 @@ CONTAINS
 			IF (ASSOCIATED(ie_op%csigb))	ie_op%csigb(1:ie_op%Nz)=ie_op%csigb(1:ie_op%Nz)
                         CALL CalcFFTofIETensor(ie_op)
                         CALL PrintTimings(ie_op%DFD)
-                        CALL DROP_COUNTER(ie_op%DFD)
+                        CALL DROP_DFD_COUNTER(ie_op%DFD)
         ENDSUBROUTINE
 
         SUBROUTINE GIEM2G_SET_ANOMALY_CONDUCTIVITY(ie_op_ptr,siga_ptr) &
