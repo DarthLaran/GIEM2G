@@ -83,7 +83,7 @@ contains
             u = 0
         else 
             print *, "ERROR: Need a file or a string"
-            call exit (1)
+            stop (1)
         end if
 
         ! open the file
@@ -157,7 +157,7 @@ contains
                 call parse_number(unit, str, value)
             case default
                 print *, "ERROR: Unexpected character while parsing value. '", c, "' ASCII=", iachar(c)
-                call exit (1)
+                stop (1)
             end select
         end if
 
@@ -179,7 +179,7 @@ contains
         c = pop_char(unit, str, eof = eof, skip_ws = .true.)
         if (eof) then
             print *, "ERROR: Unexpected end of file while parsing start of object."
-            call exit (1)
+            stop (1)
         else if ("}" == c) then
             ! end of an empty object
             return
@@ -188,21 +188,21 @@ contains
             pair % name => parse_string(unit, str)
         else
             print *, "ERROR: Expecting string: '", c, "'"
-            call exit (1)
+            stop (1)
         end if
 
         ! pair value
         c = pop_char(unit, str, eof = eof, skip_ws = .true.)
         if (eof) then
             print *, "ERROR: Unexpected end of file while parsing object member. 1"
-            call exit (1)
+            stop (1)
         else if (":" == c) then
             ! parse the value                       
             call parse_value(unit, str, pair)
             call fson_value_add(parent, pair)
         else
             print *, "ERROR: Expecting : and then a value. ", c
-            call exit (1)
+            stop (1)
         end if
 
         ! another possible pair
@@ -216,7 +216,7 @@ contains
             return
         else
             print *, "ERROR: Expecting end of object.", c
-            call exit (1)
+            stop (1)
         end if
 
     end subroutine parse_object
@@ -278,7 +278,7 @@ contains
             c = pop_char(unit, str, eof = eof, skip_ws = .false.)
             if (eof) then
                print *, "Expecting end of string"
-               call exit(1)
+               stop(1)
             elseif (escape) then
               call fson_string_append(string,c)
               escape = .false.
@@ -309,10 +309,10 @@ contains
             c = pop_char(unit, str, eof = eof, skip_ws = .true.)
             if (eof) then
                 print *, "ERROR: Unexpected end of file while parsing array."
-                call exit (1)
+                stop (1)
             else if (c .ne. chars(i:i)) then
                 print *, "ERROR: Unexpected character.'", c,"'", chars(i:i)
-                call exit (1)
+                stop (1)
             end if
         end do
 
@@ -336,7 +336,7 @@ contains
         c = pop_char(unit, str, eof = eof, skip_ws = .true.)
         if (eof) then
             print *, "ERROR: Unexpected end of file while parsing number."
-            call exit (1)
+            stop (1)
         else if ("-" == c) then
             negative = .true.
         else
@@ -356,7 +356,7 @@ contains
             c = pop_char(unit, str, eof = eof, skip_ws = .true.)
             if (eof) then
                 print *, "ERROR: Unexpected end of file while parsing number."
-                call exit (1)
+                stop (1)
             else
                 select case (c)
                 case (".")
@@ -364,7 +364,7 @@ contains
                     if (decimal) then
                         ! already found a decimal place
                         print *, "ERROR: Unexpected second decimal place while parsing number."
-                        call exit(1)
+                        stop(1)
                     end if
                     decimal = .true.
                     frac = parse_integer(unit, str, digit_count)
@@ -374,7 +374,7 @@ contains
                     if (scientific) then
                         ! already found a e place
                         print *, "ERROR: Unexpected second exponent while parsing number."
-                        call exit(1)
+                        stop(1)
                     end if
                     scientific = .true.
                     ! this number has an exponent
@@ -450,19 +450,19 @@ contains
             c = pop_char(unit, str, eof = eof, skip_ws = .true.)
             if (eof) then
                 print *, "ERROR: Unexpected end of file while parsing digit."
-                call exit (1)
+                stop (1)
             else
                 select case(c)
                 case ("+")
                     if (found_sign.or.found_digit) then
                         print *, "ERROR: Miss formatted number."
-                        call exit(1)
+                        stop(1)
                     end if
                     found_sign = .true.
                 case ("-")
                     if (found_sign.or.found_digit) then
                         print *, "ERROR: Miss formatted number."
-                        call exit(1)
+                        stop(1)
                     end if
                     found_sign = .true.
                     isign = -1
@@ -470,7 +470,7 @@ contains
                     found_sign = .true.
                     if (icount > max_integer_length) then
                         print *, "ERROR: Too many digits for an integer."
-                        call exit(1)
+                        stop(1)
                     end if
                     ! digit        
                     read (c, '(i1)') tmp
