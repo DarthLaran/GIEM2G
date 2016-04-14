@@ -8,6 +8,8 @@ MODULE GIEM2G_INTERFACES
 	USE INTEGRAL_EQUATION_MODULE
         USE APPLY_IE_OPERATOR_MODULE 
 
+	USE CHECK_MEMORY
+
         IMPLICIT NONE
 
         TYPE, BIND(C)::GIEM2G_BACKGROUND_TYPE
@@ -157,12 +159,14 @@ CONTAINS
                                         & BIND(C,NAME='giem2g_calc_fft_of_ie_kernel')  
                         TYPE(C_PTR),VALUE,INTENT(IN)::ie_ptr
                 	TYPE(IntegralEquationOperator),POINTER::ie_op
-			                        
+			INTEGER(MPI_CTL_KIND)::IERROR			                        
                         CALL C_F_POINTER(ie_ptr,ie_op)
 			IF (ASSOCIATED(ie_op%csigb))	ie_op%csigb(1:ie_op%Nz)=ie_op%csigb(1:ie_op%Nz)
                         CALL CalcFFTofIETensor(ie_op)
                         CALL PrintTimings(ie_op%DFD)
                         CALL DROP_DFD_COUNTER(ie_op%DFD)
+			CALL CHECK_MEM(ie_op%me,0,ie_op%ie_comm)
+
         ENDSUBROUTINE
 
         SUBROUTINE GIEM2G_SET_ANOMALY_CONDUCTIVITY(ie_op_ptr,siga_ptr) &

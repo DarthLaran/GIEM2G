@@ -175,6 +175,7 @@ MODULE APPLY_IE_OPERATOR_MODULE
 		COMPLEX(REALPARM)::MirrorY
 		time1=GetTime()
 		CALL IE_OP_FFTW_FWD_PREPARED(ie_op)
+		
 		time2=GetTime()
 		ie_op%counter%mult_fftw=ie_op%counter%mult_fftw+time2-time1
 

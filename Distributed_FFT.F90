@@ -62,6 +62,7 @@ MODULE DISTRIBUTED_FFT_MODULE
 		INTEGER::Np !Np is number of processes 
 		INTEGER::Ny_loc
 		INTEGER::K
+		INTEGER(C_INTPTR_T)::buff_len
 
 		INTEGER(MPI_CTL_KIND)::comm,me
 	
@@ -600,6 +601,7 @@ MODULE DISTRIBUTED_FFT_MODULE
 		INTEGER::Nx,Ny,Nc,Nt,M,Nz,Nx2
 		COMPLEX(REALPARM),POINTER::p_in(:,:,:,:,:),p_out(:,:,:,:)
 		REAL(DOUBLEPARM)::time1,time2
+		INTEGER(C_INTPTR_T)::II
 #ifndef performance_test
 		time1=GetTime()
 #endif
@@ -619,8 +621,8 @@ MODULE DISTRIBUTED_FFT_MODULE
 				ENDDO
 			 ENDDO
 		ENDDO
-		!$OMP PARALLEL DEFAULT(SHARED), PRIVATE(Ix,Iy,Iz,Ic)
-		!$OMP DO SCHEDULE(GUIDED) 
+		!$OMP PARALLEL DEFAULT(SHARED), PRIVATE(Ix,Iy,Iz,II)
+		!$OMP DO SCHEDULE(GUIDED) COLLAPSE(2) 
 		DO Iz=1,Nz
 			DO Iy=1,Ny
 				DO Ix=1,Nx2-1
@@ -632,7 +634,7 @@ MODULE DISTRIBUTED_FFT_MODULE
 			ENDDO
 		ENDDO
 		!$OMP ENDDO
-		!$OMP DO SCHEDULE(GUIDED) 
+		!$OMP DO SCHEDULE(GUIDED) COLLAPSE(2) 
 		DO Iz=1,Nz
 			DO Iy=1,Ny
 				DO Ix=1,Nx2-1
@@ -644,7 +646,7 @@ MODULE DISTRIBUTED_FFT_MODULE
 			ENDDO
 		ENDDO
 		!$OMP ENDDO
-		!$OMP DO SCHEDULE(GUIDED) 
+		!$OMP DO SCHEDULE(GUIDED) COLLAPSE(2) 
 		DO Iz=1,Nz
 			DO Iy=1,Ny
 				DO Ix=1,Nx2-1
@@ -656,9 +658,12 @@ MODULE DISTRIBUTED_FFT_MODULE
 			ENDDO
 		ENDDO
 		!$OMP ENDDO
-		!$OMP WORKSHARE
-		DFD%field_in=DFD%field_out
-		!$OMP END WORKSHARE
+
+		!$OMP DO SCHEDULE(GUIDED) 
+		DO II=1,DFD%buff_len
+			DFD%field_in(II)=DFD%field_out(II)
+		ENDDO
+		!$OMP ENDDO	
 		!$OMP END PARALLEL
 #ifndef performance_test
 		time2=GetTime()
@@ -840,6 +845,7 @@ MODULE DISTRIBUTED_FFT_MODULE
 		DFD%Np=Np
 		DFD%Ny_loc=Ny_loc
 		DFD%K=K
+		DFD%buff_len=buff_len
 		CALL CreateBlockPlans(DFD)
 		CALL DROP_DFD_COUNTER(DFD)
 

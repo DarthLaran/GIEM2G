@@ -305,6 +305,7 @@ CONTAINS
 		COMPLEX(REALPARM),POINTER::G(:,:,:,:)
 		COMPLEX(REALPARM),POINTER::Gout(:,:,:,:)
 		TYPE(C_PTR)::ptr
+		INTEGER(MPI_CTL_KIND)::IERROR
 		time1=GetTime()
 		ie_op%field_in=C_ZERO
 		G=>ie_op%G_symm
