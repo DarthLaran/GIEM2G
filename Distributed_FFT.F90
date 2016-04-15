@@ -257,7 +257,11 @@ MODULE DISTRIBUTED_FFT_MODULE
 		p_in(1:Nc,1:M)=>DFD%field_out
 		p_out(1:M,1:Nc)=>DFD%field_in
 		!$OMP PARALLEL DEFAULT(SHARED), PRIVATE(Ic,Ixy) 
+#ifndef IBM_Bluegene
+		!$OMP DO SCHEDULE(GUIDED) COLLAPSE(2)
+#else
 		!$OMP DO SCHEDULE(GUIDED) 
+#endif
 		DO Ic=1,Nc
 			DO Ixy=1,M
 					p_out(Ixy,Ic)=p_in(Ic,Ixy)
@@ -286,7 +290,11 @@ MODULE DISTRIBUTED_FFT_MODULE
 		p_in(1:M,1:Nc)=>DFD%field_in
 		p_out(1:Nc,1:M)=>DFD%field_out
 		!$OMP PARALLEL DEFAULT(SHARED), PRIVATE(Ic,Ixy) 
+#ifndef IBM_Bluegene
+		!$OMP DO SCHEDULE(GUIDED) COLLAPSE(2)
+#else
 		!$OMP DO SCHEDULE(GUIDED) 
+#endif
 		DO Ixy=1,M
 			DO Ic=1,Nc
 					p_out(Ic,Ixy)=p_in(Ixy,Ic)
@@ -387,18 +395,23 @@ MODULE DISTRIBUTED_FFT_MODULE
 			p1(1:K,0:Ny-1)=>DFD%field_in
 			p2(1:K,0:Ny-1)=>DFD%field_out
 			!$OMP PARALLEL PRIVATE(Iy,Ik),DEFAULT(SHARED)
+#ifndef IBM_Bluegene
+			!$OMP DO SCHEDULE(GUIDED) COLLAPSE(2)
+#else
 			!$OMP DO SCHEDULE(GUIDED) 
+#endif
 			DO Iy=Ny2+1,Ny-1
+			
 			    DO Ik=1,K
 				p1(Ik,Iy)=p2(Ik,Ny+Ny2-Iy)
-				ENDDO
+			ENDDO
 			ENDDO
 			!$OMP ENDDO
 			!$OMP WORKSHARE
 			p2(:,Ny2+1:)=p1(:,Ny2+1:)
 			p2(:,Ny2)=C_ZERO
 			!$OMP END WORKSHARE
-		!$OMP END PARALLEL
+			!$OMP END PARALLEL
 		ENDIF
 		CALL fftw_execute_dft(plan,pin,pout)
 		IF (FFT_DIR==FFT_FWD) THEN
@@ -408,7 +421,11 @@ MODULE DISTRIBUTED_FFT_MODULE
 			!$OMP WORKSHARE
 			p2(:,Ny2)=p1(:,0)
 			!$OMP END WORKSHARE
+#ifndef IBM_Bluegene
+			!$OMP DO SCHEDULE(GUIDED) COLLAPSE(2)
+#else
 			!$OMP DO SCHEDULE(GUIDED) 
+#endif
 			DO Iy=Ny2+1,Ny-1
 				DO Ik=1,K
 				p2(Ik,Iy)=p1(Ik,Ny+Ny2-Iy)
@@ -418,7 +435,7 @@ MODULE DISTRIBUTED_FFT_MODULE
 			!$OMP WORKSHARE
 			p1(:,Ny2:)=p2(:,Ny2:)
 			!$OMP END WORKSHARE
-		!$OMP END PARALLEL
+			!$OMP END PARALLEL
 		ENDIF
 #ifndef performance_test
 		time2=GetTime()
@@ -447,10 +464,16 @@ MODULE DISTRIBUTED_FFT_MODULE
 		pin=>DFD%field_fft_y_in
 		pout=>DFD%field_fft_y_out
 		plan=DFD%plan(FFT_DIR)%planY
+		!$OMP PARALLEL DEFAULT(SHARED), PRIVATE(Iy)
+		!$OMP DO SCHEDULE(GUIDED) 
 		DO Iy=1,Ny2-1
 			ptr(:,Ny-Iy)=s*ptr(:,Iy)
 		ENDDO
-		ptr(:,Ny2)=C_ZERO
+		!$OMP ENDDO
+		!$OMP WORKSHARE
+			ptr(:,Ny2)=C_ZERO
+		!$OMP END WORKSHARE
+		!$OMP END PARALLEL
 		CALL fftw_execute_dft(plan,pin,pout)
 		ptr(1:K,1:Ny)=>DFD%field_in
 		t=C_ONE
@@ -532,7 +555,11 @@ MODULE DISTRIBUTED_FFT_MODULE
 		p_out(1:Nc,1:Ny,1:Nx)=>DFD%field_out
 
 		!$OMP PARALLEL DEFAULT(SHARED), PRIVATE(Ix,Iy,Ic)
+#ifndef IBM_Bluegene
+		!$OMP DO SCHEDULE(GUIDED) COLLAPSE(3)
+#else
 		!$OMP DO SCHEDULE(GUIDED) 
+#endif
 		DO Ix=1,Nx
 			DO Iy=1,Ny
 				DO Ic=1,Nc
@@ -565,6 +592,12 @@ MODULE DISTRIBUTED_FFT_MODULE
 		p_in(0:Nx-1,1:Ny,1:Nz,1:3)=>DFD%field_in
 		p_out(1:Nz,1:2,1:3,1:Ny,0:Nx2-1)=>DFD%field_out
 
+		!$OMP PARALLEL DEFAULT(SHARED), PRIVATE(Ix,Iy,Iz,Ic)
+#ifndef IBM_Bluegene
+		!$OMP DO SCHEDULE(GUIDED) COLLAPSE(3)
+#else
+		!$OMP DO SCHEDULE(GUIDED) 
+#endif
 		DO Iy=1,Ny
 			 DO Ic=1,3
 				DO Iz=1,Nz
@@ -573,8 +606,12 @@ MODULE DISTRIBUTED_FFT_MODULE
 				ENDDO
 			 ENDDO
 		ENDDO
-		!$OMP PARALLEL DEFAULT(SHARED), PRIVATE(Ix,Iy,Iz,Ic)
+		!$OMP ENDDO
+#ifndef IBM_Bluegene
+		!$OMP DO SCHEDULE(GUIDED) COLLAPSE(3)
+#else
 		!$OMP DO SCHEDULE(GUIDED) 
+#endif
 		DO Ix=1,Nx2-1
 			DO Iy=1,Ny
 				DO Ic=1,3
@@ -613,6 +650,12 @@ MODULE DISTRIBUTED_FFT_MODULE
 		p_in(1:Nz,1:2,1:3,1:Ny,0:Nx2-1)=>DFD%field_in
 		p_out(0:Nx-1,1:Ny,1:Nz,1:3)=>DFD%field_out
 
+		!$OMP PARALLEL DEFAULT(SHARED), PRIVATE(Ic,Ix,Iy,Iz,II)
+#ifndef IBM_Bluegene
+		!$OMP DO SCHEDULE(GUIDED) COLLAPSE(3)
+#else
+		!$OMP DO SCHEDULE(GUIDED) 
+#endif
 		DO Ic=1,3
 			DO Iz=1,Nz
 				DO Iy=1,Ny
@@ -621,8 +664,12 @@ MODULE DISTRIBUTED_FFT_MODULE
 				ENDDO
 			 ENDDO
 		ENDDO
-		!$OMP PARALLEL DEFAULT(SHARED), PRIVATE(Ix,Iy,Iz,II)
-		!$OMP DO SCHEDULE(GUIDED) COLLAPSE(2) 
+		!$OMP ENDDO
+#ifndef IBM_Bluegene
+		!$OMP DO SCHEDULE(GUIDED) COLLAPSE(2)
+#else
+		!$OMP DO SCHEDULE(GUIDED) 
+#endif
 		DO Iz=1,Nz
 			DO Iy=1,Ny
 				DO Ix=1,Nx2-1
@@ -634,7 +681,11 @@ MODULE DISTRIBUTED_FFT_MODULE
 			ENDDO
 		ENDDO
 		!$OMP ENDDO
-		!$OMP DO SCHEDULE(GUIDED) COLLAPSE(2) 
+#ifndef IBM_Bluegene
+		!$OMP DO SCHEDULE(GUIDED) COLLAPSE(2)
+#else
+		!$OMP DO SCHEDULE(GUIDED) 
+#endif
 		DO Iz=1,Nz
 			DO Iy=1,Ny
 				DO Ix=1,Nx2-1
@@ -646,7 +697,11 @@ MODULE DISTRIBUTED_FFT_MODULE
 			ENDDO
 		ENDDO
 		!$OMP ENDDO
-		!$OMP DO SCHEDULE(GUIDED) COLLAPSE(2) 
+#ifndef IBM_Bluegene
+		!$OMP DO SCHEDULE(GUIDED) COLLAPSE(2)
+#else
+		!$OMP DO SCHEDULE(GUIDED) 
+#endif
 		DO Iz=1,Nz
 			DO Iy=1,Ny
 				DO Ix=1,Nx2-1
@@ -691,7 +746,11 @@ MODULE DISTRIBUTED_FFT_MODULE
 		M=SIZE(p_in) !length of data
 		!Linear writting, nonlinear reading
 		!$OMP PARALLEL	DEFAULT(SHARED),PRIVATE(Ip,Iy,Ik,l0,m0,l)
-		!$OMP DO SCHEDULE(GUIDED)	
+#ifndef IBM_Bluegene
+		!$OMP DO SCHEDULE(GUIDED) COLLAPSE(3)
+#else
+		!$OMP DO SCHEDULE(GUIDED) 
+#endif
 		DO Ip=1,Np
 			DO Iy=1,Ny_loc
 				DO Ik=1,K
@@ -735,7 +794,11 @@ MODULE DISTRIBUTED_FFT_MODULE
 		p_in=>DFD%field_out
 		!Linear writting, nonlinear reading
 		!$OMP PARALLEL	DEFAULT(SHARED),PRIVATE(Im,Iy,Ix,l0,m0,l)
-		!$OMP DO SCHEDULE(GUIDED)	
+#ifndef IBM_Bluegene
+		!$OMP DO SCHEDULE(GUIDED) COLLAPSE(3)
+#else
+		!$OMP DO SCHEDULE(GUIDED) 
+#endif
 		DO Im=1,Nm
 			DO Iy=1,Ny_loc
 				DO Ix=1,Nx
