@@ -43,6 +43,7 @@ LOGICAL::SAVE_SOLUTION
 LOGICAL::SOLVE_EQUATION
 LOGICAL::RECALC_FIELD
 LOGICAL::success
+LOGICAL::save_all_output
 INTEGER(MPI_CTL_KIND)::wcomm,wsize,me,real_comm
 TYPE (BKG_DATA_TYPE)::bkg
 TYPE (ANOMALY_TYPE)::anomaly
@@ -119,8 +120,12 @@ CALL PRINT_CALC_NUMBER('Number of threads:',NT)
 
 SAVE_SOLUTION=.TRUE.
 
-SOLVE_EQUATION=.TRUE.
+SOLVE_EQUATION=.FALSE.
 RECALC_FIELD=.TRUE.
+save_all_output=.TRUE.
+
+
+
 
 #ifdef performance_test
 CALL LOGGER('PERFORMACE TEST')
@@ -147,21 +152,12 @@ recvs=>NULL()
 CALL LoadBackground(bkg,wcomm,'background.dat')
 CALL LoadAnomalyShape(anomaly,bkg,wcomm,'anomaly_shape.dat',.TRUE.)
 CALL LoadFrequencies(freqs,wcomm,'frequencies.dat')
-CALL LoadRecievers(recvs,wcomm,'recievers.dat')
 CALL LoadFGMRES_Ctl(fgmres_ctl,wcomm,'fgmres_ctl.dat')
 CALL LoadAnomalySigmaList('anomaly_list.dat',wcomm,anom_list,Na)
 
 Nr=SIZE(recvs)	
 Nfreq=SIZE(freqs)
 N=anomaly%Nz
-ALLOCATE(recv_depths(Nr))	
-CALL PrepareRecvs(recvs,anomaly,bkg)
-DO Ir=1,Nr
-	recv_depths(Ir)=recvs(Ir)%zrecv
-	IF (me==0) THEN
-	    PRINT*,recvs(Ir)%anom_cell,recvs(Ir)%zrecv
-	ENDIF
-ENDDO
 CALL PRINT_BORDER
 WRITE (message,'(A, I5, A, I5, A, I5)') 'Nx=',anomaly%Nx, ' Ny=',anomaly%Ny,' Nz=',anomaly%Nz
 CALL LOGGER(message)
@@ -210,6 +206,15 @@ IF (SOLVE_EQUATION) THEN
 	ENDIF
 ENDIF
 IF (RECALC_FIELD) THEN
+	CALL LoadRecievers(recvs,wcomm,'recievers.dat')
+	CALL LoadAnomalySigmaList('anomaly_list.dat',wcomm,anom_list,Na)
+
+	Nr=SIZE(recvs)	
+	ALLOCATE(recv_depths(Nr))	
+	CALL PrepareRecvs(recvs,anomaly,bkg)
+	DO Ir=1,Nr
+		recv_depths(Ir)=recvs(Ir)%zrecv
+	ENDDO
 	CALL PrepareContinuationOperator(rc_op,anomaly,recvs,wcomm,threads_ok);
 
 	IF (rc_op%real_space) THEN
@@ -353,8 +358,12 @@ DO Ifreq=1,Nfreq
 				    Ht(Ir,HY,:,:)=Ha(Ir,HY,:,:)+FY(Ir,1,1,HY)
 				    Ht(Ir,HZ,:,:)=Ha(Ir,HZ,:,:)+FY(Ir,1,1,HZ)
 			    ENDDO
-			    !CALL SaveOutputOneFile(Ea,Et,Ha,Ht,anomaly,recvs,freqs(Ifreq),real_comm,'PY_F'//trim(fnum1)//'T_'//trim(fnum2))
-			    CALL SaveOutputOneFileStations(Ea,Et,Ha,Ht,anomaly,recvs,freqs(Ifreq),real_comm,'PY_F'//trim(fnum1)//'T_'//trim(fnum2),stations,mz)
+			    IF (save_all_output) THEN
+				CALL SaveOutputOneFile(Ea,Et,Ha,Ht,anomaly,recvs,freqs(Ifreq),real_comm,'PY_F'//trim(fnum1)//'T_'//trim(fnum2))
+				CALL SaveOutputOneFileStations(Ea,Et,Ha,Ht,anomaly,recvs,freqs(Ifreq),real_comm,'ST_PY_F'//trim(fnum1)//'T_'//trim(fnum2),stations,mz)
+			    ELSE
+				CALL SaveOutputOneFileStations(Ea,Et,Ha,Ht,anomaly,recvs,freqs(Ifreq),real_comm,'PY_F'//trim(fnum1)//'T_'//trim(fnum2),stations,mz)
+			    ENDIF
 			ENDIF
 			time2=GetTime()-time2;
 			CALL PRINT_CALC_TIME("Save fields in",time2) 
@@ -424,8 +433,12 @@ DO Ifreq=1,Nfreq
 					Ht(Ir,HY,:,:)=Ha(Ir,HY,:,:)+FX(Ir,1,1,HY)
 					Ht(Ir,HZ,:,:)=Ha(Ir,HZ,:,:)+FX(Ir,1,1,HZ)
 				ENDDO
-!			CALL SaveOutputOneFile(Ea,Et,Ha,Ht,anomaly,recvs,freqs(Ifreq),real_comm,'PX_F'//trim(fnum1)//'T_'//trim(fnum2))
+			    IF (save_all_output) THEN
+				CALL SaveOutputOneFile(Ea,Et,Ha,Ht,anomaly,recvs,freqs(Ifreq),real_comm,'PX_F'//trim(fnum1)//'T_'//trim(fnum2))
+				CALL SaveOutputOneFileStations(Ea,Et,Ha,Ht,anomaly,recvs,freqs(Ifreq),real_comm,'ST_PX_F'//trim(fnum1)//'T_'//trim(fnum2),stations,mz)
+			    ELSE
 				CALL SaveOutputOneFileStations(Ea,Et,Ha,Ht,anomaly,recvs,freqs(Ifreq),real_comm,'PX_F'//trim(fnum1)//'T_'//trim(fnum2),stations,mz)
+			    ENDIF
 			ENDIF
 			time2=GetTime()-time2;
 			CALL PRINT_CALC_TIME("Save fields in",time2) 
