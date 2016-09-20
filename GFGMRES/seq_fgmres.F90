@@ -14,6 +14,7 @@ MODULE SEQ_FGMRES
 
         PUBLIC:: SEQ_FGMRES_DATA
         PUBLIC:: INIT_SEQ_FGMRES,SET_OPERATORS,SEQ_FGMRES_SOLVE
+        PUBLIC:: SET_DP_INSTANCE
         PUBLIC:: DELETE_SEQ_FGMRES
 CONTAINS
         SUBROUTINE INIT_SEQ_FGMRES(solver,N,M,depth,params,l)
@@ -31,6 +32,8 @@ CONTAINS
                 CALL AllocateFGMRES(gsolver,N,M(depth),.FALSE.,full_length)
                 gsolver%params%Maxit=1
                 
+      		NULLIFY(solver%solvers(Depth)%PrecondLeft)
+	        solver%solvers(Depth)%MLeft=C_NULL_PTR
                 DO I=Depth-1,1,-1
                         CALL  AllocateFGMRES(solver%solvers(I),N,&
                                 &M(I),.TRUE.,length)
@@ -38,38 +41,71 @@ CONTAINS
                         cptr=C_LOC(solver%solvers(I+1))
         		solver%solvers(I)%PrecondRight=>FGMRES_BASED_PRECONDITIONER
 		        solver%solvers(I)%MRight=cptr
+		        solver%solvers(I)%MLeft=C_NULL_PTR
+        		NULLIFY(solver%solvers(I)%PrecondLeft)
 		        solver%solvers(I)%params=params
 		        solver%solvers(I)%params%MaxIt=1
                 ENDDO
 		solver%solvers(1)%params%MaxIt=params%MaxIt
                 IF (PRESENT(l)) l=full_length
         ENDSUBROUTINE
-        SUBROUTINE SET_OPERATORS(solver,apply,precond_right,precond_left,dp,inform,A,M1,M2)
+        SUBROUTINE SET_OPERATORS(solver,apply,dp,inform,A)
                 TYPE(SEQ_FGMRES_DATA),INTENT(IN)::solver
 		PROCEDURE(MatrixVectorMult),POINTER,INTENT(IN)::apply
-		PROCEDURE(MatrixVectorMult),POINTER,INTENT(IN)::precond_right
-		PROCEDURE(MatrixVectorMult),POINTER,INTENT(IN)::precond_left
 		PROCEDURE(MANYDOTPRODUCTS),POINTER,INTENT(IN)::dp
 		PROCEDURE (InformAboutIteration),POINTER,INTENT(IN)::Inform
-		TYPE(C_PTR),INTENT(IN)::A,M1,M2
+		TYPE(C_PTR),INTENT(IN)::A
                 TYPE(FGMRES_DATA),POINTER::gsolver
                 INTEGER::I,Depth
                 Depth=solver%Depth
                 gsolver=>solver%solvers(Depth)
-                CALL Set_FGMRES_Operators(gsolver,apply,precond_right,precond_left,dp,null_inform,A,M1,M2)
+                CALL Set_FGMRES_Operators(gsolver,apply,null_operator,&
+                        &null_operator,dp,null_inform,&
+                        &A,C_NULL_PTR,C_NULL_PTR)
 
                 DO I=solver%Depth-1,1,-1
                         solver%solvers(I)%ApplyOperator=>apply
-                        solver%solvers(I)%PrecondLeft=>precond_left
-                        IF (.NOT. ASSOCIATED(precond_left)) NULLIFY(solver%solvers(I)%PrecondLeft)
+                        NULLIFY(solver%solvers(I)%PrecondLeft)
                         solver%solvers(I)%A=A
-                        solver%solvers(I)%MLeft=M1
+                        solver%solvers(I)%MLeft=C_NULL_PTR
                         solver%solvers(I)%MANYDP=>dp
                         solver%solvers(I)%Inform=>null_inform
                 ENDDO
-                        solver%solvers(1)%Inform=>inform
+                solver%solvers(1)%Inform=>inform
         ENDSUBROUTINE
+        SUBROUTINE SET_RIGHT_PRECONDTIONER(solver,precond_right,M2)
+                TYPE(SEQ_FGMRES_DATA),INTENT(IN)::solver
+		PROCEDURE(MatrixVectorMult),POINTER,INTENT(IN)::precond_right
+		TYPE(C_PTR),INTENT(IN)::M2
+                TYPE(FGMRES_DATA),POINTER::gsolver
+                INTEGER::I,Depth
+                Depth=solver%Depth
+                gsolver=>solver%solvers(Depth)
+                IF (.NOT. ASSOCIATED(precond_right)) NULLIFY(gsolver%PrecondRight)
+                gsolver%Mright=M2
+        ENDSUBROUTINE
+        SUBROUTINE SET_LEFT_PRECONDITIONER(solver,precond_left,M1)
+                TYPE(SEQ_FGMRES_DATA),INTENT(IN)::solver
+		PROCEDURE(MatrixVectorMult),POINTER,INTENT(IN)::precond_left
+		TYPE(C_PTR),INTENT(IN)::M1
+                TYPE(FGMRES_DATA),POINTER::gsolver
+                INTEGER::I,Depth
 
+                DO I=solver%Depth,1,-1
+                        solver%solvers(I)%PrecondLeft=>precond_left
+                        IF (.NOT. ASSOCIATED(precond_left)) NULLIFY(solver%solvers(I)%PrecondLeft)
+                        solver%solvers(I)%MLeft=M1
+                ENDDO
+        ENDSUBROUTINE
+        SUBROUTINE SET_DP_INSTANCE(solver,dpinstance)
+                TYPE(SEQ_FGMRES_DATA),INTENT(IN)::solver
+		TYPE(C_PTR),INTENT(IN)::dpinstance
+                INTEGER::I,Depth
+                Depth=solver%Depth
+                DO I=1,Depth
+                        solver%solvers(I)%dpinstance=dpinstance
+                ENDDO
+        ENDSUBROUTINE
         SUBROUTINE SEQ_FGMRES_SOLVE(solver,x,x0,b,info)
                 TYPE(SEQ_FGMRES_DATA),INTENT(IN)::solver
 		COMPLEX(REALPARM),POINTER,INTENT(IN)::x(:),x0(:)
