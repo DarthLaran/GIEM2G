@@ -33,6 +33,7 @@ MODULE FGMRES
 	      TYPE(C_PTR)::A
 	      TYPE(C_PTR)::MLeft
 	      TYPE(C_PTR)::MRight
+              TYPE(C_PTR)::dpinstance
       END TYPE
 
      PUBLIC:: FGMRES_DATA, GMRES_SOLVE, AllocateFGMRES,Set_FGMRES_Operators,DeallocateFGMRES
@@ -88,6 +89,7 @@ MODULE FGMRES
 		solver%MRight=M2
 		solver%MANYDP=>dp
 		solver%Inform=>Inform
+                solver%dpinstance=C_NULL_PTR
 		IF (.NOT. ASSOCIATED(Inform)) NULLIFY(solver%Inform)
 	ENDSUBROUTINE
 
@@ -236,8 +238,6 @@ MODULE FGMRES
                         tmpptr(1:N)=>KrylovBasis(:,jH)
 			CALL ApplyRightPreconditioner(solver,tmpptr,w, jH);
 
-                        
-
                         CALL ApplyOperator(solver,w,r0)
 			CALL ApplyLeftPreconditioner(solver,r0,w);
 			!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(I)
@@ -252,7 +252,9 @@ MODULE FGMRES
 			Northo=ZERO
 			DO
 			    Northo=Northo+1
-			    CALL solver%MANYDP(KrylovBasis,w,jH,dotproducts)
+			    
+                            CALL   CalculateDotProduct(solver,KrylovBasis,&
+                                    &w,jH,dotproducts)
 
 
 			    CALL ZAXPY(jH,C_ONE,dotproducts,ONE,Hessenberg(:,jH),ONE)
@@ -506,6 +508,17 @@ RECURSIVE	SUBROUTINE ApplyRightPreconditioner(solver,v_in,v_out,K)
 		ENDIF
 	ENDSUBROUTINE
 
+        SUBROUTINE CalculateDotProduct(solver,m,v,K,res)
+		TYPE(FGMRES_DATA),TARGET,INTENT(IN)::solver
+		COMPLEX(REALPARM),POINTER,INTENT(IN)::m(:,:)
+		COMPLEX(REALPARM),POINTER,INTENT(IN)::v(:)
+		COMPLEX(REALPARM),POINTER,INTENT(IN)::res(:)
+                INTEGER,INTENT(IN)::K
+		CALL solver%MANYDP(m,v,K,res,solver%dpinstance)
+        ENDSUBROUTINE
+                 
+
+
 	FUNCTION CalculateVectorNorm(solver,v) RESULT(res)
 		TYPE(FGMRES_DATA),TARGET,INTENT(IN)::solver
 		COMPLEX(REALPARM),POINTER,INTENT(IN)::v(:)
@@ -517,7 +530,7 @@ RECURSIVE	SUBROUTINE ApplyRightPreconditioner(solver,v_in,v_out,K)
                 cptr=C_LOC(v(1))
                 CALL C_F_POINTER(cptr,m,(/SIZE(v),1/))
                 tmp=>tt
-		CALL solver%MANYDP(m,v,ONE,tmp)
+		CALL solver%MANYDP(m,v,ONE,tmp,solver%dpinstance)
 		res=SQRT(REAL(tt(1)))
 	ENDFUNCTION
 

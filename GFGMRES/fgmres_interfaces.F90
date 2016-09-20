@@ -30,22 +30,24 @@ MODULE  FGMRES_INTERFACES
       ENDTYPE
         INTERFACE 
                 SUBROUTINE MatrixVectorMult(A,v_in,v_out)
-                        USE UTILITIES
+                        USE UTILITIES,ONLY: REALPARM
+                        USE, INTRINSIC :: iso_c_binding
                         TYPE(C_PTR),INTENT(IN)::A
                         COMPLEX(REALPARM),POINTER,INTENT(IN)::v_in(:)
                         COMPLEX(REALPARM),POINTER,INTENT(IN)::v_out(:)
                 ENDSUBROUTINE
 
-                SUBROUTINE MANYDOTPRODUCTS(M,v,N,res)
-                        USE UTILITIES
+                SUBROUTINE MANYDOTPRODUCTS(M,v,N,res,ptr)
+                        USE UTILITIES,ONLY: REALPARM
+                        USE, INTRINSIC :: iso_c_binding
                         COMPLEX(REALPARM), POINTER, INTENT(IN):: M(:,:)
                         COMPLEX(REALPARM), POINTER, INTENT(IN):: v(:)
                         INTEGER                   , INTENT(IN):: N
                         COMPLEX(REALPARM), POINTER, INTENT(IN):: res(:)
+                        TYPE(C_PTR)::ptr
                 ENDSUBROUTINE
 
                 FUNCTION InformAboutIteration(info) RESULT(interp)
-                        USE UTILITIES
                         IMPORT RESULT_INFO
                         TYPE(RESULT_INFO),INTENT(IN)::info
                         INTEGER::interp

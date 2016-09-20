@@ -37,11 +37,11 @@ MODULE IE_SOLVER_MODULE
 		Nx=ie_op%Nx
 		Nz=ie_op%Nz
 		Ny_loc=ie_op%Ny_loc
+		ALLOCATE(guess(ie_op%Nx,ie_op%Ny_loc,ie_op%Nz,3))
 		IF (ie_op%real_space) THEN
 			DO Iz=1,Nz
 				Esol(:,:,Iz,:)=ie_op%sqsigb(Iz)*E_bkg(:,:,Iz,:)
 			ENDDO
-			ALLOCATE(guess(ie_op%Nx,ie_op%Ny_loc,ie_op%Nz,3))
 			IF (PRESENT(E0)) THEN
 			    DO Iy=1,Ny_loc
 				    DO Ix=1,ie_op%Nx
@@ -71,8 +71,9 @@ MODULE IE_SOLVER_MODULE
 					ENDDO
 				ENDDO
 			ENDDO
-			    DEALLOCATE(guess)
+	!		    DEALLOCATE(guess)
 		ENDIF
+                DEALLOCATE(guess)
 		time2=GetTime()
 	        CALL LOGGER('Solver finished')
 		CALL PRINT_CALC_TIME('Total time:                                               ',time2-time1)
@@ -116,6 +117,93 @@ MODULE IE_SOLVER_MODULE
 	ENDSUBROUTINE
 !-------------------------------------PRIVATE---------------------------------------------------------------------!
 	SUBROUTINE GIEM2G_FGMRES(ie_op,fgmres_ctl,Esol, guess)
+		TYPE(IntegralEquationOperator),TARGET,INTENT(IN)::ie_op
+		TYPE (FGMRES_CTL_TYPE),INTENT(IN)::fgmres_ctl
+		COMPLEX(REALPARM),POINTER,INTENT(IN)::Esol(:,:,:,:),guess(:,:,:,:)
+
+                TYPE(SEQ_FGMRES_DATA)::seq_solver
+                PROCEDURE (MatrixVectorMult),POINTER::Apply=>FULL_APPLY
+                PROCEDURE (MANYDOTPRODUCTS),POINTER::MANYDP=>DISTRIBUTED_DOT_PRODUCT
+                PROCEDURE (InformAboutIteration),POINTER::InformMe=>Information
+		COMPLEX(REALPARM),POINTER::x(:),x0(:),b(:)
+		INTEGER(8)::Length
+		INTEGER(MPI_CTL_KIND),TARGET::comm
+                TYPE(C_PTR)::pA,pcomm
+		REAL(8)::time1,time2
+		REAL(8)::full_time
+		CHARACTER(LEN=*), PARAMETER  :: info_fmt = "(A, I6, A, ES10.2E2)"
+		CHARACTER(LEN=2048,KIND=C_CHAR)::message 
+                INTEGER::Nloc
+                TYPE(GMRES_PARAMETERS)::params
+		INTEGER::MM(2)
+                TYPE(RESULT_INFO)::info
+		full_time=GetTime()
+                CALL DROP_IE_COUNTER(ie_op)
+                params%MaxIt=fgmres_ctl%fgmres_maxit
+                params%Tol=fgmres_ctl%misfit
+                params%RESTART_RESIDUAL=ITERATIVE_RESIDUAL_AT_RESTART
+
+		MM(1)=fgmres_buf
+		MM(2)=gmres_buf
+
+                CALL INIT_SEQ_FGMRES(seq_solver,Nloc,MM,2,params,Length)
+
+                CALL SET_OPERATORS(seq_solver,Apply,MANYDP,informMe,pA)
+                comm=ie_op%comm
+                pcomm=C_LOC(comm)
+                CALL SET_DP_INSTANCE(seq_solver,pcomm)
+
+		WRITE (message,*) 'Solver needs',Length*16.0/1024/1024/1024, 'Gb for workspace'
+		
+		CALL LOGGER(message)
+		Nloc=3*ie_op%Nz*ie_op%Nx*ie_op%Ny_loc/2
+		IF (ie_op%real_space) THEN
+                        b(1:2*Nloc)=>Esol
+                        x0(1:2*Nloc)=>guess
+                        x(1:Nloc)=>x0
+                ELSE
+                        ALLOCATE(b(Nloc))
+                        x0(1:Nloc)=>guess
+                        x(1:Nloc)=>x0
+                ENDIF
+		IF (ie_op%real_space) THEN
+			CALL MPI_SEND(x0(Nloc+1:),Nloc, MPI_DOUBLE_COMPLEX, ie_op%partner, ie_op%me,ie_op%ie_comm, IERROR)
+			CALL MPI_SEND(b(Nloc+1:),Nloc, MPI_DOUBLE_COMPLEX, ie_op%partner, ie_op%me+ie_op%comm_size,ie_op%ie_comm, IERROR)
+		ELSE
+			CALL MPI_RECV(x0,Nloc, MPI_DOUBLE_COMPLEX, ie_op%partner, ie_op%partner,ie_op%ie_comm, IERROR,MPI_STATUS_IGNORE)
+			CALL MPI_RECV(b,Nloc, MPI_DOUBLE_COMPLEX, ie_op%partner, ie_op%partner+ie_op%comm_size,ie_op%ie_comm, IERROR,MPI_STATUS_IGNORE)
+		ENDIF
+
+                CALL SEQ_FGMRES_SOLVE(seq_solver,x,x0(1:Nloc),b(1:Nloc),info)
+
+		IF (ie_op%real_space) THEN
+			CALL MPI_RECV(x0(Nloc+1:),Nloc, MPI_DOUBLE_COMPLEX, ie_op%partner, ie_op%partner,ie_op%ie_comm, IERROR,MPI_STATUS_IGNORE)
+			CALL ZCOPY (2*Nloc, x0, ONE, Esol, ONE)
+		ELSE
+			CALL MPI_SEND(x,Nloc, MPI_DOUBLE_COMPLEX, ie_op%partner, ie_op%me,ie_op%ie_comm, IERROR)
+                        DEALLOCATE(b)
+		ENDIF
+
+		full_time=GetTime()-full_time
+		ie_op%counter%solving=full_time
+
+		IF (info%stat==CONVERGED ) THEN
+                        WRITE(message,info_fmt) 'GFGMRES converged in', info%Iterations, &
+				&' iterations with misfit:',info%be	
+		ELSEIF (info%stat==NON_TRUE_CONVERGED) THEN
+                        WRITE(message,info_fmt) 'GFGMRES  more or less converged in', info%Iterations, &
+				&' iterations with Arnoldy misfit',info%bea, &
+                                &' and true misfit' info%be	
+                ELSEIF (info%stat==NON_CONVERGED) THEN
+                        WRITE(message,info_fmt) 'GFGMRES has NOT converged in', info%Iterations, &
+				&' iterations with Arnoldy  misfit:',info%bea	
+                ELSE
+			WRITE(message,'(A)') 'Unknown behaviour of GFGMRES'
+		ENDIF
+		CALL LOGGER(message)
+	END SUBROUTINE
+
+	SUBROUTINE GIEM2G_FGMRES_2(ie_op,fgmres_ctl,Esol, guess)
 		TYPE(IntegralEquationOperator),INTENT(INOUT)::ie_op
 		TYPE (FGMRES_CTL_TYPE),INTENT(IN)::fgmres_ctl
 		COMPLEX(REALPARM),POINTER,INTENT(IN)::Esol(:,:,:,:),guess(:,:,:,:)
@@ -339,5 +427,57 @@ MODULE IE_SOLVER_MODULE
 		ENDIF
 		CALL LOGGER(message)
 	END SUBROUTINE
+
+
+        SUBROUTINE FULL_APPLY (pA,v_in,v_out)
+                        TYPE(C_PTR),INTENT(IN)::pA
+                        COMPLEX(REALPARM),POINTER,INTENT(IN)::v_in(:)
+                        COMPLEX(REALPARM),POINTER,INTENT(IN)::v_out(:)
+        		TYPE(IntegralEquationOperator),POINTER::ie_op
+                        COMPLEX(REALPARM)::tmp_in(SIZE(v_in))
+                        COMPLEX(REALPARM)::tmp_out(SIZE(v_out))
+                        INTEGER::Nloc
+                        CALL C_F_POINTER(pA,ie_op)
+                        Nloc=SIZE(v_in)
+                        IF (ie_op%real_space) THEN
+                                CALL ZCOPY (Nloc, v_in, ONE, tmp_in, ONE)
+                                CALL MPI_RECV(tmp_in(Nloc+1:),Nloc, MPI_DOUBLE_COMPLEX, ie_op%partner, ie_op%partner,ie_op%ie_comm, IERROR,MPI_STATUS_IGNORE)
+                                CALL APPLY_IE_OP(ie_op,tmp_in,tmp_out)
+                                CALL MPI_SEND(tmp_out(Nloc+1:),Nloc, MPI_DOUBLE_COMPLEX, ie_op%partner, ie_op%me+ie_op%comm_size,ie_op%ie_comm, IERROR)
+                                CALL ZCOPY (Nloc, tmp_out, ONE, v_out, ONE)
+
+                        ELSE
+                                CALL MPI_SEND(v_in,Nloc, MPI_DOUBLE_COMPLEX, ie_op%partner, ie_op%me,ie_op%ie_comm, IERROR)
+                                CALL APPLY_IE_ZEROS(ie_op)
+                                CALL MPI_RECV(v_out,Nloc, MPI_DOUBLE_COMPLEX, ie_op%partner, ie_op%partner+ie_op%comm_size,ie_op%ie_comm, IERROR,MPI_STATUS_IGNORE)
+                        ENDIF
+        ENDSUBROUTINE
+
+
+
+
+        SUBROUTINE DISTRIBUTED_DOT_PRODUCT(Matrix,v,K,res,ptr)
+                COMPLEX(REALPARM), POINTER, INTENT(IN):: Matrix(:,:)
+                COMPLEX(REALPARM), POINTER, INTENT(IN):: v(:)
+                INTEGER                   , INTENT(IN):: K
+                COMPLEX(REALPARM), POINTER, INTENT(IN):: res(:)
+                TYPE(C_PTR),INTENT(IN)::ptr
+                COMPLEX(REALPARM)::tmp(K)
+		INTEGER(MPI_CTL_KIND)::	IERROR,comm
+		INTEGER(MPI_CTL_KIND),POINTER::	pcomm
+                INTEGER::N
+                N=SIZE(V)
+                CALL ZGEMV('C',N,K,C_ONE,Matrix,N,v,ONE,C_ZERO,tmp,ONE)
+                CALL C_F_POINTER(ptr,pcomm)
+                comm=pcomm
+                CALL MPI_ALLREDUCE(res,tmp,K,MPI_DOUBLE_COMPLEX,MPI_SUM,comm,IERROR)
+        ENDSUBROUTINE
+
+		FUNCTION Information(info) RESULT(interp)
+			TYPE(RESULT_INFO),INTENT(IN)::info
+			INTEGER::interp
+                        PRINT*, "Iteration: " , info%Iterations ,&
+                                &"Arnoldy misfit:"  ,info%bea
+                ENDFUNCTION
 
 END MODULE  
