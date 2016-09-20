@@ -202,8 +202,8 @@ MODULE IE_SOLVER_MODULE
 		ENDIF
 		CALL LOGGER(message)
 	END SUBROUTINE
-
-	SUBROUTINE GIEM2G_FGMRES_2(ie_op,fgmres_ctl,Esol, guess)
+#ifndef not_compile
+	SUBROUTINE GIEM2G_FGMRES(ie_op,fgmres_ctl,Esol, guess)
 		TYPE(IntegralEquationOperator),INTENT(INOUT)::ie_op
 		TYPE (FGMRES_CTL_TYPE),INTENT(IN)::fgmres_ctl
 		COMPLEX(REALPARM),POINTER,INTENT(IN)::Esol(:,:,:,:),guess(:,:,:,:)
@@ -427,7 +427,7 @@ MODULE IE_SOLVER_MODULE
 		ENDIF
 		CALL LOGGER(message)
 	END SUBROUTINE
-
+#endif
 
         SUBROUTINE FULL_APPLY (pA,v_in,v_out)
                         TYPE(C_PTR),INTENT(IN)::pA
