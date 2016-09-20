@@ -136,6 +136,7 @@ SAVE_SOLUION=.FALSE.
 
 
 IF (SAVE_SOLUTION) THEN
+
 	CALL LOGGER("IE solution will be save to disk")
 ELSE
 	CALL LOGGER("IE solution will NOT be stored")
