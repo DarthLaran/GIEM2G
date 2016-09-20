@@ -46,6 +46,7 @@ giem2g_lib_shared: $(ENGINE_O)
 
 zfgmres:
 	$(MAKE) -C ZFGMRES FC=$(F77)  FOPTS='$(OPTS)' AR=$(AR) FGMRES_PATH='$(FGMRES_PATH)'
+	$(MAKE) -C GFGMRES FC=$(F77)  FOPTS='$(OPTS)' AR=$(AR) 
 fson:
 	$(MAKE) -C FSON FC=$(FC)  FOPTS='$(OPTS)' AR=$(AR) 
 
