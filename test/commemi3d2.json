@@ -28,13 +28,13 @@
 	"Frequencies": [1.0,0.001,0.01,0.1],
 	"Recievers":[
 		  {"xshift":	0e0,"yshift": -20000,"depth": 0},
-		{"xshift":	0e0,"yshift": -20000,"depth": 0}
+		{"xshift":	1e0,"yshift": -20000,"depth": 0}
 	],
 	"Stations": "Stations.dat",
 	"FGMRES":{
 		"OuterBufferSize": 5,
 		"InnerBufferSize": 5,
 		"MaxRestart":300,
-		"Misfit":1e-12
+		"Tolerance":1e-8
 	}
  }

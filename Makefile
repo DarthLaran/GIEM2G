@@ -33,7 +33,7 @@ LIB_FSON=-L./FSON -lfson
 LIBS=  $(LIB_ADD)  $(LIB_FFTW) $(LIB_FGMRES) $(LIB_BLAS)  $(LIB_FSON)
 
 
-giem2g: zfgmres  giem2g_lib giem2g.F90 
+giem2g: gfgmres fson  giem2g_lib giem2g.F90 
 	$(FC_Link)   $(OPTS)  giem2g.F90  -L./ -lgiem2g  $(LIBS)  $(INCLUDE) -o giem2g 
 	
 ifdef INSTALL_PATH
@@ -46,9 +46,8 @@ giem2g_lib_shared: $(ENGINE_O)
 #	$(SHARED_Link) -fPIC  -shared   -L$(SHARED_BLAS) -L$(SHARED_FFTW) $(ENGINE_O)   -o $(DST)/lib_giem2g.so 
 
 
-zfgmres:
-#	$(MAKE) -C ZFGMRES FC=$(F77)  FOPTS='$(OPTS)' AR=$(AR) FGMRES_PATH='$(FGMRES_PATH)'
-	$(MAKE) -C GFGMRES FC=$(F77)  FOPTS='$(OPTS)' AR=$(AR) 
+gfgmres:
+	$(MAKE) -C GFGMRES FC=$(FC)  FOPTS='$(OPTS)' AR=$(AR) 
 fson:
 	$(MAKE) -C FSON FC=$(FC)  FOPTS='$(OPTS)' AR=$(AR) 
 

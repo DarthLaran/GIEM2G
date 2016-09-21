@@ -160,6 +160,7 @@ CONTAINS
 		TYPE (RECEIVER_TYPE),POINTER,INTENT(INOUT)::recvs(:)
 		INTEGER(MPI_CTL_KIND),INTENT(IN)::comm
                 TYPE(FSON_VALUE), POINTER,INTENT(IN) :: input_data
+                TYPE(FSON_VALUE), POINTER :: recvs_array,item
 		INTEGER(MPI_CTL_KIND):: me,IERROR
 		INTEGER:: Nr,I
 		REAL(REALPARM),ALLOCATABLE::zr(:),xshift(:),yshift(:)
@@ -169,13 +170,16 @@ CONTAINS
 		ENDIF
 		CALL MPI_COMM_RANK(comm, me, IERROR)
 		IF (me==0) THEN
-			OPEN(078,file=recievers,form='FORMATTED')
-			READ(078,*) Nr
+
+                        CALL FSON_GET(input_data, "Recievers", recvs_array)
+                        Nr=FSON_VALUE_COUNT(recvs_array)
 			ALLOCATE(zr(Nr),xshift(Nr),yshift(Nr))
 			DO I=1,Nr
-				READ(078,*) zr(I),xshift(I),yshift(I)
+                              item => FSON_VALUE_GET(recvs_array, I)
+                              CALL FSON_GET(item, "xshift",xshift(I) )
+                              CALL FSON_GET(item, "yshift",yshift(I) )
+                              CALL FSON_GET(item, "depth",zr(I) )
 			ENDDO
-			CLOSE(078)
 		ENDIF
 		CALL MPI_BCAST(Nr,1,MPI_INTEGER, 0, comm, IERROR)
 		IF (me/=0) THEN
@@ -192,21 +196,24 @@ CONTAINS
 		ENDDO
 		DEALLOCATE(zr,xshift,yshift)
 	ENDSUBROUTINE
-	SUBROUTINE LoadFGMRES_Ctl(fgmres_ctl,comm,fname)
+	SUBROUTINE LoadFGMRES_Ctl(fgmres_ctl,comm,input_data)
 		TYPE (FGMRES_CTL_TYPE),INTENT(OUT)::fgmres_ctl
 		INTEGER(MPI_CTL_KIND),INTENT(IN)::comm
-		CHARACTER(*),INTENT(IN)::fname
-		INTEGER :: buf_length,maxit,maxit_precond,ort_type
+                TYPE(FSON_VALUE), POINTER,INTENT(IN) :: input_data
+
+                TYPE(FSON_VALUE), POINTER :: fgmres
+		INTEGER :: buf_length,maxit,maxit_precond
 		REAL(REALPARM)::misfit
 		INTEGER(MPI_CTL_KIND):: me,IERROR
 		CALL MPI_COMM_RANK(comm, me, IERROR)
 		IF (me==0) THEN
-			OPEN(078,file=fname)
-			READ(078,*) buf_length,maxit,maxit_precond,misfit, ort_type
-			CLOSE(078)
+                        CALL FSON_GET(input_data, "FGMRES",fgmres)
+                        CALL FSON_GET(fgmres, "OuterBufferSize",buf_length)
+                        CALL FSON_GET(fgmres, "InnerBufferSize",maxit_precond)
+                        CALL FSON_GET(fgmres, "MaxRestart",maxit)
+                        CALL FSON_GET(fgmres, "Tolerance",misfit)
 		ENDIF
 		CALL MPI_BCAST(buf_length,1,MPI_INTEGER, 0, comm, IERROR)
-		CALL MPI_BCAST(ort_type,1,MPI_INTEGER, 0, comm, IERROR)
 		CALL MPI_BCAST(maxit,1,MPI_INTEGER, 0, comm, IERROR)
 		CALL MPI_BCAST(maxit_precond,1,MPI_INTEGER, 0, comm, IERROR)
 		CALL MPI_BCAST(misfit,1,MPI_DOUBLE_PRECISION, 0, comm, IERROR)
@@ -214,24 +221,9 @@ CONTAINS
 		fgmres_ctl%fgmres_maxit=maxit
 		fgmres_ctl%fgmres_buf=buf_length
 		fgmres_ctl%gmres_buf=maxit_precond
-		fgmres_ctl%ort_type=ort_type
 	ENDSUBROUTINE
-	SUBROUTINE LoadThreshold(IE_Threshold,RC_Threshold,comm,fname)
-		REAL(REALPARM),INTENT(OUT)::IE_Threshold,RC_Threshold
-		INTEGER(MPI_CTL_KIND),INTENT(IN)::comm
-		CHARACTER(*),INTENT(IN)::fname
-		REAL(REALPARM)::tmp(2)
-		INTEGER(MPI_CTL_KIND):: me,IERROR
-		CALL MPI_COMM_RANK(comm, me, IERROR)
-		IF (me==0) THEN
-			OPEN(078,file=fname)
-			READ(078,*) tmp
-			CLOSE(078)
-		ENDIF
-		CALL MPI_BCAST(tmp,2,MPI_DOUBLE_PRECISION, 0, comm, IERROR)
-		IE_Threshold=tmp(1)
-		RC_Threshold=tmp(2)
-	ENDSUBROUTINE
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!        
 	SUBROUTINE SaveField(E,fname,me,t)
 		COMPLEX(REALPARM),INTENT(INOUT)::E(:,:,:,:)
 		CHARACTER(len=*), INTENT(IN)::fname
