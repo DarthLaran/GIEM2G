@@ -66,7 +66,7 @@ else
 	$(FC) $(OPTS) -fPIC -D ExtrEMe   -c $*.F90 -o $*.o -I$(SHARED_BLAS_INC)  -I$(SHARED_FFTW_INC) 
 endif
 clean:
-	rm $(ALL_O)   *.mod  
 	$(MAKE) -C ZFGMRES clean
 	$(MAKE) -C GFGMRES clean 
+	rm $(ALL_O)   *.mod  
 	rm libgiem2g.a

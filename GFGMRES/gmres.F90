@@ -123,6 +123,7 @@ MODULE FGMRES
 		bea=-R_ONE
 
 
+
 		bn=CalculateVectorNorm(solver,b)
 		IF (bn< ZERO_THRESHOLD) THEN
 			x=C_ZERO
@@ -135,25 +136,22 @@ MODULE FGMRES
 	       sPb=bn
 !!!!!!!!!!!!-----------------------!!!!!!!!!!!!!!!!!!!!!
                 CALL ZCOPY(N,x0,ONE,x,ONE) 
-
 		CALL ApplyOperator(solver,x0,r0)
-!		!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(I)
-                !$OMP DO SCHEDULE(GUIDED) 
+                !$OMP PARALLEL DEFAULT(SHARED),PRIVATE(I)
+                !$OMP DO SCHEDULE(GUIDED)
                         DO I=1,N
 	        		r0(I)=b(I)-r0(I)
                         ENDDO
-                !$OMP ENDDO
-!		!$END OMP PARALLEL 
+               !$OMP ENDDO
+               !$OMP END PARALLEL 
 
 		CALL ApplyLeftPreconditioner(solver,r0,w)
-
 		beta=CalculateVectorNorm(solver,w)
 
-
-		IF (beta< ZERO_THRESHOLD) THEN
+		IF (beta/sb< solver%params%Tol) THEN
 			info%stat=CONVERGED
-			info%be=be
-			info%Iterations=1
+			info%be=beta/sb
+			info%Iterations=0
 			RETURN
 		ENDIF
 		Iter=0

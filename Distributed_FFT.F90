@@ -32,10 +32,6 @@ MODULE DISTRIBUTED_FFT_MODULE
 		REAL(DOUBLEPARM)::plan_time
 	ENDTYPE
 
-	TYPE LocalTransposeData
-		PROCEDURE(DFD_TRANSPOSE),POINTER,NOPASS::LocalTranspose
-		INTEGER::Nopt
-	ENDTYPE
 
 
 	TYPE FFT_COUNTER
@@ -67,12 +63,10 @@ MODULE DISTRIBUTED_FFT_MODULE
 		INTEGER(MPI_CTL_KIND)::comm,me
 	
 		TYPE(FFTW_TRANSPOSE_DATA)::FFTW_TRANSPOSE
-		TYPE(LocalTransposeData)::FullLocalTranspose
 
 		TYPE(PlanXY_TYPE)::plan(FFT_FWD:FFT_BWD)
 
 		REAL(DOUBLEPARM)::plans_time(2,FFT_FWD:FFT_BWD)
-		REAL(DOUBLEPARM)::local_transpose_time(2)
 		TYPE (FFT_COUNTER)::timer(FFT_FWD:FFT_BWD)
 	ENDTYPE
 	INTERFACE 
@@ -133,8 +127,6 @@ MODULE DISTRIBUTED_FFT_MODULE
 		CALL PRINT_CALC_TIME('Forward along Y:', DFD%plans_time(2,FFT_FWD))
 		CALL PRINT_CALC_TIME('Backward along X:', DFD%plans_time(1,FFT_BWD))
 		CALL PRINT_CALC_TIME('Backward along Y:', DFD%plans_time(2,FFT_BWD))
-		CALL PRINT_CALC_TIME('Optimal local transpose:',DFD%local_transpose_time(1))
-		CALL PRINT_CALC_TIME('Local transpose plan:',DFD%local_transpose_time(2))
 		CALL PRINT_CALC_TIME('FFTW Transpose plan:',DFD%FFTW_TRANSPOSE%plan_time)
 		CALL PRINT_BORDER
 #endif

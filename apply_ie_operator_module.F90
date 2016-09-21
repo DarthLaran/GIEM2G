@@ -97,6 +97,13 @@ MODULE APPLY_IE_OPERATOR_MODULE
 		!$OMP END PARALLEL
 
 		CALL	MULT_IE_OP(ie_op)
+
+                
+		field_in(1:ie_op%Nx,1:ie_op%Ny_loc,1:ie_op%Nz,1:3)=>v_in
+		field_out(1:ie_op%Nx,1:ie_op%Ny_loc,1:ie_op%Nz,1:3)=>v_out
+                fft_buff(1:2*ie_op%Nx,1:ie_op%Ny_loc,1:ie_op%Nz,1:3)=>ie_op%DFD%field_in
+                N=4*ie_op%Nx*ie_op%Ny
+
 		!$OMP PARALLEL DEFAULT(SHARED), PRIVATE(Iy,Ix,Iz,d1,d2,asiga)
 #ifndef IBM_Bluegene
                 !$OMP DO SCHEDULE(GUIDED) COLLAPSE(3)

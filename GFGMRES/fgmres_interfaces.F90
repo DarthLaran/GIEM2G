@@ -44,7 +44,7 @@ MODULE  FGMRES_INTERFACES
                         COMPLEX(REALPARM), POINTER, INTENT(IN):: v(:)
                         INTEGER                   , INTENT(IN):: N
                         COMPLEX(REALPARM), POINTER, INTENT(IN):: res(:)
-                        TYPE(C_PTR)::ptr
+                        TYPE(C_PTR),INTENT(IN)::ptr
                 ENDSUBROUTINE
 
                 FUNCTION InformAboutIteration(info) RESULT(interp)

@@ -21,18 +21,22 @@ IMPLICIT NONE
 INTEGER(MPI_CTL_KIND)::PROVIDED,IERROR
 INTEGER(MPI_CTL_KIND):: STATUS(MPI_STATUS_SIZE)
 INTEGER::Iz,Ifreq
-REAL(REALPARM),POINTER::freqs(:)
+REAL(REALPARM),POINTER::freqs(:)=>NULL()
 TYPE (RECEIVER_TYPE),POINTER::recvs(:)
 TYPE(IntegralEquationOperator)::ie_op
 TYPE(RC_OPERATOR)::rc_op
 COMPLEX(REALPARM),POINTER::FX(:,:,:,:),FY(:,:,:,:)
 COMPLEX(REALPARM),POINTER::Ea(:,:,:,:),Ha(:,:,:,:)
 COMPLEX(REALPARM),POINTER::Et(:,:,:,:),Ht(:,:,:,:)
-COMPLEX(REALPARM),POINTER::E_bkg(:,:,:,:)
-COMPLEX(REALPARM),POINTER::E_sol(:,:,:,:)
-COMPLEX(REALPARM),POINTER::Eprevy(:,:,:,:)
-COMPLEX(REALPARM),POINTER::Eprevx(:,:,:,:)
-REAL(REALPARM),POINTER::Stations(:,:)
+COMPLEX(REALPARM),POINTER::E_bkg(:,:,:,:)=>NULL()
+COMPLEX(REALPARM),POINTER::E_sol(:,:,:,:)=>NULL()
+
+COMPLEX(REALPARM),POINTER::Eprevy(:,:,:,:)=>NULL()
+
+COMPLEX(REALPARM),POINTER::Eprevx(:,:,:,:)=>NULL()
+
+REAL(REALPARM),POINTER::Stations(:,:)=>NULL()
+
 REAL(REALPARM)::mz
 INTEGER(MPI_CTL_KIND),PARAMETER::MPI_TWO=2
 INTEGER(MPI_CTL_KIND),PARAMETER::MPI_ONE=1
@@ -53,7 +57,8 @@ REAL(DOUBLEPARM)::time2
 REAL(DOUBLEPARM),ALLOCATABLE::recv_depths(:)
 
 CHARACTER(len=22)::fnum1,fnum2
-CHARACTER(len=1024),POINTER::anom_list(:)
+CHARACTER(len=1024),POINTER::anom_list(:)=>NULL()
+
 INTEGER::Istr,Na,Ia,Ir,Nf
 CHARACTER(LEN=2048,KIND=C_CHAR)::message 
 INTEGER(C_INTPTR_T)::kernel_len,fft_len
@@ -70,7 +75,7 @@ CALL MPI_COMM_RANK(wcomm, me, IERROR)
 CALL MPI_COMM_SIZE(wcomm,wsize,IERROR) 
 LOGGER_MASTER=me
 #ifndef MPI_TIMER
-CALL LOGGER("Timer is based in SYSTEM_CLOCK")
+CALL LOGGER("Timer is based on SYSTEM_CLOCK")
 #else
 CALL LOGGER("Timer is based on MPI_Wtime()")
 #endif
@@ -120,8 +125,8 @@ CALL PRINT_CALC_NUMBER('Number of threads:',NT)
 
 SAVE_SOLUTION=.TRUE.
 
-SOLVE_EQUATION=.FALSE.
-RECALC_FIELD=.TRUE.
+SOLVE_EQUATION=.TRUE.
+RECALC_FIELD=.FALSE.
 save_all_output=.TRUE.
 
 
@@ -193,6 +198,12 @@ IF (SOLVE_EQUATION) THEN
 		ALLOCATE(E_sol(ie_op%Nx,ie_op%Ny_loc,ie_op%Nz,3))
 		ALLOCATE(Eprevx(ie_op%Nx,ie_op%Ny_loc,ie_op%Nz,3))
 		ALLOCATE(Eprevy(ie_op%Nx,ie_op%Ny_loc,ie_op%Nz,3))
+		FX=>NULL()
+		FY=>NULL();
+		Ea=>NULL()
+		Ha=>NULL()
+		Et=>NULL()
+		Ht=>NULL()
 	ELSE
 		FX=>NULL()
 		FY=>NULL();
@@ -206,6 +217,8 @@ IF (SOLVE_EQUATION) THEN
 		Eprevy=>NULL()
 	ENDIF
 ENDIF
+
+
 IF (RECALC_FIELD) THEN
 	CALL LoadRecievers(recvs,wcomm,'recievers.dat')
 	CALL LoadAnomalySigmaList('anomaly_list.dat',wcomm,anom_list,Na)
@@ -224,7 +237,7 @@ IF (RECALC_FIELD) THEN
 		  CALL   MPI_COMM_SPLIT(rc_op%matrix_comm, MPI_TWO, rc_op%me,   real_comm, IERROR)
 	ENDIF
 	IF (me==0) THEN
-	    CALL LoadStations('stations.dat',stations)
+	   ! CALL LoadStations('stations.dat',stations)
 	ENDIF
 	mz=anomaly%dz(1)*1.1;
 	IF (rc_op%real_space) THEN
@@ -253,12 +266,16 @@ IF (RECALC_FIELD) THEN
 
 ENDIF
 
+
 !----------------------------------------------------------------------------!
 DO Ifreq=1,Nfreq
 	WRITE (fnum1,'(F22.10)') freqs(Ifreq)
+
 	DO Istr=1,11
 		IF (fnum1(Istr:Istr)==' ') fnum1(Istr:Istr)='0'
 	ENDDO
+
+
 	WRITE (message,'(A, F22.10, A)') 'Frequency:', freqs(Ifreq), 'Hz'
 	CALL LOGGER(message)
 
@@ -360,10 +377,13 @@ DO Ifreq=1,Nfreq
 				    Ht(Ir,HZ,:,:)=Ha(Ir,HZ,:,:)+FY(Ir,1,1,HZ)
 			    ENDDO
 			    IF (save_all_output) THEN
-				CALL SaveOutputOneFile(Ea,Et,Ha,Ht,anomaly,recvs,freqs(Ifreq),real_comm,'PY_F'//trim(fnum1)//'T_'//trim(fnum2))
-				CALL SaveOutputOneFileStations(Ea,Et,Ha,Ht,anomaly,recvs,freqs(Ifreq),real_comm,'ST_PY_F'//trim(fnum1)//'T_'//trim(fnum2),stations,mz)
+				CALL SaveOutputOneFile(Ea,Et,Ha,Ht,anomaly,recvs,freqs(Ifreq),&
+                                        &real_comm,'PY_F'//trim(fnum1)//'T_'//trim(fnum2))
+!				CALL SaveOutputOneFileStations(Ea,Et,Ha,Ht,anomaly,recvs,freqs(Ifreq),&
+!                                        &real_comm,'ST_PY_F'//trim(fnum1)//'T_'//trim(fnum2),stations,mz)
 			    ELSE
-				CALL SaveOutputOneFileStations(Ea,Et,Ha,Ht,anomaly,recvs,freqs(Ifreq),real_comm,'PY_F'//trim(fnum1)//'T_'//trim(fnum2),stations,mz)
+!				CALL SaveOutputOneFileStations(Ea,Et,Ha,Ht,anomaly,recvs,freqs(Ifreq),&
+!                                        &real_comm,'PY_F'//trim(fnum1)//'T_'//trim(fnum2),stations,mz)
 			    ENDIF
 			ENDIF
 			time2=GetTime()-time2;
@@ -375,7 +395,8 @@ DO Ifreq=1,Nfreq
 				ENDIF
 				success=.TRUE.
 				IF (ie_op%real_space) THEN
-					CALL LoadIESolutionOneFIleBinary(Eprevx,real_comm,'SOL_PX_F'//trim(fnum1)//'T_'//trim(fnum2),success)
+					CALL LoadIESolutionOneFIleBinary(Eprevx,real_comm,&
+                                                &'SOL_PX_F'//trim(fnum1)//'T_'//trim(fnum2),success)
 				ENDIF
 				time2=GetTime()-time2;
 				CALL MPI_BARRIER(ie_op%ie_comm,IERROR)
@@ -397,7 +418,8 @@ DO Ifreq=1,Nfreq
 				IF (SAVE_SOLUTION) THEN
 					time2=GetTime()
 					IF (ie_op%real_space) THEN
-						CALL SaveIESolutionOneFIleBinary(E_sol,real_comm,'SOL_PX_F'//trim(fnum1)//'T_'//trim(fnum2))
+						CALL SaveIESolutionOneFIleBinary(E_sol,real_comm,&
+                                                        &'SOL_PX_F'//trim(fnum1)//'T_'//trim(fnum2))
 					ENDIF
 					time2=GetTime()-time2;
 					CALL PRINT_CALC_TIME("Save IE Solution in",time2) 
@@ -408,7 +430,8 @@ DO Ifreq=1,Nfreq
 			time2=GetTime()
 			success=.TRUE.
 			IF (rc_op%real_space) THEN
-				CALL LoadIESolutionOneFIleBinary(Eprevx,real_comm,'SOL_PX_F'//trim(fnum1)//'T_'//trim(fnum2),success)
+				CALL LoadIESolutionOneFIleBinary(Eprevx,real_comm,&
+                                        &'SOL_PX_F'//trim(fnum1)//'T_'//trim(fnum2),success)
 			ENDIF
 			time2=GetTime()-time2;
 			CALL MPI_BCAST(success, 1, MPI_LOGICAL, 0,wcomm, IERROR)
@@ -435,10 +458,13 @@ DO Ifreq=1,Nfreq
 					Ht(Ir,HZ,:,:)=Ha(Ir,HZ,:,:)+FX(Ir,1,1,HZ)
 				ENDDO
 			    IF (save_all_output) THEN
-				CALL SaveOutputOneFile(Ea,Et,Ha,Ht,anomaly,recvs,freqs(Ifreq),real_comm,'PX_F'//trim(fnum1)//'T_'//trim(fnum2))
-				CALL SaveOutputOneFileStations(Ea,Et,Ha,Ht,anomaly,recvs,freqs(Ifreq),real_comm,'ST_PX_F'//trim(fnum1)//'T_'//trim(fnum2),stations,mz)
+				CALL SaveOutputOneFile(Ea,Et,Ha,Ht,anomaly,recvs,freqs(Ifreq),real_comm,&
+                                        &'PX_F'//trim(fnum1)//'T_'//trim(fnum2))
+!				CALL SaveOutputOneFileStations(Ea,Et,Ha,Ht,anomaly,recvs,freqs(Ifreq),real_comm,&
+!                                        &'ST_PX_F'//trim(fnum1)//'T_'//trim(fnum2),stations,mz)
 			    ELSE
-				CALL SaveOutputOneFileStations(Ea,Et,Ha,Ht,anomaly,recvs,freqs(Ifreq),real_comm,'PX_F'//trim(fnum1)//'T_'//trim(fnum2),stations,mz)
+!				CALL SaveOutputOneFileStations(Ea,Et,Ha,Ht,anomaly,recvs,freqs(Ifreq),real_comm,&
+ !                                       &'PX_F'//trim(fnum1)//'T_'//trim(fnum2),stations,mz)
 			    ENDIF
 			ENDIF
 			time2=GetTime()-time2;
@@ -449,6 +475,6 @@ ENDDO
 CALL CHECK_MEM(me,0,wcomm)
 IF (SOLVE_EQUATION) CALL DeleteIE_OP(ie_op)
 IF (RECALC_FIELD) CALL DeleteRC_OP(RC_OP)
-CALL LOGGER("Final!")
+CALL LOGGER("Finish!")
 CALL MPI_FINALIZE(IERROR)
 END PROGRAM
