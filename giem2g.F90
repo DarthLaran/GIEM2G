@@ -18,6 +18,9 @@ USE Timer_Module
 
 IMPLICIT NONE
 #define debug		 
+
+CHARACTER(len=*),PARAMETER::default_input="giem2g_input.json"
+
 INTEGER(MPI_CTL_KIND)::PROVIDED,IERROR
 INTEGER(MPI_CTL_KIND):: STATUS(MPI_STATUS_SIZE)
 INTEGER::Iz,Ifreq
@@ -65,6 +68,9 @@ CHARACTER(len=1024),POINTER::anom_list(:)=>NULL()
 
 INTEGER::Istr,Ir,Nf
 CHARACTER(LEN=2048,KIND=C_CHAR)::message 
+
+CHARACTER(LEN=2048)::input_file
+
 INTEGER(C_INTPTR_T)::kernel_len,fft_len
 TYPE(C_PTR)::p1,p2,p3
 INTEGER::ll
@@ -127,9 +133,17 @@ NT=OMP_GET_MAX_THREADS()
 CALL PRINT_CALC_NUMBER('Number of threads:',NT)
 
 
+ll=COMMAND_ARGUMENT_COUNT()
 
-input_data => fson_parse("giem2g_input.json")
-
+if (ll==0) THEN
+        input_file=default_input
+else
+        CALL GET_COMMAND_ARGUMENT(1,input_file)
+endif
+        input_data => fson_parse(trim(input_file))
+CALL Logger(" ")
+CALL Logger("INPUT FILE: "//trim(input_file))
+CALL Logger(" ")
 SAVE_SOLUTION=.TRUE.
 SOLVE_EQUATION=.TRUE.
 RECALC_FIELD=.TRUE.

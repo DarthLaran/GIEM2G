@@ -16,7 +16,7 @@ FC=mpif90
 F77=mpif90
 FC_Link=mpif90
 
-FOPTS= -g -fcheck=all   -fopenmp  -O3   -mtune=native -march=native -D LEGACY_MPI
+FOPTS= -g  -fopenmp  -O3   -mtune=native -march=native -D LEGACY_MPI
 
 
 Ar=ar
