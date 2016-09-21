@@ -275,20 +275,20 @@ contains
         escape = .false.
 
         do
-            c = pop_char(unit, str, eof = eof, skip_ws = .false.)
-            if (eof) then
-               print *, "Expecting end of string"
-               stop(1)
-            elseif (escape) then
-              call fson_string_append(string,c)
-              escape = .false.
-	elseif (c=='\\') then
-		escape = .true.
-            elseif (c == '"') then
-                  exit
-            else
-                  call fson_string_append(string,c)
-            endif
+                c = pop_char(unit, str, eof = eof, skip_ws = .false.)
+                if (eof) then
+                        print *, "Expecting end of string"
+                        stop(1)
+                elseif (escape) then
+                        call fson_string_append(string,c)
+                        escape = .false.
+                elseif (c=='\\') then
+                        escape = .true.
+                elseif (c == '"') then
+                        exit
+                else
+                        call fson_string_append(string,c)
+                endif
         end do
     end function parse_string
 

@@ -147,11 +147,10 @@ MODULE IE_SOLVER_MODULE
                 CALL DROP_IE_COUNTER(ie_op)
                 params%MaxIt=fgmres_ctl%fgmres_maxit
                 params%Tol=fgmres_ctl%misfit
-                params%RESTART_RESIDUAL=.TRUE.
+                params%RESTART_RESIDUAL=.FALSE.
 
 		MM(1)=fgmres_ctl%fgmres_buf
 		MM(2)=fgmres_ctl%gmres_buf
-
 		Nloc=3*ie_op%Nz*ie_op%Nx*ie_op%Ny_loc/2
                 CALL INIT_SEQ_FGMRES(seq_solver,Nloc,MM,2,params,Length)
                 pA=C_LOC(ie_op)
@@ -294,7 +293,9 @@ MODULE IE_SOLVER_MODULE
 
                 comm=ie_op%ie_comm
                 KK=K
+
                 CALL MPI_ALLREDUCE(tmp,res(1:KK),KK,MPI_DOUBLE_COMPLEX,MPI_SUM,comm,IERROR)
+
 		time2=GetTime()
                 ie_op%counter%dotprod_num=ie_op%counter%dotprod_num+K
                 ie_op%counter%dotprod=ie_op%counter%dotprod+time2-time1

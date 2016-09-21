@@ -123,7 +123,6 @@ MODULE FGMRES
 		bea=-R_ONE
 
 
-
 		bn=CalculateVectorNorm(solver,b)
 		IF (bn< ZERO_THRESHOLD) THEN
 			x=C_ZERO
