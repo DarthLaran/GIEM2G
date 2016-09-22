@@ -128,7 +128,7 @@ MODULE IE_SOLVER_MODULE
                 PROCEDURE (MatrixVectorMult),POINTER::Apply=>FULL_APPLY
                 PROCEDURE (MANYDOTPRODUCTS),POINTER::MANYDP=>DISTRIBUTED_DOT_PRODUCT
                 PROCEDURE (InformAboutIteration),POINTER::InformMe=>Information
-		COMPLEX(REALPARM),POINTER::solution(:),initial_guess(:),rhs(:)
+		COMPLEX(REALPARM),ALLOCATABLE::solution(:),initial_guess(:),rhs(:)
 		COMPLEX(REALPARM),POINTER::pguess(:),pEsol(:)
                 TYPE(C_PTR)::ptmp
 		INTEGER(8)::Length
@@ -238,8 +238,8 @@ MODULE IE_SOLVER_MODULE
 
         SUBROUTINE FULL_APPLY (pA,v_in,v_out)
                         TYPE(C_PTR),INTENT(IN)::pA
-                        COMPLEX(REALPARM),POINTER,INTENT(IN)::v_in(:)
-                        COMPLEX(REALPARM),POINTER,INTENT(IN)::v_out(:)
+                        COMPLEX(REALPARM),INTENT(IN)::v_in(:)
+                        COMPLEX(REALPARM),INTENT(INOUT)::v_out(:)
         		TYPE(IntegralEquationOperator),POINTER::ie_op
                         COMPLEX(REALPARM),TARGET::tmp_in(2*SIZE(v_in))
                         COMPLEX(REALPARM),TARGET::tmp_out(2*SIZE(v_out))
@@ -276,10 +276,10 @@ MODULE IE_SOLVER_MODULE
 
 
         SUBROUTINE DISTRIBUTED_DOT_PRODUCT(Matrix,v,K,res,ptr)
-                COMPLEX(REALPARM), POINTER, INTENT(IN):: Matrix(:,:)
-                COMPLEX(REALPARM), POINTER, INTENT(IN):: v(:)
+                COMPLEX(REALPARM),  INTENT(IN):: Matrix(:,:)
+                COMPLEX(REALPARM),  INTENT(IN):: v(:)
                 INTEGER                   , INTENT(IN):: K
-                COMPLEX(REALPARM), POINTER, INTENT(IN):: res(:)
+                COMPLEX(REALPARM),  INTENT(INOUT):: res(:)
                 TYPE(C_PTR),INTENT(IN)::ptr
        		TYPE(IntegralEquationOperator),POINTER::ie_op
                 COMPLEX(REALPARM),TARGET::tmp(K)

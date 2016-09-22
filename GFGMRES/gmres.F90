@@ -96,8 +96,8 @@ MODULE FGMRES
 
         RECURSIVE	SUBROUTINE GMRES_SOLVE(solver,x,x0,b,info)
 		TYPE(FGMRES_DATA),INTENT(INOUT)::solver
-		COMPLEX(REALPARM),POINTER,INTENT(IN)::x(:),x0(:)
-		COMPLEX(REALPARM),POINTER,INTENT(IN)::b(:)
+		COMPLEX(REALPARM),INTENT(INOUT)::x(:)
+		COMPLEX(REALPARM),INTENT(IN)::b(:),x0(:)
 		TYPE(RESULT_INFO),INTENT(OUT)::info
 		INTEGER :: Itnum,Iter
 		REAL(REALPARM)::bn,sb,sPb
@@ -318,7 +318,8 @@ MODULE FGMRES
 	FUNCTION PrepareRestart(solver,rhs,solution,jH) RESULT(beta)
 		TYPE(FGMRES_DATA),INTENT(INOUT)::solver
 		INTEGER,INTENT(IN)::jH
-		COMPLEX(REALPARM),POINTER,INTENT(IN)::solution(:),rhs(:)
+		COMPLEX(REALPARM),TARGET,INTENT(IN)::rhs(:)
+		COMPLEX(REALPARM),TARGET,INTENT(INOUT)::solution(:)
 		COMPLEX(REALPARM),POINTER::x(:),w(:),r0(:)
 		COMPLEX(REALPARM),POINTER::Hessenberg(:,:)
 		COMPLEX(REALPARM),POINTER::KrylovBasis(:,:)
@@ -367,7 +368,8 @@ MODULE FGMRES
 		TYPE(FGMRES_DATA),INTENT(INOUT)::solver
 		INTEGER,INTENT(IN)::jH
 		REAL(REALPARM),INTENT(IN)::sPb
-		COMPLEX(REALPARM),POINTER,INTENT(IN)::rhs(:),solution(:)
+		COMPLEX(REALPARM),TARGET,INTENT(IN)::rhs(:)
+                COMPLEX(REALPARM),TARGET,INTENT(INOUT)::solution(:)
 		REAL(REALPARM)::res
 		REAL(REALPARM)::TrueResNorm
 		COMPLEX(REALPARM),POINTER::Hessenberg(:,:)
@@ -406,7 +408,7 @@ MODULE FGMRES
 	SUBROUTINE  ConstructCurrentSolution(solver,jH,solution)
 		TYPE(FGMRES_DATA),INTENT(INOUT)::solver
 		INTEGER,INTENT(IN)::jH
-		COMPLEX(REALPARM),POINTER,INTENT(IN)::solution(:)
+		COMPLEX(REALPARM),TARGET,INTENT(INOUT)::solution(:)
 		COMPLEX(REALPARM),POINTER::Hessenberg(:,:)
 		COMPLEX(REALPARM),POINTER::x(:),r0(:),y(:)
 		INTEGER::N,M
@@ -473,8 +475,8 @@ MODULE FGMRES
 
 RECURSIVE	SUBROUTINE ApplyRightPreconditioner(solver,v_in,v_out,K)
 		TYPE(FGMRES_DATA),TARGET,INTENT(IN)::solver
-		!COMPLEX(REALPARM),TARGET,INTENT(IN)::v_in(:),v_out(:)
-		COMPLEX(REALPARM),POINTER,INTENT(IN)::v_in(:),v_out(:)
+		COMPLEX(REALPARM),TARGET,INTENT(IN)::v_in(:)
+                COMPLEX(REALPARM),TARGET,INTENT(INOUT)::v_out(:)
 		INTEGER,INTENT(IN)::K
 		COMPLEX(REALPARM),POINTER::pH(:)
 		IF (ASSOCIATED(solver%PrecondRight)) THEN
@@ -490,14 +492,15 @@ RECURSIVE	SUBROUTINE ApplyRightPreconditioner(solver,v_in,v_out,K)
 
 	SUBROUTINE ApplyOperator(solver,v_in,v_out)
 		TYPE(FGMRES_DATA),TARGET,INTENT(IN)::solver
-		COMPLEX(REALPARM),POINTER,INTENT(IN)::v_in(:),v_out(:)
+		COMPLEX(REALPARM),INTENT(IN)::v_in(:)
+		COMPLEX(REALPARM),INTENT(INOUT)::v_out(:)
 		CALL solver%ApplyOperator(solver%A,v_in,v_out)
 	ENDSUBROUTINE
 
 	SUBROUTINE ApplyLeftPreconditioner(solver,v_in,v_out)
 		TYPE(FGMRES_DATA),TARGET,INTENT(IN)::solver
-		COMPLEX(REALPARM),POINTER,INTENT(IN)::v_in(:),v_out(:)
-		REAL(REALPARM),POINTER::pH(:)
+		COMPLEX(REALPARM),INTENT(IN)::v_in(:)
+		COMPLEX(REALPARM),INTENT(INOUT)::v_out(:)
 		IF (ASSOCIATED(solver%PrecondLeft)) THEN
 			CALL solver%PrecondLeft(solver%MLeft,v_in,v_out)
 		ELSE
@@ -507,9 +510,9 @@ RECURSIVE	SUBROUTINE ApplyRightPreconditioner(solver,v_in,v_out,K)
 
         SUBROUTINE CalculateDotProduct(solver,m,v,K,res)
 		TYPE(FGMRES_DATA),TARGET,INTENT(IN)::solver
-		COMPLEX(REALPARM),POINTER,INTENT(IN)::m(:,:)
-		COMPLEX(REALPARM),POINTER,INTENT(IN)::v(:)
-		COMPLEX(REALPARM),POINTER,INTENT(IN)::res(:)
+		COMPLEX(REALPARM),INTENT(IN)::m(:,:)
+		COMPLEX(REALPARM),INTENT(IN)::v(:)
+		COMPLEX(REALPARM),INTENT(INOUT)::res(:)
                 INTEGER,INTENT(IN)::K
 		CALL solver%MANYDP(m,v,K,res,solver%dpinstance)
         ENDSUBROUTINE
@@ -518,16 +521,14 @@ RECURSIVE	SUBROUTINE ApplyRightPreconditioner(solver,v_in,v_out,K)
 
 	FUNCTION CalculateVectorNorm(solver,v) RESULT(res)
 		TYPE(FGMRES_DATA),TARGET,INTENT(IN)::solver
-		COMPLEX(REALPARM),POINTER,INTENT(IN)::v(:)
+		COMPLEX(REALPARM),TARGET,INTENT(IN)::v(:)
 		COMPLEX(REALPARM),POINTER::m(:,:)
                 TYPE(C_PTR)::cptr
-		COMPLEX(REALPARM),POINTER::tmp(:)
 		COMPLEX(REALPARM),TARGET::tt(1)
 		REAL(REALPARM)::res
                 cptr=C_LOC(v(1))
                 CALL C_F_POINTER(cptr,m,(/SIZE(v),1/))
-                tmp=>tt
-		CALL solver%MANYDP(m,v,ONE,tmp,solver%dpinstance)
+		CALL solver%MANYDP(m,v,ONE,tt,solver%dpinstance)
 		res=SQRT(REAL(tt(1)))
 	ENDFUNCTION
 

@@ -33,17 +33,17 @@ MODULE  FGMRES_INTERFACES
                         USE UTILITIES,ONLY: REALPARM
                         USE, INTRINSIC :: iso_c_binding
                         TYPE(C_PTR),INTENT(IN)::A
-                        COMPLEX(REALPARM),POINTER,INTENT(IN)::v_in(:)
-                        COMPLEX(REALPARM),POINTER,INTENT(IN)::v_out(:)
+                        COMPLEX(REALPARM),INTENT(IN)::v_in(:)
+                        COMPLEX(REALPARM),INTENT(INOUT)::v_out(:)
                 ENDSUBROUTINE
 
                 SUBROUTINE MANYDOTPRODUCTS(M,v,N,res,ptr)
                         USE UTILITIES,ONLY: REALPARM
                         USE, INTRINSIC :: iso_c_binding
-                        COMPLEX(REALPARM), POINTER, INTENT(IN):: M(:,:)
-                        COMPLEX(REALPARM), POINTER, INTENT(IN):: v(:)
-                        INTEGER                   , INTENT(IN):: N
-                        COMPLEX(REALPARM), POINTER, INTENT(IN):: res(:)
+                        COMPLEX(REALPARM), INTENT(IN):: M(:,:)
+                        COMPLEX(REALPARM), INTENT(IN):: v(:)
+                        INTEGER          , INTENT(IN):: N
+                        COMPLEX(REALPARM),  INTENT(INOUT):: res(:)
                         TYPE(C_PTR),INTENT(IN)::ptr
                 ENDSUBROUTINE
 
