@@ -31,13 +31,15 @@ LIB_GFGMRES=-L./GFGMRES -lgfgmres
 LIB_FGMRES=$(LIB_GFGMRES)
 LIB_FSON=-L./FSON -lfson
 
+INCLUDE=$(FFTW_INCLUDE) $(OPENBLAS_INCLUDE) -I./GFGMRES -I./FSON
+
 
 LIBS=  $(LIB_ADD)  $(LIB_FFTW) $(LIB_FGMRES) $(LIB_BLAS)  $(LIB_FSON)
 
 
 
 giem2g: gfgmres fson  giem2g_lib giem2g.F90 
-	$(FC_Link)   $(OPTS)  giem2g.F90  -L./ -lgiem2g  $(LIBS)  $(INCLUDE) -o giem2g  -J./GFGMRES -I./FSON
+	$(FC_Link)   $(OPTS)  giem2g.F90  -L./ -lgiem2g  $(LIBS)  $(INCLUDE) -o giem2g  
 
 	
 ifdef INSTALL_PATH
@@ -60,12 +62,12 @@ giem2g_lib: $(ALL_O)   Makefile
 
 
 %.o:%.f90
-	$(FC) $(OPTS) -c $*.f90 -o $*.o $(INCLUDE) -J./GFGMRES -I./FSON 
+	$(FC) $(OPTS) -c $*.f90 -o $*.o $(INCLUDE) 
 
 
 %.o:%.F90
 ifneq ($(SHARED_LIB),1)
-	$(FC) $(OPTS) -c $*.F90 -o $*.o $(INCLUDE) -J./GFGMRES -I./FSON
+	$(FC) $(OPTS) -c $*.F90 -o $*.o $(INCLUDE) 
 
 else
 	$(FC) $(OPTS) -fPIC -D ExtrEMe   -c $*.F90 -o $*.o -I$(SHARED_BLAS_INC)  -I$(SHARED_FFTW_INC) 

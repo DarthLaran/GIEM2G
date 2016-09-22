@@ -522,11 +522,12 @@ RECURSIVE	SUBROUTINE ApplyRightPreconditioner(solver,v_in,v_out,K)
 	FUNCTION CalculateVectorNorm(solver,v) RESULT(res)
 		TYPE(FGMRES_DATA),TARGET,INTENT(IN)::solver
 		COMPLEX(REALPARM),TARGET,INTENT(IN)::v(:)
-		COMPLEX(REALPARM),POINTER::m(:,:)
+		COMPLEX(REALPARM),POINTER::m(:,:),pv(:)
                 TYPE(C_PTR)::cptr
 		COMPLEX(REALPARM),TARGET::tt(1)
 		REAL(REALPARM)::res
-                cptr=C_LOC(v(1))
+                pv=>v
+                cptr=C_LOC(pv(1))
                 CALL C_F_POINTER(cptr,m,(/SIZE(v),1/))
 		CALL solver%MANYDP(m,v,ONE,tt,solver%dpinstance)
 		res=SQRT(REAL(tt(1)))
