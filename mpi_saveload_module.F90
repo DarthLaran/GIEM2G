@@ -547,21 +547,6 @@ CONTAINS
 		ENDDO
 		CLOSE(277)
 	ENDSUBROUTINE
-	SUBROUTINE SaveIESolutionSeparateBinary(Eint,tag,fname)
-		COMPLEX(REALPARM),INTENT(IN)::Eint(1:,EX:,1:,1:)
-		INTEGER,INTENT(IN)::tag
-		CHARACTER(*),INTENT(IN)::fname
-		CHARACTER(LEN=6):: ftag
-		INTEGER::Ir,Nx,Nz,me, IERROR
-		INTEGER::fsize
-		INTEGER::Ix,Iy,Iz,Nyloc,s(4)
-		REAL(REALPARM)::x,y,z
-		WRITE (ftag,'(I5.5)') tag
-!		OPEN(UNIT = 277,STATUS='replace',FILE=fname//trim(ftag)//'.bin',form='binary',access="stream")
-		OPEN(UNIT = 277,STATUS='replace',FILE=fname//trim(ftag)//'.bin',form='unformatted',access="stream")
-		WRITE (UNIT =277) Eint
-		CLOSE(277)
-	ENDSUBROUTINE
 	SUBROUTINE SaveIESolutionOneFileBinary(Eint,comm,fname)
 		COMPLEX(REALPARM),INTENT(IN)::Eint(1:,EX:,1:,1:)
 		INTEGER(MPI_CTL_KIND),INTENT(IN)::comm
@@ -570,7 +555,7 @@ CONTAINS
 		INTEGER::fsize,fshape(4)
 		INTEGER(MPI_CTL_KIND):: REC_STATUS(MPI_STATUS_SIZE)
 		INTEGER::Ix,Iy,I
-		COMPLEX(REALPARM),POINTER::Eint1(:,:,:,:)
+		COMPLEX(REALPARM),POINTER::Eint1(:,:,:,:),Eint2(:,:,:,:)
 		REAL(REALPARM)::x,y
 		
 		CALL MPI_COMM_RANK(comm, me, IERROR)
@@ -579,9 +564,11 @@ CONTAINS
 		IF (me==0) THEN
 			fshape=SHAPE(Eint)
 			ALLOCATE(Eint1(fshape(1),fshape(2),fshape(3),fshape(4)))
+			ALLOCATE(Eint2(fshape(3),fshape(4),fshape(1),fshape(2)))
+                        CALL ConvertNaIn(Eint,Eint2)
 !			OPEN(UNIT = 77,STATUS='replace',FILE=fname//'.bin',form='binary',access="stream")
 			OPEN(UNIT = 77,STATUS='replace',FILE=fname//'.bin',form='unformatted',access="stream")
-			WRITE (UNIT =77) Eint
+			WRITE (UNIT =77) Eint2
 		ENDIF
 
 		IF (me/=0) THEN
@@ -591,10 +578,11 @@ CONTAINS
 		ENDIF
 		DO I=1,csize-1
 			CALL MPI_RECV(Eint1, fsize, MPI_DOUBLE_COMPLEX, I, I,comm, REC_STATUS,IERROR)
-			WRITE (UNIT =77) Eint1
+                        CALL ConvertNaIn(Eint1,Eint2)
+			WRITE (UNIT =77) Eint2
 		ENDDO
 		CLOSE(77)
-		DEALLOCATE(Eint1)
+		DEALLOCATE(Eint1,Eint2)
 		CALL MPI_BARRIER(comm,IERROR)
 	ENDSUBROUTINE
 
@@ -613,54 +601,39 @@ CONTAINS
 		CALL MPI_COMM_RANK(comm, me, IERROR)
 		CALL MPI_COMM_SIZE(comm, csize, IERROR)
 		fsize=SIZE(Eint)
-		
-
+		fshape=SHAPE(Eint)
+		ALLOCATE(Eint1(fshape(3),fshape(4),fshape(1),fshape(2)))
 		IF (me/=0) THEN
 			CALL MPI_RECV(success, 1, MPI_LOGICAL,0,me+2*csize,comm,REC_STATUS, IERROR)
 			IF (success) THEN
-				CALL MPI_RECV(Eint, fsize, MPI_DOUBLE_COMPLEX,0,me,comm,REC_STATUS, IERROR)
+				CALL MPI_RECV(Eint1, fsize, MPI_DOUBLE_COMPLEX,0,me,comm,REC_STATUS, IERROR)
+                                CALL ConvertInNa(Eint1,Eint)
 			    ENDIF
 			CALL MPI_BARRIER(comm,IERROR)
 			RETURN
 		ENDIF
 		IF (me==0) THEN
-			fshape=SHAPE(Eint)
 			INQUIRE ( FILE=fname//'.bin',EXIST = success)
 			IF (success) THEN
-				ALLOCATE(Eint1(fshape(1),fshape(2),fshape(3),fshape(4)))
 				OPEN(UNIT = 77,STATUS='old',FILE=fname//'.bin',form='unformatted',access="stream")
-				READ (UNIT =77) Eint
+				READ (UNIT =77) Eint1
+                                CALL ConvertInNa(Eint1,Eint)
 				DO I=1,csize-1
 					READ (UNIT =77) Eint1
 					CALL MPI_SEND(success, 1, MPI_LOGICAL, I, I+2*csize,comm, IERROR)
 					CALL MPI_SEND(Eint1, fsize, MPI_DOUBLE_COMPLEX, I, I,comm, IERROR)
 				ENDDO
 				CLOSE(77)
-				DEALLOCATE(Eint1)
 		    ELSE
 				DO I=1,csize-1
 					CALL MPI_SEND(success, 1, MPI_LOGICAL, I, I+2*csize,comm, IERROR)
 				ENDDO
 			    ENDIF
 		    ENDIF
+                 DEALLOCATE(Eint1)
 		CALL MPI_BARRIER(comm,IERROR)
 	ENDSUBROUTINE
 
-	SUBROUTINE LoadIESolutionSeparateBinary(Eint,tag,fname)
-		COMPLEX(REALPARM),INTENT(INOUT)::Eint(1:,EX:,1:,1:)
-		INTEGER,INTENT(IN)::tag
-		CHARACTER(*),INTENT(IN)::fname
-		CHARACTER(LEN=6):: ftag
-		INTEGER::Ir,Nx,Nz,me, IERROR
-		INTEGER::fsize
-		INTEGER::Ix,Iy,Iz,Nyloc,s(4)
-		REAL(REALPARM)::x,y,z
-		WRITE (ftag,'(I5.5)') tag
-!		OPEN(UNIT = 277,STATUS='old',FILE=fname//trim(ftag)//'.bin',form='binary',access="stream")
-		OPEN(UNIT = 277,STATUS='old',FILE=fname//trim(ftag)//'.bin',form='unformatted',access="stream")
-		READ (UNIT =277) Eint
-		CLOSE(277)
-	ENDSUBROUTINE
 	SUBROUTINE ConvertNaIn(E1,E2) !Convert EM field array  E1 from "naive" format E1(x,y,z,c) to internal format E2(z,c,x,y)
 		COMPLEX(REALPARM),INTENT(IN)::E1(:,:,:,:)
 		COMPLEX(REALPARM),INTENT(OUT)::E2(:,:,:,:)
@@ -699,7 +672,8 @@ CONTAINS
 			        !$OMP END DO
 			!$OMP END PARALLEL
 		ELSE
-			PRINT*, 'CONVERT ERROR'
+			PRINT*, 'CONVERT ERROR 1',S1
+			PRINT*, 'CONVERT ERROR 2',S2
 		ENDIF
 	
 	END SUBROUTINE

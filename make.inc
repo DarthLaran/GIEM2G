@@ -33,14 +33,14 @@ FC=mpif90
 F77=mpif90
 FC_Link=mpif90
 
-FOPTS= -g  -fopenmp  -O3   -mtune=native -march=native -D LEGACY_MPI
+FOPTS= -g   -fopenmp  -O3    -mtune=native -march=native -D LEGACY_MPI
 
 
 Ar=ar
 
 LIB_FFTW= -L$(HOME)/lib/FFTW/lib -lfftw3_omp -lfftw3_mpi  -lfftw3 
 LIB_BLAS=  -L$(HOME)/lib/OpenBLAS/lib -lopenblas_omp
-INCLUDE=   -I$(HOME)/lib/FFTW/include
+FFTW_INC=   -I$(HOME)/lib/FFTW/include
 endif
 
 ifeq ($(PLATFORM), DAINT) 

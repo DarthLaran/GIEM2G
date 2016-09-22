@@ -81,6 +81,8 @@ LOGGER=>NATIVE_LOGGER
 
 wcomm=MPI_COMM_WORLD
 
+CALL MPI_ERRHANDLER_SET(wcomm,MPI_ERRORS_RETURN, IERROR)
+
 CALL MPI_COMM_RANK(wcomm, me, IERROR)
 CALL MPI_COMM_SIZE(wcomm,wsize,IERROR) 
 LOGGER_MASTER=me
@@ -294,7 +296,6 @@ IF (RECALC_FIELD) THEN
 	ENDIF
 
 ENDIF
-
 
 !----------------------------------------------------------------------------!
 DO Ifreq=1,Nfreq

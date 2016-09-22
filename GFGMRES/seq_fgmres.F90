@@ -19,7 +19,7 @@ MODULE SEQ_FGMRES
 CONTAINS
         SUBROUTINE INIT_SEQ_FGMRES(solver,N,M,depth,params,l)
                 TYPE(SEQ_FGMRES_DATA),INTENT(INOUT)::solver
-                INTEGER,INTENT(IN)::N,M(depth),depth
+                INTEGER,INTENT(IN)::N,depth,M(depth)
                 TYPE(GMRES_PARAMETERS),INTENT(IN)::params
                 INTEGER(C_INTPTR_T),INTENT(OUT),OPTIONAL::l
                 TYPE(FGMRES_DATA),POINTER::gsolver
@@ -108,7 +108,7 @@ CONTAINS
                 ENDDO
         ENDSUBROUTINE
         SUBROUTINE SEQ_FGMRES_SOLVE(solver,x,x0,b,info)
-                TYPE(SEQ_FGMRES_DATA),INTENT(IN)::solver
+                TYPE(SEQ_FGMRES_DATA),INTENT(INOUT)::solver
 		COMPLEX(REALPARM),INTENT(INOUT)::x(:)
 		COMPLEX(REALPARM),INTENT(IN)::x0(:),b(:)
 		TYPE(RESULT_INFO),INTENT(OUT)::info

@@ -12,7 +12,7 @@ MODULE UTILITIES
 	REAL(REALPARM)   ,PARAMETER ::	R_ONE=1e0_REALPARM
 
         INTERFACE FREE
-                MODULE PROCEDURE::FreeMatrix,FreeRealVector,FreeComplexVector
+                MODULE PROCEDURE FreeMatrix,FreeRealVector,FreeComplexVector
 
         ENDINTERFACE
         INTERFACE

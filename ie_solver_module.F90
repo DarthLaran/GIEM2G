@@ -289,13 +289,23 @@ MODULE IE_SOLVER_MODULE
 		time1=GetTime()
                 N=SIZE(V)
                 CALL C_F_POINTER(ptr,ie_op)
-                CALL ZGEMV('C',N,K,C_ONE,Matrix,N,v,ONE,C_ZERO,tmp,ONE)
+                CALL ZGEMV('C',N,K,C_ONE,Matrix,N,v,ONE,C_ZERO,res,ONE)
 
                 comm=ie_op%ie_comm
                 KK=K
-
-                CALL MPI_ALLREDUCE(tmp,res(1:KK),KK,MPI_DOUBLE_COMPLEX,MPI_SUM,comm,IERROR)
-
+   !             IF( (ie_op%counter%dotprod_num >230).AND. (ie_op%counter%dotprod_num <250))THEN
+    !                    PRINT*,'DP $$',ie_op%me, ie_op%counter%dotprod_num,res(1)
+    !                    CALL MPI_BARRIER(comm,IERROR)
+    !            ENDIF
+!                CALL MPI_ALLREDUCE(tmp,res(1:KK),KK,MPI_DOUBLE_COMPLEX,MPI_SUM,comm,IERROR)
+                CALL MPI_ALLREDUCE(MPI_IN_PLACE,res(1:KK),KK,MPI_DOUBLE_COMPLEX,MPI_SUM,comm,IERROR)
+                IF (IERROR/=0) THEN
+                        PRINT*,'DP ##',ie_op%me, ie_op%counter%dotprod_num,res(1),IERROR
+                ENDIF
+!                IF( (ie_op%counter%dotprod_num >230).AND. (ie_op%counter%dotprod_num <250))THEN
+ !                       PRINT*,'DP ##',ie_op%me, ie_op%counter%dotprod_num,res(1)
+ !                       CALL MPI_BARRIER(comm,IERROR)
+  !              ENDIF
 		time2=GetTime()
                 ie_op%counter%dotprod_num=ie_op%counter%dotprod_num+K
                 ie_op%counter%dotprod=ie_op%counter%dotprod+time2-time1
