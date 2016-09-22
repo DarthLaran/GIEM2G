@@ -30,6 +30,7 @@ CONTAINS
                 ALLOCATE(solver%solvers(Depth))
                 gsolver=>solver%solvers(Depth)
                 CALL AllocateFGMRES(gsolver,N,M(depth),.FALSE.,full_length)
+                gsolver%params=params
                 gsolver%params%Maxit=1
                 
       		NULLIFY(solver%solvers(Depth)%PrecondLeft)
