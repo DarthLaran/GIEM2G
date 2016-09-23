@@ -1,3 +1,21 @@
+!Copyright (c) 2016 Mikhail Kruglyakov 
+!This file is part of GIEM2G.
+!
+!GIEM2G is free software: you can redistribute it and/or modify
+!it under the terms of the GNU General Public License as published by
+!the Free Software Foundation, either version 2 of the License.
+!
+!GIEM2G is distributed in the hope that it will be useful,
+!but WITHOUT ANY WARRANTY; without even the implied warranty of
+!MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+!GNU General Public License for more details.
+!
+!You should have received a copy of the GNU General Public License
+!along with GFMRES.  If not, see <http://www.gnu.org/licenses/>.
+!
+!
+!
+
 MODULE Calc_RC_Tensor_Module
 	USE CONST_MODULE
 	USE FFTW3
@@ -148,8 +166,8 @@ CONTAINS
 		INTEGER, INTENT(IN)::lx,ly
 		TYPE (BKG_DATA_TYPE),INTENT(IN)::bkg
 		TYPE (ANOMALY_TYPE),INTENT(IN)::anomaly
-		TYPE (RECEIVER_TYPE),INTENT(IN)::recvs(Nr)
 		INTEGER,INTENT(IN)::Nr
+		TYPE (RECEIVER_TYPE),INTENT(IN)::recvs(Nr)
 		COMPLEX(REALPARM),INTENT(OUT)::G_H(anomaly%Nz,Nr,RHXX:RHZY)
 		COMPLEX(REALPARM),INTENT(OUT)::G_E(anomaly%Nz,Nr,REXX:REZZ)
 		REAL(REALPARM),INTENT(INOUT)::calc_time(4)

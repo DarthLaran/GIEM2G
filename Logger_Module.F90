@@ -1,12 +1,30 @@
+!Copyright (c) 2016 Mikhail Kruglyakov 
+!This file is part of GIEM2G.
+!
+!GIEM2G is free software: you can redistribute it and/or modify
+!it under the terms of the GNU General Public License as published by
+!the Free Software Foundation, either version 2 of the License.
+!
+!GIEM2G is distributed in the hope that it will be useful,
+!but WITHOUT ANY WARRANTY; without even the implied warranty of
+!MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+!GNU General Public License for more details.
+!
+!You should have received a copy of the GNU General Public License
+!along with GFMRES.  If not, see <http://www.gnu.org/licenses/>.
+!
+!
+!
+
 MODULE LOGGER_MODULE
 USE CONST_MODULE
 USE MPI_MODULE
 USE TIMER_MODULE
 
 IMPLICIT NONE
-CHARACTER(LEN=*),PARAMETER  :: CALC_TIME_FMT='(A, 1ES10.2E2, A3)'
+CHARACTER(LEN=*),PARAMETER  :: CALC_TIME_FMT='(A, 1ES12.2E3, A3)'
 CHARACTER(LEN=*),PARAMETER  :: CALC_TIME_RNG_FMT='(A, 1ES10.2E2, A, ES10.2E2 ,A)'
-CHARACTER(LEN=*),PARAMETER  :: CALC_NUM_FMT='(A, I10.2)'
+CHARACTER(LEN=*),PARAMETER  :: CALC_NUM_FMT='(A, I10)'
 CHARACTER(LEN=*),PARAMETER  :: FFT_INFO_FMT = '(A36, ES10.2E3, A3, F10.3, A3)'
 
 

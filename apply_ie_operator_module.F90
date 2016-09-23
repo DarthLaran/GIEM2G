@@ -1,3 +1,21 @@
+!Copyright (c) 2016 Mikhail Kruglyakov 
+!This file is part of GIEM2G.
+!
+!GIEM2G is free software: you can redistribute it and/or modify
+!it under the terms of the GNU General Public License as published by
+!the Free Software Foundation, either version 2 of the License.
+!
+!GIEM2G is distributed in the hope that it will be useful,
+!but WITHOUT ANY WARRANTY; without even the implied warranty of
+!MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+!GNU General Public License for more details.
+!
+!You should have received a copy of the GNU General Public License
+!along with GFMRES.  If not, see <http://www.gnu.org/licenses/>.
+!
+!
+!
+
 MODULE APPLY_IE_OPERATOR_MODULE 
 	USE CONST_MODULE
 	USE FFTW3
@@ -20,8 +38,8 @@ MODULE APPLY_IE_OPERATOR_MODULE
 
 	SUBROUTINE APPLY_PRECOND(ie_op,v_in,v_out)
 		TYPE(IntegralEquationOperator),TARGET,INTENT(INOUT)::ie_op
-		COMPLEX(REALPARM),POINTER,INTENT(IN)::v_in(:)
-		COMPLEX(REALPARM),POINTER,INTENT(IN)::v_out(:)
+		COMPLEX(REALPARM),TARGET,INTENT(IN)::v_in(:)
+		COMPLEX(REALPARM),TARGET,INTENT(INOUT)::v_out(:)
 		COMPLEX(REALPARM),POINTER::field_in(:,:,:,:)
 		COMPLEX(REALPARM),POINTER::field_out(:,:,:,:)
 		COMPLEX(REALPARM),POINTER::fft_buff(:,:,:,:)
@@ -97,6 +115,13 @@ MODULE APPLY_IE_OPERATOR_MODULE
 		!$OMP END PARALLEL
 
 		CALL	MULT_IE_OP(ie_op)
+
+                
+		field_in(1:ie_op%Nx,1:ie_op%Ny_loc,1:ie_op%Nz,1:3)=>v_in
+		field_out(1:ie_op%Nx,1:ie_op%Ny_loc,1:ie_op%Nz,1:3)=>v_out
+                fft_buff(1:2*ie_op%Nx,1:ie_op%Ny_loc,1:ie_op%Nz,1:3)=>ie_op%DFD%field_in
+                N=4*ie_op%Nx*ie_op%Ny
+
 		!$OMP PARALLEL DEFAULT(SHARED), PRIVATE(Iy,Ix,Iz,d1,d2,asiga)
 #ifndef IBM_Bluegene
                 !$OMP DO SCHEDULE(GUIDED) COLLAPSE(3)

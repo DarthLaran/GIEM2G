@@ -26,13 +26,21 @@ ENGINE_O=$(MISC_O) $(FILTER_WEIGHTS_O) $(MODEL_O) $(FFT_O)  $(IE_IMAGE) $(IE_O) 
 
 
 LIB_ZFGMRES=-L./ZFGMRES -lzfgmres
+LIB_GFGMRES=-L./GFGMRES -lgfgmres
+
+LIB_FGMRES=$(LIB_GFGMRES)
 LIB_FSON=-L./FSON -lfson
 
-LIBS=  $(LIB_ADD)  $(LIB_FFTW) $(LIB_ZFGMRES) $(LIB_BLAS)  $(LIB_FSON)
+INCLUDE=$(FFTW_INC) $(BLAS_INC) -I./GFGMRES -I./FSON
 
 
-giem2g: zfgmres  giem2g_lib giem2g.F90 
-	$(FC_Link)   $(OPTS)  giem2g.F90  -L./ -lgiem2g  $(LIBS)  $(INCLUDE) -o giem2g 
+LIBS=  $(LIB_ADD)  $(LIB_FFTW) $(LIB_FGMRES) $(LIB_BLAS)  $(LIB_FSON)
+
+
+
+giem2g: gfgmres fson  giem2g_lib giem2g.F90 
+	$(FC_Link)   $(OPTS)  giem2g.F90  -L./ -lgiem2g  $(LIBS)  $(INCLUDE) -o giem2g  
+
 	
 ifdef INSTALL_PATH
 	cp giem2g $(INSTALL_PATH)
@@ -44,8 +52,8 @@ giem2g_lib_shared: $(ENGINE_O)
 #	$(SHARED_Link) -fPIC  -shared   -L$(SHARED_BLAS) -L$(SHARED_FFTW) $(ENGINE_O)   -o $(DST)/lib_giem2g.so 
 
 
-zfgmres:
-	$(MAKE) -C ZFGMRES FC=$(F77)  FOPTS='$(OPTS)' AR=$(AR) FGMRES_PATH='$(FGMRES_PATH)'
+gfgmres:
+	$(MAKE) -C GFGMRES FC=$(FC)  FOPTS='$(OPTS)' AR=$(AR) 
 fson:
 	$(MAKE) -C FSON FC=$(FC)  FOPTS='$(OPTS)' AR=$(AR) 
 
@@ -54,15 +62,18 @@ giem2g_lib: $(ALL_O)   Makefile
 
 
 %.o:%.f90
-	$(FC) $(OPTS) -c $*.f90 -o $*.o $(INCLUDE)
+	$(FC) $(OPTS) -c $*.f90 -o $*.o $(INCLUDE) 
+
 
 %.o:%.F90
 ifneq ($(SHARED_LIB),1)
-	$(FC) $(OPTS) -c $*.F90 -o $*.o $(INCLUDE)
+	$(FC) $(OPTS) -c $*.F90 -o $*.o $(INCLUDE) 
+
 else
 	$(FC) $(OPTS) -fPIC -D ExtrEMe   -c $*.F90 -o $*.o -I$(SHARED_BLAS_INC)  -I$(SHARED_FFTW_INC) 
 endif
 clean:
+	$(MAKE) -C FSON clean
+	$(MAKE) -C GFGMRES clean 
 	rm $(ALL_O)   *.mod  
-	$(MAKE) -C ZFGMRES clean
 	rm libgiem2g.a

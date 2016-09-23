@@ -1,3 +1,21 @@
+!Copyright (c) 2016 Mikhail Kruglyakov 
+!This file is part of GIEM2G.
+!
+!GIEM2G is free software: you can redistribute it and/or modify
+!it under the terms of the GNU General Public License as published by
+!the Free Software Foundation, either version 2 of the License.
+!
+!GIEM2G is distributed in the hope that it will be useful,
+!but WITHOUT ANY WARRANTY; without even the implied warranty of
+!MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+!GNU General Public License for more details.
+!
+!You should have received a copy of the GNU General Public License
+!along with GFMRES.  If not, see <http://www.gnu.org/licenses/>.
+!
+!
+!
+
 MODULE Data_Types_Module
 	USE CONST_MODULE
 	IMPLICIT NONE
@@ -15,11 +33,11 @@ MODULE Data_Types_Module
 		INTEGER :: Nx,Ny,Nz
 		INTEGER::Ny_loc
 		REAL(REALPARM)::dx,dy
-		REAL(REALPARM),POINTER::z(:)
-		REAL(REALPARM),POINTER::siga(:,:,:)
-		REAL(REALPARM),POINTER::epsa(:,:,:)
-		REAL(REALPARM),POINTER::dz(:)
-		INTEGER,POINTER::Lnumber(:)
+		REAL(REALPARM),POINTER::z(:)=>NULL()
+		REAL(REALPARM),POINTER::siga(:,:,:)=>NULL()
+		REAL(REALPARM),POINTER::epsa(:,:,:)=>NULL()
+		REAL(REALPARM),POINTER::dz(:)=>NULL()
+		INTEGER,POINTER::Lnumber(:)=>NULL()
 	ENDTYPE
 
 	TYPE RECEIVER_TYPE

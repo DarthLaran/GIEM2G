@@ -1,3 +1,21 @@
+!Copyright (c) 2016 Mikhail Kruglyakov 
+!This file is part of GIEM2G.
+!
+!GIEM2G is free software: you can redistribute it and/or modify
+!it under the terms of the GNU General Public License as published by
+!the Free Software Foundation, either version 2 of the License.
+!
+!GIEM2G is distributed in the hope that it will be useful,
+!but WITHOUT ANY WARRANTY; without even the implied warranty of
+!MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+!GNU General Public License for more details.
+!
+!You should have received a copy of the GNU General Public License
+!along with GFMRES.  If not, see <http://www.gnu.org/licenses/>.
+!
+!
+!
+
 MODULE DISTRIBUTED_FFT_MODULE
 !VERY VERY C-LIKE MODULE
 !THERE ARE A LOT OF POINTERS FOR THE SAME MEMORY
@@ -32,10 +50,6 @@ MODULE DISTRIBUTED_FFT_MODULE
 		REAL(DOUBLEPARM)::plan_time
 	ENDTYPE
 
-	TYPE LocalTransposeData
-		PROCEDURE(DFD_TRANSPOSE),POINTER,NOPASS::LocalTranspose
-		INTEGER::Nopt
-	ENDTYPE
 
 
 	TYPE FFT_COUNTER
@@ -67,12 +81,10 @@ MODULE DISTRIBUTED_FFT_MODULE
 		INTEGER(MPI_CTL_KIND)::comm,me
 	
 		TYPE(FFTW_TRANSPOSE_DATA)::FFTW_TRANSPOSE
-		TYPE(LocalTransposeData)::FullLocalTranspose
 
 		TYPE(PlanXY_TYPE)::plan(FFT_FWD:FFT_BWD)
 
 		REAL(DOUBLEPARM)::plans_time(2,FFT_FWD:FFT_BWD)
-		REAL(DOUBLEPARM)::local_transpose_time(2)
 		TYPE (FFT_COUNTER)::timer(FFT_FWD:FFT_BWD)
 	ENDTYPE
 	INTERFACE 
@@ -133,8 +145,6 @@ MODULE DISTRIBUTED_FFT_MODULE
 		CALL PRINT_CALC_TIME('Forward along Y:', DFD%plans_time(2,FFT_FWD))
 		CALL PRINT_CALC_TIME('Backward along X:', DFD%plans_time(1,FFT_BWD))
 		CALL PRINT_CALC_TIME('Backward along Y:', DFD%plans_time(2,FFT_BWD))
-		CALL PRINT_CALC_TIME('Optimal local transpose:',DFD%local_transpose_time(1))
-		CALL PRINT_CALC_TIME('Local transpose plan:',DFD%local_transpose_time(2))
 		CALL PRINT_CALC_TIME('FFTW Transpose plan:',DFD%FFTW_TRANSPOSE%plan_time)
 		CALL PRINT_BORDER
 #endif

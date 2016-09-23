@@ -83,7 +83,7 @@ contains
             u = 0
         else 
             print *, "ERROR: Need a file or a string"
-            stop (1)
+            call exit (1)
         end if
 
         ! open the file
@@ -157,7 +157,7 @@ contains
                 call parse_number(unit, str, value)
             case default
                 print *, "ERROR: Unexpected character while parsing value. '", c, "' ASCII=", iachar(c)
-                stop (1)
+                call exit (1)
             end select
         end if
 
@@ -179,7 +179,7 @@ contains
         c = pop_char(unit, str, eof = eof, skip_ws = .true.)
         if (eof) then
             print *, "ERROR: Unexpected end of file while parsing start of object."
-            stop (1)
+            call exit (1)
         else if ("}" == c) then
             ! end of an empty object
             return
@@ -188,21 +188,21 @@ contains
             pair % name => parse_string(unit, str)
         else
             print *, "ERROR: Expecting string: '", c, "'"
-            stop (1)
+            call exit (1)
         end if
 
         ! pair value
         c = pop_char(unit, str, eof = eof, skip_ws = .true.)
         if (eof) then
             print *, "ERROR: Unexpected end of file while parsing object member. 1"
-            stop (1)
+            call exit (1)
         else if (":" == c) then
             ! parse the value                       
             call parse_value(unit, str, pair)
             call fson_value_add(parent, pair)
         else
             print *, "ERROR: Expecting : and then a value. ", c
-            stop (1)
+            call exit (1)
         end if
 
         ! another possible pair
@@ -216,7 +216,7 @@ contains
             return
         else
             print *, "ERROR: Expecting end of object.", c
-            stop (1)
+            call exit (1)
         end if
 
     end subroutine parse_object
@@ -278,17 +278,19 @@ contains
             c = pop_char(unit, str, eof = eof, skip_ws = .false.)
             if (eof) then
                print *, "Expecting end of string"
-               stop(1)
-            elseif (escape) then
+               call exit(1)
+            else if (escape) then
               call fson_string_append(string,c)
               escape = .false.
-	elseif (c=='\\') then
-		escape = .true.
-            elseif (c == '"') then
-                  exit
             else
+               if (c == '\') then
+                  escape = .true.
+               else if (c == '"') then
+                  exit
+               else
                   call fson_string_append(string,c)
-            endif
+               end if
+            end if
         end do
     end function parse_string
 
@@ -309,10 +311,10 @@ contains
             c = pop_char(unit, str, eof = eof, skip_ws = .true.)
             if (eof) then
                 print *, "ERROR: Unexpected end of file while parsing array."
-                stop (1)
+                call exit (1)
             else if (c .ne. chars(i:i)) then
                 print *, "ERROR: Unexpected character.'", c,"'", chars(i:i)
-                stop (1)
+                call exit (1)
             end if
         end do
 
@@ -336,7 +338,7 @@ contains
         c = pop_char(unit, str, eof = eof, skip_ws = .true.)
         if (eof) then
             print *, "ERROR: Unexpected end of file while parsing number."
-            stop (1)
+            call exit (1)
         else if ("-" == c) then
             negative = .true.
         else
@@ -350,13 +352,14 @@ contains
 
         decimal = .false.
         scientific = .false.
+        frac = 0.0d0
 
         do
             ! first character is either - or a digit        
             c = pop_char(unit, str, eof = eof, skip_ws = .true.)
             if (eof) then
                 print *, "ERROR: Unexpected end of file while parsing number."
-                stop (1)
+                call exit (1)
             else
                 select case (c)
                 case (".")
@@ -364,7 +367,7 @@ contains
                     if (decimal) then
                         ! already found a decimal place
                         print *, "ERROR: Unexpected second decimal place while parsing number."
-                        stop(1)
+                        call exit(1)
                     end if
                     decimal = .true.
                     frac = parse_integer(unit, str, digit_count)
@@ -374,47 +377,32 @@ contains
                     if (scientific) then
                         ! already found a e place
                         print *, "ERROR: Unexpected second exponent while parsing number."
-                        stop(1)
+                        call exit(1)
                     end if
                     scientific = .true.
+                    decimal = .true.
                     ! this number has an exponent
                     exp = parse_integer(unit, str)
-                    if (exp < 0) then
-                       decimal = .true.
-                    end if
-
                 case default
-                    ! this is a integer
                     if (decimal) then
-
                         ! add the integral
                         frac = frac + integral
-
                         if (scientific) then
                             ! apply exponent
                             frac = frac * (10.0d0 ** exp)
                         end if
-
                         ! apply negative
                         if (negative) then
-                            frac = frac * (-1)
+                            frac = -frac
                         end if
-
                         value % value_type = TYPE_REAL
                         value % value_real = frac
                         value % value_double = frac
-
                     else
-                        if (scientific) then
-                        ! apply exponent
-                        integral = integral * (10.0d0 ** exp)
-                        end if
-
-                        ! apply negative
                         if (negative) then
-                        integral = integral * (-1)
+                           ! apply negative
+                           integral = -integral
                         end if
-
                         value % value_type = TYPE_INTEGER
                         value % value_integer = integral
                     end if
@@ -423,8 +411,6 @@ contains
                 end select
             end if
         end do
-
-
 
     end subroutine
 
@@ -450,19 +436,19 @@ contains
             c = pop_char(unit, str, eof = eof, skip_ws = .true.)
             if (eof) then
                 print *, "ERROR: Unexpected end of file while parsing digit."
-                stop (1)
+                call exit (1)
             else
                 select case(c)
                 case ("+")
                     if (found_sign.or.found_digit) then
                         print *, "ERROR: Miss formatted number."
-                        stop(1)
+                        call exit(1)
                     end if
                     found_sign = .true.
                 case ("-")
                     if (found_sign.or.found_digit) then
                         print *, "ERROR: Miss formatted number."
-                        stop(1)
+                        call exit(1)
                     end if
                     found_sign = .true.
                     isign = -1
@@ -470,7 +456,7 @@ contains
                     found_sign = .true.
                     if (icount > max_integer_length) then
                         print *, "ERROR: Too many digits for an integer."
-                        stop(1)
+                        call exit(1)
                     end if
                     ! digit        
                     read (c, '(i1)') tmp

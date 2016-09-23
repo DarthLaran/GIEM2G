@@ -11,6 +11,38 @@ FOPTS= -g    -fopenmp  -O3   -mtune=native -D LEGACY_MPI
 Ar=ar
 endif
 
+ifeq ($(PLATFORM), GNU_EULER)
+FC=mpif90
+F77=mpif90
+FC_Link=mpif90
+
+FOPTS=   -flto=10    -fopenmp  -O3   -mtune=native -D LEGACY_MPI
+
+BLAS_INC=-I/cluster/apps/openblas/0.2.13_par/x86_64/gcc_4.8.2/include/
+FFTW_INC=-I/cluster/apps/fftw/3.3.3/x86_64/gcc_4.8.2/openmpi_1.6.5/include/
+LIB_FFTW=-L/cluster/apps/fftw/3.3.3/x86_64/gcc_4.8.2/openmpi_1.6.5/lib  -lfftw3_omp -lfftw3_mpi  -lfftw3 
+FGMRES_PATH=../FGMRES/
+LIB_BLAS= -L/cluster/apps/openblas/0.2.13_seq/x86_64/gcc_4.8.2/lib -lopenblas
+
+Ar=ar
+INSTALL_PATH=
+endif
+
+ifeq ($(PLATFORM), GNU_ETH)
+FC=mpif90
+F77=mpif90
+FC_Link=mpif90
+
+FOPTS= -g   -fopenmp  -O3    -mtune=native -march=native -D LEGACY_MPI
+
+
+Ar=ar
+
+LIB_FFTW= -L$(HOME)/lib/FFTW/lib -lfftw3_omp -lfftw3_mpi  -lfftw3 
+LIB_BLAS=  -L$(HOME)/lib/OpenBLAS/lib -lopenblas_omp
+FFTW_INC=   -I$(HOME)/lib/FFTW/include
+endif
+
 ifeq ($(PLATFORM), DAINT) 
 
 FC=ftn
