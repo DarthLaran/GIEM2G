@@ -1,7 +1,6 @@
 MODULE FGMRES
       USE UTILITIES
       USE FGMRES_INTERFACES
-      USE OMP_LIB
       IMPLICIT NONE
 
       PRIVATE
@@ -217,6 +216,8 @@ MODULE FGMRES
 		INTEGER::Northo=ZERO
 		REAL(REALPARM)::dloo,dnormw,dnormres
                 COMPLEX(REALPARM)::H1(1),H2(1)
+                REAL(REALPARM)::DZNRM2
+
 		INTEGER::N,M
 		INTEGER::I,J
 		INTEGER::interp
@@ -259,9 +260,9 @@ MODULE FGMRES
 
 			    CALL ZGEMV('N',N,jH,-C_ONE,KrylovBasis,N,dotproducts,ONE,C_ONE,w,ONE)
 
-			    dloo=DZNRM2(jH,dotproducts(1:jH),ONE)
+			    dloo=DZNRM2(jH,dotproducts,ONE)
 
-			    dnormw = CalculateVectorNorm(solver,w)
+                            dnormw = CalculateVectorNorm(solver,w)
 			    IF ((2.0*dnormw>dloo) .OR. (Northo > NumberOfIGSIterations)) EXIT
 			ENDDO  
 

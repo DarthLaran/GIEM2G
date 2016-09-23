@@ -15,15 +15,6 @@ MODULE UTILITIES
                 MODULE PROCEDURE FreeMatrix,FreeRealVector,FreeComplexVector
 
         ENDINTERFACE
-        INTERFACE
-                FUNCTION DZNRM2(N,x,INCX) RESULT(RES)
-                        IMPORT REALPARM
-                        INTEGER,INTENT(IN)::N,INCX
-                        COMPLEX(REALPARM)::x(:)
-                        REAL(REALPARM)::RES
-                ENDFUNCTION
-
-        ENDINTERFACE
 
 
       CONTAINS

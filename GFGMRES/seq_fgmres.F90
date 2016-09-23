@@ -133,7 +133,6 @@ CONTAINS
                 TYPE(RESULT_INFO)::info
                 INTEGER::I,J
                 CALL C_F_POINTER(psolver,solver)
-                v0=(0e0_REALPARM,0e0_REALPARM)
-                CALL GMRES_SOLVE(solver,v_out,v0,v_in,info)
+                CALL GMRES_SOLVE(solver,v_out,v_in,v_in,info)
         ENDSUBROUTINE
 ENDMODULE
