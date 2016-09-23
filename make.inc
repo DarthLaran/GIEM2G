@@ -1,15 +1,5 @@
 
-
-
-ifeq ($(PLATFORM), GNU)
-FC=mpifort
-F77=mpifort
-FC_Link=mpifort
-
-FOPTS= -g    -fopenmp  -O3   -mtune=native -D LEGACY_MPI
-
-Ar=ar
-endif
+FFT_QUAD_OOURA="YES"
 
 ifeq ($(PLATFORM), GNU_EULER)
 FC=mpif90
@@ -21,11 +11,10 @@ FOPTS=   -flto=10    -fopenmp  -O3   -mtune=native -D LEGACY_MPI
 BLAS_INC=-I/cluster/apps/openblas/0.2.13_par/x86_64/gcc_4.8.2/include/
 FFTW_INC=-I/cluster/apps/fftw/3.3.3/x86_64/gcc_4.8.2/openmpi_1.6.5/include/
 LIB_FFTW=-L/cluster/apps/fftw/3.3.3/x86_64/gcc_4.8.2/openmpi_1.6.5/lib  -lfftw3_omp -lfftw3_mpi  -lfftw3 
-FGMRES_PATH=../FGMRES/
 LIB_BLAS= -L/cluster/apps/openblas/0.2.13_seq/x86_64/gcc_4.8.2/lib -lopenblas
 
 Ar=ar
-INSTALL_PATH=
+INSTALL_PATH=~/bin/GIEM2G/giem2g
 endif
 
 ifeq ($(PLATFORM), GNU_ETH)
@@ -41,6 +30,8 @@ Ar=ar
 LIB_FFTW= -L$(HOME)/lib/FFTW/lib -lfftw3_omp -lfftw3_mpi  -lfftw3 
 LIB_BLAS=  -L$(HOME)/lib/OpenBLAS/lib -lopenblas_omp
 FFTW_INC=   -I$(HOME)/lib/FFTW/include
+
+INSTALL_PATH=~/bin/GIEM2G/giem2g
 endif
 
 ifeq ($(PLATFORM), DAINT) 
@@ -52,10 +43,10 @@ AR=ar
 FFLAGS= -O 3 -O aggress  -O cache3 -O inlinelib  -O vector3 -O scalar3   -O ipa4 -s integer32
 
 ifdef QUAD
-	FDEFS=-D FFTW_SIZE_32=1 -D MEMORY_CHECKING  -D VOLUME_WEIGHT_QUAD -D NOT_USE_OMP_LIB 
+	FDEFS=-D FFTW_SIZE_32=1  -D VOLUME_WEIGHT_QUAD -D NOT_USE_OMP_LIB 
 
 else
-	FDEFS=-D FFTW_SIZE_32=1 -D MEMORY_CHECKING  -D NOT_USE_OMP_LIB 
+	FDEFS=-D FFTW_SIZE_32=1  -D NOT_USE_OMP_LIB 
 
 
 endif
@@ -85,11 +76,11 @@ AR=ar
 FFLAGS= -O 0 
 
 ifdef QUAD
-	FDEFS=-D FFTW_SIZE_32=1 -D MEMORY_CHECKING  -D VOLUME_WEIGHT_QUAD -D NOT_USE_OMP_LIB 
+	FDEFS=-D FFTW_SIZE_32=1  -D VOLUME_WEIGHT_QUAD -D NOT_USE_OMP_LIB 
 
 
 else
-	FDEFS=-D FFTW_SIZE_32=1 -D MEMORY_CHECKING  -D NOT_USE_OMP_LIB 
+	FDEFS=-D FFTW_SIZE_32=1  -D NOT_USE_OMP_LIB 
 
 
 endif
@@ -117,6 +108,7 @@ F77= mpixlf77_r
 FC_Link=mpixlf2003_r
 AR=ar
 
+FFT_QUAD_OOURA="NO"
 FFLAGS= -qessl -g -O5   -qsmp=omp   -qalias=std -qarch=450d -qhot -qmaxmem=-1  -qipa=partition=large -qunroll=yes -qipa=level=2
 FDEFS=-WF,-DLEGACY_MPI -WF,-DIBM_Bluegene  -WF,-DMPI_TIMER  -WF,-Dinternal_timer 
 FOPTS=$(FFLAGS) $(FDEFS)
@@ -146,6 +138,7 @@ F77= mpixlf77_r
 FC_Link=mpixlf2003_r
 AR=ar
 
+FFT_QUAD_OOURA="NO"
 FFLAGS= -qessl -g -O0  -qsmp=omp   -qalias=std  -qmaxmem=-1 -qcheck 
 FDEFS=-WF,-DLEGACY_MPI -WF,-DIBM_Bluegene  -WF,-DMPI_TIMER  -WF,-Dinternal_timer #  -WF,-DVOLUME_WEIGHT_QUAD  #  -WF,-DNO_DISPLACEMENT_CURRENTS # 
 FOPTS=$(FFLAGS) $(FDEFS)
@@ -163,6 +156,7 @@ else
 INSTALL_PATH=~/bin/test/giem2g_test
 endif
 endif
+
 ifeq ($(PLATFORM), LOMONOSOV)
 
 FC=mpif90

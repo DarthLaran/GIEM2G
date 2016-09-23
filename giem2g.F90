@@ -316,6 +316,8 @@ IF (RECALC_FIELD) THEN
 
 ENDIF
 
+CALL LOGGER("After allocating memory for kernels")
+CALL CHECK_MEM(me,0,wcomm)
 !----------------------------------------------------------------------------!
 DO Ifreq=1,Nfreq
 	WRITE (fnum1,'(F22.10)') freqs(Ifreq)
@@ -502,6 +504,8 @@ DO Ifreq=1,Nfreq
                 CALL PRINT_CALC_TIME("Save fields in",time2) 
             ENDIF
 ENDDO
+
+CALL LOGGER("Before exit")
 CALL CHECK_MEM(me,0,wcomm)
 IF (SOLVE_EQUATION) CALL DeleteIE_OP(ie_op)
 IF (RECALC_FIELD) CALL DeleteRC_OP(RC_OP)

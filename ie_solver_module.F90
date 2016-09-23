@@ -23,6 +23,7 @@ MODULE IE_SOLVER_MODULE
 	USE DATA_TYPES_MODULE
 	USE INTEGRAL_EQUATION_MODULE
 	USE Timer_Module 
+        USE CHECK_MEMORY
         USE LOGGER_MODULE
         USE APPLY_IE_OPERATOR_MODULE 
 
@@ -218,6 +219,8 @@ MODULE IE_SOLVER_MODULE
                                 & ie_op%partner+ie_op%comm_size,ie_op%ie_comm, IERROR,MPI_STATUS_IGNORE)
 		ENDIF
 
+                CALL LOGGER("After allocating buffers fo FGMRES")
+                CALL CHECK_MEM(ie_op%me,0,ie_op%ie_comm)
                 CALL SEQ_FGMRES_SOLVE(seq_solver,solution,initial_guess,rhs,info)
 		IF (ie_op%real_space) THEN
 	        	Nloc=3*ie_op%Nz*ie_op%Nx*ie_op%Ny_loc/2

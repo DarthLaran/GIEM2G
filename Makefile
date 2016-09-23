@@ -1,9 +1,9 @@
 ifneq ($(MAKECMDGOALS), clean)
 include make.inc	
 else
-	FFT_QUAD_OOURA=1
+FFT_QUAD_OOURA="YES"
 endif
-ifdef FFT_QUAD_OOURA
+ifeq ($(FFT_QUAD_OOURA),"YES")
 	FILTER_WEIGHTS_O=IntegralCodes.o FFT_Quadruple.o  VolumeBesselTransforms.o 
 	OPTS=$(FOPTS) -D FFT_QUAD_OOURA
 else
