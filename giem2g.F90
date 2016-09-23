@@ -507,7 +507,12 @@ ENDDO
 
 CALL LOGGER("Before exit")
 CALL CHECK_MEM(me,0,wcomm)
-IF (SOLVE_EQUATION) CALL DeleteIE_OP(ie_op)
+IF (SOLVE_EQUATION) THEN
+         CALL DeleteIE_OP(ie_op)
+        CALL fftw_free(p1)
+        CALL fftw_free(p2)
+        CALL fftw_free(p3)
+ENDIF
 IF (RECALC_FIELD) CALL DeleteRC_OP(RC_OP)
 CALL FSON_DESTROY(input_data)
 CALL LOGGER("Finish!")

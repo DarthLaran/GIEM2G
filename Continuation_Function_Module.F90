@@ -395,8 +395,6 @@ CONTAINS
 	ENDSUBROUTINE
 	SUBROUTINE DeleteRC_OP(rc_op)
 		TYPE(RC_OPERATOR),INTENT(INOUT)::rc_op
-		CALL fftw_free(rc_op%p_in)
-		CALL fftw_free(rc_op%p_out)
 		rc_op%field_in4=>NULL()
 		rc_op%field_in3=>NULL()
 		rc_op%field_out4=>NULL()
