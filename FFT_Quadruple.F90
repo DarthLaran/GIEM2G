@@ -1,6 +1,11 @@
 !Copyright (c) 2016 Mikhail Kruglyakov 
 !This file is part of GIEM2G.
 !
+!It is modification of one by Takuaya OOURA from
+!http://www.kurims.kyoto-u.ac.jp/~ooura/fft.html
+!The modification includes the FORTARN95 interface and posibility to use
+!quadruple precision
+!
 !GIEM2G is free software: you can redistribute it and/or modify
 !it under the terms of the GNU General Public License as published by
 !the Free Software Foundation, either version 2 of the License.
@@ -14,6 +19,16 @@
 !along with GFMRES.  If not, see <http://www.gnu.org/licenses/>.
 !
 !
+
+
+
+
+!Copyright(c) Takuya OOURA, 1996-2001
+
+!        You may use, copy, modify and distribute this code for any purpose
+!        (include commercial use) and without fee. Please refer to this package
+!        when you modify this code.
+
 !
 
 ! Fast Fourier/Cosine/Sine Transform
