@@ -1,3 +1,8 @@
+
+ifndef PLATFORM
+PLATFORM=GNU
+endif
+
 ifneq ($(MAKECMDGOALS), clean)
 include make.inc	
 else

@@ -1,6 +1,26 @@
 
 FFT_QUAD_OOURA="YES"
 
+
+
+ifeq ($(PLATFORM), GNU)
+FC=mpif90
+F77=mpif90
+FC_Link=mpif90
+
+FOPTS= -g   -fopenmp  -O3    -mtune=native -march=native -D LEGACY_MPI
+
+
+Ar=ar
+
+LIB_FFTW=  -lfftw3_omp -lfftw3_mpi  -lfftw3 
+LIB_BLAS=  -lopenblas_omp
+FFTW_INC=  
+
+INSTALL_PATH=~/bin/GIEM2G/giem2g
+endif
+
+
 ifeq ($(PLATFORM), GNU_EULER)
 FC=mpif90
 F77=mpif90

@@ -1,8 +1,6 @@
 # GIEM2G
 Gnu Integral Equation Modeling in ElectroMagnetic  Geophysics 
+The giem2g.pdf is a preprint of the paper about this software
 
-Аttention!
-
-Because of very specific license policy of FGMRES library by http://www.cerfacs.fr/algor/Softs/GMRES/index.html you should get this library by yourself.
 
 
