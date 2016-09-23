@@ -472,6 +472,7 @@ CONTAINS
                 ie_op%counter%mult_zgemv=0
                 ie_op%counter%mult_num=0
                 ie_op%counter%dotprod_num=0
+                ie_op%counter%dotprod=0
                 ie_op%counter%tensor_fft=0
                 ie_op%counter%tensor_calc=0
                 ie_op%counter%plans=0
