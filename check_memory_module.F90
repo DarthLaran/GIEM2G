@@ -20,7 +20,7 @@ MODULE CHECK_MEMORY
 	USE MPI_MODULE
 	USE LOGGER_MODULE
 	 IMPLICIT NONE
-         REAL,PARAMETER::PAGE_SIZE=4.0/1024/1024
+         REAL,PARAMETER::KB2GB=1.0/1024/1024
 CONTAINS
 	SUBROUTINE CHECK_MEM(me,master,comm)
 		INTEGER(MPI_CTL_KIND),INTENT(IN)::me,master,comm
@@ -30,21 +30,35 @@ CONTAINS
 		INTEGER:: MAX_USAGE,TOTAL_USAGE
 		INTEGER:: IERR=0
 		CHARACTER(LEN=2048)::message 
-
-		FILE='/proc/self/statm'
-		OPEN(UNIT=1,FILE=FILE,FORM='FORMATTED',STATUS='OLD',ACTION='READ',IOSTAT=IERR)
-		READ(UNIT=1,FMT=*,IOSTAT=IERR) SIZE, RESIDENT, SHARE, TEXT, LIB, DATA_LOC, DT
-		CLOSE(UNIT=1)
-
-		IF (IERR < 0) THEN
-			WRITE(*,*)'PROBLEM READING /PROC/SELF/STATM'
-		ENDIF
+                
+                DATA_LOC=OBTAIN_PHYSAL_MEMORY()
+                
 		CALL MPI_REDUCE(DATA_LOC,MAX_USAGE,1,MPI_INT,MPI_MAX,master,comm,IERR)
 		CALL MPI_REDUCE(DATA_LOC,TOTAL_USAGE,1,MPI_INT,MPI_SUM,master,comm,IERR)
-		WRITE (message,'(A, 1ES10.2E2, A)')  "Total memory usage:", TOTAL_USAGE*PAGE_SIZE, " GB"
+		WRITE (message,'(A, 1ES10.2E2, A)')  "Total physical memory usage:", TOTAL_USAGE*KB2GB, " GB"
 	        CALL LOGGER(TRIM(message)) 
-		WRITE (message,'(A, 1ES10.2E2, A)')  "Maximum memory usage at one node:", MAX_USAGE*PAGE_SIZE, " GB"
+		WRITE (message,'(A, 1ES10.2E2, A)')  "Maximum physical memory usage at one node:", MAX_USAGE*KB2GB, " GB"
 	        CALL LOGGER(TRIM(message)) 
 #endif
-	END SUBROUTINE 
+	END SUBROUTINE
+
+
+        FUNCTION OBTAIN_PHYSAL_MEMORY() RESULT(MEM)!RESULT IS IN KB!!
+                INTEGER::MEM
+                CHARACTER(LEN=256)::line
+                CHARACTER(LEN=*),PARAMETER::stat_file='/proc/self/status'
+                INTEGER::IERR,FD
+                OPEN(UNIT=FD,FILE=stat_file,FORM='FORMATTED',STATUS='OLD',ACTION='READ',IOSTAT=IERR)
+		IF (IERR < 0) THEN
+			WRITE(*,*)'PROBLEM READING /proc/self/status !!!'
+		ENDIF
+                DO
+                        READ(UNIT=FD,FMT='(A)') line
+                        IF (line(1:5)=="VmRSS") THEN
+                                READ(line(7:),*) MEM
+                                EXIT
+                        ENDIF
+                ENDDO
+                CLOSE(FD)
+        ENDFUNCTION
 END
