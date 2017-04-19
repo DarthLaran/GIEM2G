@@ -219,7 +219,7 @@ MODULE DISTRIBUTED_FFT_MODULE
 
 	SUBROUTINE CalcPreparedForwardFFT(DFD)
 		TYPE (DistributedFourierData),INTENT(INOUT)::DFD
-		CALL ProcessDistributedFourierKernelSync(DFD,FFT_FWD)
+		CALL ProcessDistributedFourierKernelSyncPrepared(DFD,FFT_FWD)
 		CALL FinalTransposeRepack(DFD)
 	END SUBROUTINE
 	
@@ -234,7 +234,7 @@ MODULE DISTRIBUTED_FFT_MODULE
 	SUBROUTINE CalcPreparedBackwardFFT(DFD)
 		TYPE (DistributedFourierData),INTENT(INOUT)::DFD
 		CALL InitialTransposeRepack(DFD)
-		CALL ProcessDistributedFourierKernelSync(DFD,FFT_BWD)
+		CALL ProcessDistributedFourierKernelSyncPrepared(DFD,FFT_BWD)
 	END SUBROUTINE
 
 !----------------------------------------------------------------------------------------------------------------------------------!
@@ -337,7 +337,7 @@ MODULE DISTRIBUTED_FFT_MODULE
 		CALL BlockTransposeXToY(DFD)
 
 		CALL fftw_mpi_execute_r2r(DFD%FFTW_TRANSPOSE%plan,p_send,p_recv)!All2All
-
+                
 		CALL DistributedFourierY(DFD,FFT_DIR)
 
 		CALL  fftw_mpi_execute_r2r(DFD%FFTW_TRANSPOSE%plan,p_send,p_recv)!All2All
@@ -350,6 +350,36 @@ MODULE DISTRIBUTED_FFT_MODULE
 #endif
 	END SUBROUTINE
 
+	SUBROUTINE ProcessDistributedFourierKernelSyncPrepared(DFD,FFT_DIR)
+		TYPE (DistributedFourierData),INTENT(INOUT)::DFD
+		INTEGER,INTENT(IN)::FFT_DIR
+		INTEGER (MPI_CTL_KIND)::IERROR,comm
+		REAL(REALPARM),POINTER::p_send(:),p_recv(:)
+		REAL(DOUBLEPARM)::time1,time2
+		TYPE(C_PTR)::cp
+#ifndef performance_test
+		time1=GetTime()
+#endif
+		DFD%timer(FFT_DIR)%N=DFD%timer(FFT_DIR)%N+1
+		p_send=>DFD%FFTW_TRANSPOSE%p_in
+		p_recv=>DFD%FFTW_TRANSPOSE%p_out
+		CALL DistributedFourierX(DFD,FFT_DIR)
+
+		CALL BlockTransposeXToY(DFD)
+
+		CALL fftw_mpi_execute_r2r(DFD%FFTW_TRANSPOSE%plan,p_send,p_recv)!All2All
+                
+		CALL DistributedFourierYRepack(DFD,FFT_DIR)
+
+		CALL  fftw_mpi_execute_r2r(DFD%FFTW_TRANSPOSE%plan,p_send,p_recv)!All2All
+
+		CALL BlockTransposeYToX(DFD)
+
+#ifndef performance_test
+		time2=GetTime()
+		DFD%timer(FFT_DIR)%kernel_total=DFD%timer(FFT_DIR)%kernel_total+time2-time1
+#endif
+	END SUBROUTINE
 	
 	SUBROUTINE ProcessDistributedFourierKernelSyncMirror(DFD,FFT_DIR,s)
 		TYPE (DistributedFourierData),INTENT(INOUT)::DFD
@@ -384,6 +414,27 @@ MODULE DISTRIBUTED_FFT_MODULE
 	END SUBROUTINE
 
 	SUBROUTINE DistributedFourierY(DFD,FFT_DIR)
+		TYPE (DistributedFourierData),INTENT(INOUT)::DFD
+		INTEGER,INTENT(IN)::FFT_DIR
+		COMPLEX(REALPARM),POINTER::pin(:,:,:),pout(:,:,:)
+		COMPLEX(REALPARM),POINTER::p1(:,:),p2(:,:)
+		TYPE(C_PTR)::plan
+		REAL(DOUBLEPARM)::time1,time2
+		INTEGER::K,Ny,Ny2,Iy,Ik
+#ifndef performance_test
+		time1=GetTime()
+#endif
+		pin=>DFD%field_fft_y_in
+		pout=>DFD%field_fft_y_out
+		plan=DFD%plan(FFT_DIR)%planY
+
+		CALL fftw_execute_dft(plan,pin,pout)
+#ifndef performance_test
+		time2=GetTime()
+		DFD%timer(FFT_DIR)%ffty=DFD%timer(FFT_DIR)%ffty+time2-time1
+#endif
+	END SUBROUTINE
+	SUBROUTINE DistributedFourierYRepack(DFD,FFT_DIR)
 		TYPE (DistributedFourierData),INTENT(INOUT)::DFD
 		INTEGER,INTENT(IN)::FFT_DIR
 		COMPLEX(REALPARM),POINTER::pin(:,:,:),pout(:,:,:)
