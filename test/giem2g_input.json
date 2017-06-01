@@ -1,7 +1,7 @@
 {
-	"SaveSolution":true,
-	"SolveEquation":true,
-	"RecalcFields":true,
+	"Save Solution":true,
+	"Solve Equation":true,
+	"Recalculate Fields":true,
 
 	"Background":{
 		"Conductivity":[1e-1, 1e-2, 10e0],
@@ -33,7 +33,6 @@
 		  {"xshift":	0e0,"yshift": -20000,"depth": 0},
 		  {"xshift":	0e0,"yshift":  20000,"depth": 0},
 	],
-	"Stations": "Stations.dat",
 	"FGMRES":{
 		"OuterBufferSize": 15,
 		"InnerBufferSize": 15,
