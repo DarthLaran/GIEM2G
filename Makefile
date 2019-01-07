@@ -51,6 +51,15 @@ ifdef INSTALL_PATH
 	cp giem2g $(INSTALL_PATH)
 endif
 
+testmpi: fson giem2g_lib testmpi.F90
+
+	$(FC_Link)   $(OPTS)  testmpi.F90  -L./ -lgiem2g  $(LIBS)  $(INCLUDE) -o testmpi
+
+	
+ifdef INSTALL_PATH
+	cp test_mpi $(INSTALL_PATH)
+endif
+
 giem2g_lib_shared: $(ENGINE_O)
 	$(FC_Link)   $(ENGINE_O) -shared   -L$(SHARED_BLAS) -L$(SHARED_FFTW)  -o $(DST)/libgiem2g.so  
 
