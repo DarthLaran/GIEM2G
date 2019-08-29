@@ -390,34 +390,35 @@ CONTAINS
 		COMPLEX(REALPARM),POINTER::p_in(:,:,:)
 		COMPLEX(REALPARM),POINTER::p_out(:,:,:)
 		INTEGER,INTENT(IN)::comp
-                COMPLEX(REALPARM),INTENT(IN)::sx,sy
+        COMPLEX(REALPARM),INTENT(IN)::sx,sy
 		COMPLEX(REALPARM)::tmp(3*ie_op%Nz)
 		INTEGER::N,Nz,M,Nz3,Nx,l
-		INTEGER::Iz,Ix,Iy,s
-                INTEGER::NxHalf,xfirst,xlast
-                INTEGER(MPI_CTL_KIND)::proc,recv_start,data_length
+		INTEGER::Iz,Ix,Iy,s,ss
+        INTEGER::NxHalf,xfirst,xlast
+        INTEGER(MPI_CTL_KIND)::proc,recv_start,data_length
 
 		INTEGER(MPI_CTL_KIND)::requests(2),IERROR
 		Nx=ie_op%Nx
-                NxHalf=ie_op%NxHalf
+        NxHalf=ie_op%NxHalf
 		Nz=ie_op%Nz
 		Nz3=3*Nz
 		M=1
 		l=MIN(Nz3,N-M+1)
-                p_in(1:Nz3,1:ie_op%Ny_loc,1:2*Nx)=>ie_op%DFD%field_out
-                p_out(1:Nz3,1:ie_op%Ny_loc,1:2*Nx)=>ie_op%DFD%field_out
-                
-                proc=ie_op%partner
-                IF (ie_op%real_space) THEN
-                        xfirst=1
-                        xlast=NxHalf
-                        recv_start=NxHalf+1
-                ELSE
-                        recv_start=1
-                        xfirst=NxHalf+1
-                        xlast=Nx
-                ENDIF
-                data_length=Nz3*ie_op%Ny_loc*NxHalf
+            p_in(1:Nz3,1:ie_op%Ny_loc,1:2*Nx)=>ie_op%DFD%field_out
+            p_out(1:Nz3,1:ie_op%Ny_loc,1:2*Nx)=>ie_op%DFD%field_out
+            
+            proc=ie_op%partner
+            IF (ie_op%real_space) THEN
+                xfirst=1
+                xlast=NxHalf
+                recv_start=NxHalf+1
+            ELSE
+                recv_start=1
+                xfirst=NxHalf+1
+                xlast=Nx
+                IF (MODULO(NxHalf,2)==1) ss=-1
+            ENDIF
+            data_length=Nz3*ie_op%Ny_loc*NxHalf
 		DO
                          CALL  MPI_IRECV(p_in(:,:,recv_start:),data_length,MPI_DOUBLE_COMPLEX,proc,proc,&
                          &ie_op%ie_comm,requests(1),IERROR)
@@ -457,7 +458,7 @@ CONTAINS
         		!$OMP END PARALLEL
 			DO Iy=1,ie_op%Ny_loc
 				CALL ZCOPY(l,p_out(:,Iy,Nx+1),ONE,tmp,ONE) 
-				s=1
+				s=ss
 				DO Ix=1,NxHalf
 				      Gout(M:M+l-1,comp,Iy,Ix)=Gout(M:M+l-1,comp,Iy,Ix)-tmp(1:l)*s
 				      s=-s
